@@ -1,0 +1,265 @@
+# Default configuration file for the SerenityLoan System
+# Version 0.2
+# All keys are shown below. Keys with blank values will be ignored.
+
+# The SerenityLoan System has multiple components which can be enabled independently. This
+# configuration file contain settings for each component.
+
+# This document contains seven sections which control the plugin behavior.
+
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  databasename: loans
+  # This user must have the following grants: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, CREATE VIEW
+  username: loanplug
+  password: serenity
+
+# This section represents global options
+options:
+  # When set to true, only players whose names are listed in whitelist.txt
+  # are able to use the loan system.
+  use-whitelist: false
+  
+  # When set to true, players whose names are listed in blacklist.txt are
+  # prevented from using the system.
+  use-blacklist: false
+  
+  # Sets how often the plugin will check for loan updates, such as interest
+  # being accrued or statements due. Can accept time units y w d h m s. Numbers
+  # without units are assumed to be minutes.
+  update-frequency: 1h
+  
+  # This plugin requires an economy to run. This setting sets the installed economy.
+  # Valid values are vault, internal, serenecon, hybrid
+  # Vault setting assumes that there is a vault-enabled economy installed and that
+  # it possesses all required features, including banks.
+  # Internal setting uses a plugin-internal economy that provides basic functionality.
+  # Hybrid assumes a Vault economy, but implements banks internally, which it calls
+  # CreditUnions or crunion. This is the default
+  # setting since the semantics of banks differ in this plugin than many other plugins.
+  # Serenecon is a specially compatible economy with extra features. This option is currently
+  # not implemented.
+  economy: hybrid
+  
+  message-prefix: $loans$>
+  
+  # Messages will be prepended with the message-prefix
+  # The following macros are accepted in the messages category
+  # If a macro is not applicable to a particular message, the game will ignore it
+  # $$c - subcommand e.g. /loan pay => $$c = pay
+  # $$k - main command i.e. /loan vs /crunion
+  # $$p - sending player
+  # $$m - managed entity 
+  # $$r - receiving player
+  # $$l - loan identifier
+  # $$b - relevant balance
+  # $$s - relevant string (it's best to leave these as they are)
+  # $$h - help command e.g. /loan pay => $$h = /loan help pay
+  # $$t - relevant terms value e.g. Value, InterestRate, etc.
+  messages:
+    perm-lend-fail: You do not have permission to use lending commands.
+    perm-borrow-fail: You do not have permission to use borrowing commands.
+    missing-entity-argument: Entity argument required.
+    missing-borrower-argument: Borrower argument required.
+    command-help: Do $$h for help on this issue.
+    perm-buy-fail: You do not have permission to be a lender.
+    too-many-arguments: Too many arguments.
+    too-few-arguments: Too few arguments.
+    perm-generic-fail: You are not able to use this command.
+    no-offers: No applicable offers to view.
+    no-loan: You do not have a loan with $$r.
+    unknown-loan-selection: Loan selection specified incorrectly.
+    sent-offers: "You have sent the following offers:"
+    received-offers: "You have received the following offers:"
+    multiple-loans: You have multiple loans with this entity. Select one of the following.
+    bad-lender: Lender entity not found.
+    no-offers-lender: You do not have any outstanding offers from $$r.
+    broke-lender: $$r does not have enough money to loan!
+    loan-processed: Successfully processed loan!
+    loan-process-fail: Loan not processed!
+    ignore-fail: Cannot ignore this entity.
+    generic-refuse: Unable to complete request.
+    ignore-set: Now ignoring $$r.
+    ignore-unset: No longer ignoring $$r.
+    remove-offer: Offer removed successfully.
+    number-parse-fail: Amount specified incorrectly.
+    broke: You do not have enough money!
+    paid-loan: Payment of $$b successfully applied to loan, $$l.
+    statement-get: $$m received a payment statement!
+    statement-has: There is an outstanding payment statement.
+    details: "Details are given below:"
+    view-statement: "Use '$$k statement $$r' to view this statement again."
+    loan-pay: "Use '$$k pay $$r' to apply payment."
+    meta-offer-fail: You can't send an offer to yourself, silly.
+    offer-government: You can't attempt to loan money to the CentralBank!
+    offer-send-fail: Unable to send offer to $$r.
+    bad-expiration: Expiration time invalid.
+    talk-to-the-hand: Your offers are being ignored by $$r.
+    overwrite-fail: Cannot overwrite previous offer!
+    offline-send: Recipient offline. Will deliver when they are available.
+    no-can-borrow: Offer not sent. Target does not have permission.
+    offer-receipt: $$m received a loan offer from $$r.
+    offer-send-success: Loan offer sent successfully.
+    generic-success: Operation successful.
+    terms-constraint-fail: Terms constraint violation!
+    change-success: Changes made successfully.
+    change-fail1: One or more changes failed. Check syntax.
+    change-fail2: Remember not to include spaces in arguments.
+    new-values: New values for $$soffering.
+    loan-forgive: $$b forgiven from loan with $$r!
+    sale-fail: You cannot sell a loan to $$r.
+    sale-syntax: Syntax incorrect. Must specify new lender and amount of sale.
+    lender-offline: New lender must be online to complete transaction.
+    sale-perms: $$r does not have permission to buy loan.
+    sale-received: $$m received a loan sale offer from $$r for $$b.
+    sale-view: "Use '$$k viewsaleoffer' to view details."
+    sale-buy: "Use '$$k buy' to purchase loan."
+    sale-send-success: Sale offer sent successfully.
+    no-buy-offers: You do not have any outstanding offers to buy a loan.
+    buy-fail-broke: You do not have enough money to buy this loan. Cost is $$b.
+    buy-success: Purchase processed successfully!
+    buy-fail: Error processing purchase.
+    sale-offer-check: There is an outstanding offer to buy a loan for $$b.
+    terms-constraint-above: $$t above configured minimum of $$s.
+    terms-constraint-below: $$t below configured minimum of $$s.
+    no-continuous: Administrator does not allow continuously compounding interest.
+    no-late-fee-change: Administrator does not allow changes to the late fee.
+    no-service-fee-change: Administrator does not allow changes to the service fee.
+    offer-details: Details for $$soffering.
+    view-offers: "Use '$$k viewoffers' to view your offers."
+    loan-approval: Your loan $$l was aproved by administration.
+    loan-denial: Your loan $$l was denied.
+    payment-due: A payment of $$b is due on your loan $$l
+    payment-overdue: You have missed a payment of $$b on your loan $$l.
+    garnish-notice: Your wages have been garnished to pay off your debts!
+    queued-for-approval: Your loan has been sent to an admin for approval.
+    payment-made: A payment on loan $$l has been made.
+    missing-lender-argument: Lender argument required.
+  
+  auditing: 
+    require-admin-approve: false
+    # Available styles: queue, email (not implemented)
+    audit-style: queue
+  logging: 
+    debug-level: 2
+#    log-events: true
+  
+  # These settings control the display of a usage disclaimer
+  disclaimer: 
+    first-use-message: 
+      ---> 
+        Loans are complicated. Misuse can result in loss of your money
+        or administrative action. Use at your own risk.
+    every-use-message: 
+    require-acknowledge: false
+    website-intro: Learn how loans work at
+    tutorial-website: http://dev.bukkit.org/bukkit-mods/serenityloans/
+    
+loan: 
+  max-lends: 
+  max-borrows: 
+  default-offer-time: 1w
+  terms-constraints: 
+    interest: 
+      # Interest rates are given as fractions, so 0.01 is 1%
+      # Reporting time is what all interest rates are normalized to
+      reporting-time: 1w
+      maxrate: 1.00
+      minrate: 0.00
+      default: 0.05
+      compounding: 
+        allow-continuous: true
+        max-time: 
+        min-time: 0.0
+        default: 1w
+    principal-value: 
+      max: 
+      min: 0.00
+      default: 100
+    term:
+      max:
+      min: 0
+      default: 4w
+    min-payment: 
+      # Percent rule means that the minimum is a certain percentage
+      # of the payment due. Format percentages as decimals e.g.
+      # use 0.05 for five percent, not 5%
+      percent-rule: false
+      max: 
+      min: 
+      default: 15.00
+      auto-collect: true
+      auto-garnish: false
+    fees: 
+      service-fee: 
+        allow-change: true
+        max: 
+        min: 0.00
+        default: 0.00
+      service-fee-frequency:
+        max:
+        min:
+        default: 0d
+      late-fee: 
+        allow-change: true
+        max: 
+        min: 0.00
+        default: 0.00
+      grace-period: 
+        max: 
+        min: 0d
+        default: 0.00
+    payment-time: 
+      max: 
+      min: 0
+      default: 1w
+    payment-frequency:
+      max:
+      min:
+      default: 4w
+credit: 
+bankruptcy: 
+  enabled: true
+  dissipation-factor: 0.8
+trust: 
+  credit-score: 
+    enabled: true
+    dissipation-factor: 0.08
+    score-range: 
+      max: 850
+      min: 300
+    subprime-limit: 620
+    no-history-score: 465
+    account-inactivity-factor: 0.9
+    account-inactivity-time: 1w
+    credit-limit-reached-factor: 0.6
+    sig-figs-reported: 3
+    credit-utilization-goal: 0.5
+    overpayment-penalty-factor: 0.25
+    bankrupt-score: 300
+  trust-list: 
+    enabled: true
+    # Mode can be either single or multiple. Single only allows a simple
+    # trust-neutral-distrust, whereas multiple allows the same values as a buyer and
+    # as a lender.
+    mode: multiple
+economy: 
+  # Used for internal and hybrid economy setups
+  currency:
+    currency-name: 
+      singular: dollar
+      plural: dollars
+    # the following field accepts html style unicode entities.
+    # multiple characters is allowed
+    currency-symbol: $
+    # If this value is changed, then the databases must be rebuilt!
+    fractional-digits: 2
+    prefer-symbol: true
+  enable-banks: true
+  # This is the percentage of deposits that a bank is required to keep in cash
+  # banks 
+  reserve-requirement: 0.00
+  initial-money: 100.00
+  central-bank-balance: 10000000.00

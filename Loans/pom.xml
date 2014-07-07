@@ -1,0 +1,68 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.nwmogk.bukkit</groupId>
+  <artifactId>SerenityLoans</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>SerenityLoan Plugin</name>
+  <url>http://dev.bukkit.org/bukkit-plugins/serenityloans/</url>
+  <description>A Bukkit plugin that provides functionality for loans and a full-fleged banking system.</description>
+  <licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0</url>
+			<distribution>repo</distribution>
+			<comments>Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.</comments>
+		</license>
+	</licenses>
+	<developer>
+		<id>nmogk</id>
+		<name>Nathan W. Mogk</name>
+		<email>nm8911@gmail.com</email>
+		<url>http://nwmogk.com</url>
+		<timezone>-7</timezone>
+	</developer>
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.1</version>
+        <configuration>
+          <source>1.7</source>
+          <target>1.7</target>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <repositories>
+       	<repository>
+           	<id>bukkit-repo</id>
+           	<url>http://repo.bukkit.org/content/groups/public/</url>
+       	</repository>
+       	<repository>
+        	<id>vault-repo</id>
+         	<url>http://nexus.theyeticave.net/content/repositories/pub_releases</url>
+		</repository>
+  	</repositories>
+  	<dependencies>
+       	<dependency>
+           	<groupId>org.bukkit</groupId>
+           	<artifactId>bukkit</artifactId>
+           	<version>1.7.9-R0.2</version>
+           	<type>jar</type>
+           	<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>net.milkbowl.vault</groupId>
+			<artifactId>VaultAPI</artifactId>
+			<version>1.4</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>4.11</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

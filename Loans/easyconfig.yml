@@ -1,0 +1,70 @@
+# Simple configuration file for the SerenityLoan System
+# Version 0.2
+# Only important keys are shown below. Other values will be set to default
+
+mysql:
+  databasename: loans
+  # This user must have the following grants: SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, CREATE VIEW
+  username: loanplug
+  password: serenity
+
+# This section represents global options
+options:
+  # When set to true, only players whose names are listed in whitelist.txt
+  # are able to use the loan system.
+  use-whitelist: false
+  
+  # When set to true, players whose names are listed in blacklist.txt are
+  # prevented from using the system.
+  use-blacklist: false
+  
+  # This plugin requires an economy to run. This setting sets the installed economy.
+  # Valid values are vault, internal, serenecon, hybrid
+  # Vault setting assumes that there is a vault-enabled economy installed and that
+  # it possesses all required features, including banks.
+  # Internal setting uses a plugin-internal economy that provides basic functionality.
+  # Hybrid assumes a Vault economy, but implements banks internally, which it calls
+  # CreditUnions or crunion. This is the default
+  # setting since the semantics of banks differ in this plugin than many other plugins.
+  # Serenecon is a specially compatible economy with extra features. This option is currently
+  # not implemented.
+  economy: hybrid
+  
+  message-prefix: $loans$>
+  
+  auditing: 
+    require-admin-approve: false
+    # Available styles: queue, email (not implemented)
+    audit-style: queue
+
+  # These settings control the display of a usage disclaimer
+  disclaimer: 
+    first-use-message: 
+      ---> 
+        Loans are complicated. Misuse can result in loss of your money
+        or administrative action. Use at your own risk.
+    every-use-message: 
+    require-acknowledge: false
+    website-intro: Learn how loans work at
+    tutorial-website: http://dev.bukkit.org/bukkit-mods/serenityloans/
+    
+loan: 
+  max-lends: 
+  max-borrows: 
+
+credit: 
+trust: 
+  credit-score: 
+    enabled: true
+  trust-list: 
+    enabled: true
+economy: 
+  # Used for internal and hybrid economy setups
+  currency:
+    currency-name: 
+      singular: dollar
+      plural: dollars
+    # the following field accepts html style unicode entities.
+    # multiple characters is allowed
+    currency-symbol: $
+  enable-banks: true
