@@ -6,9 +6,11 @@
  * File: FinancialEntity.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This class contains information relating to a FinancialEntity as it is
- * represented in the mySQL table. Objects of this class are immutable and
- * cannot be changed once created.
+ * This class contains information relating to a FinancialInstitution. It 
+ * contains additional information over and above that of a FinancialEntity
+ * representing all of the information contained about the entry in the
+ * FinancialEntities and FinancialInstitutions tables. Objects of this 
+ * class are immutable and cannot be changed once created.
  * 
  * 
  * ========================================================================
