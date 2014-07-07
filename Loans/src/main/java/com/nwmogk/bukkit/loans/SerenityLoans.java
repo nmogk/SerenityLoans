@@ -68,8 +68,9 @@ public final class SerenityLoans extends JavaPlugin {
 //    public Permission perms = null;
 //    public Chat chat = null;
     
+    // Incrementing these numbers will force a rebuild of the database.
     public static final int dbMajorVersion = 0;
-    public static final int dbMinorVersion = 5;
+    public static final int dbMinorVersion = 6;
     
     private static SerenityLoans plugin;
 	
@@ -292,48 +293,45 @@ public final class SerenityLoans extends JavaPlugin {
 		 String financialEntityTable = 
 				 "CREATE TABLE FinancialEntities"
 					+ "(" 
-					+ "UserID int NOT NULL AUTO_INCREMENT,"
-					+ "Name varchar(255) NOT NULL,"
+					+ "UserID varchar(40) NOT NULL,"
 					+ "Type ENUM('Player','Bank','CreditUnion','Town/Faction','Employer') NOT NULL DEFAULT 'Player',"
-					+ "Manager int,"
 					+ "Cash DECIMAL(10," + decimals +"),"
 					+ "CreditScore int DEFAULT "+ defaultCreditScore + ","
 					+ "LastSystemUse TIMESTAMP NOT NULL DEFAULT NOW() ON UPDATE NOW(),"
 					+ "PRIMARY KEY (UserID),"
-					+ "UNIQUE (Name)"
 					+ ");";
 		 
-		 String editFinancialEntities = 
-				 "ALTER TABLE FinancialEntities ADD FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID);";
+		 String financialInstitutionsTable = 
+				 "CREATE TABLE FinancialInstitutions"
+				 	+ "("
+				 	+ "BankID varchar(40) NOT NULL,"
+				 	+ "Name varchar(255) NOT NULL,"
+				 	+ "Manager varchar(40) NOT NULL,"
+				 	+ "UNIQUE (Name),"
+				 	+ "PRIMARY KEY (BankID),"
+				 	+ "FOREIGN KEY (BankID) REFERENCES FinancialEntities(UserID),"
+				 	+ "FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID)"
+				 	+ ");";
 		 
+		
 		 String trustTable = 
 				 "CREATE TABLE Trust"
 				 	+ "("
-				 	+ "UserID int NOT NULL,"
-				 	+ "TargetID int NOT NULL,"
+				 	+ "UserID varchar(40) NOT NULL,"
+				 	+ "TargetID varchar(40) NOT NULL,"
 				 	+ "TrustLevel int NOT NULL DEFAULT 0,"
 				 	+ "IgnoreOffers ENUM('true','false') NOT NULL DEFAULt 'false',"
 				 	+ "CONSTRAINT uc_relationID PRIMARY KEY (UserID,TargetID),"
 				 	+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
 				 	+ "FOREIGN KEY (TargetID) REFERENCES FinancialEntities(UserID)"
 				 	+ ");";
-		 
-		 String trustView = 
-				 "CREATE VIEW trust_names AS "
-				 	+ "SELECT t1.Name as User,t2.Name as Target,Trust.TrustLevel "
-				 	+ "FROM Trust JOIN ("
-				 	+ "FinancialEntities as t1,"
-				 	+ "FinancialEntities as t2) "
-		 			+ "ON Trust.UserID=t1.UserID "
-		 			+ "AND Trust.TargetID=t2.UserID;";
-		 
-		 
+		 	 
 		 
 		 String creditHistoryTable = 
 				 "CREATE TABLE CreditHistory"
 				 	+ "("
 				 	+ "ItemID int NOT NULL AUTO_INCREMENT,"
-				 	+ "UserID int NOT NULL,"
+				 	+ "UserID varchar(40) NOT NULL,"
 				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart') NOT NULL,"
 				 	+ "ScoreValue double NOT NULL,"
 				 	+ "Parameter double NOT NULL DEFAULT " + dissipationFactor + ","
@@ -346,8 +344,8 @@ public final class SerenityLoans extends JavaPlugin {
 		 String membershipTable = 
 				 "CREATE TABLE Memberships"
 				 	+ "("
-				 	+ "UserID int NOT NULL,"
-				 	+ "MemberOf int NOT NULL,"
+				 	+ "UserID varchar(40) NOT NULL,"
+				 	+ "MemberOf varchar(40) NOT NULL,"
 				 	+ "JoinDate DATE NOT NULL,"
 					+ "CONSTRAINT uc_memberID PRIMARY KEY (UserID,MemberOf),"
 					+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
@@ -358,8 +356,8 @@ public final class SerenityLoans extends JavaPlugin {
 				 "CREATE TABLE Loans"
 				 	+ "("
 				 	+ "LoanID int NOT NULL AUTO_INCREMENT,"
-				 	+ "LenderID int NOT NULL,"
-				 	+ "BorrowerID int NOT NULL,"
+				 	+ "LenderID varchar(40) NOT NULL,"
+				 	+ "BorrowerID varchar(40) NOT NULL,"
 				 	+ "Terms int NOT NULL,"
 				 	+ "AutoPay ENUM('true','false') NOT NULL DEFAULT 'false',"
 					+ "Balance DECIMAL(9," + decimals + ") NOT NULL,"
@@ -384,7 +382,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "Amount DECIMAL(9,"+ decimals + "),"
 				 	+ "Executed ENUM('true', 'false') NOT NULL DEFAULT 'false',"
 				 	+ "PRIMARY KEY (LoanEventID),"
-				 	+ "FOREIGN KEY (LoanID) REFERENCES FinancialEntities (UserID)"
+				 	+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
 				 	+ ");";
 		 
 		 String paymentStatementsTable = 
@@ -401,14 +399,14 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "AdditionalInterest DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "AdditionalFees DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "PRIMARY KEY (StatementID),"
-				 	+ "FOREIGN KEY (LoanID) REFERENCES FinancialEntities (UserID)"
+				 	+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
 				 	+ ");";
 		 
 		 String preparedOffersTable = 
 				 "CREATE TABLE PreparedOffers"
 				 	+ "("
 				 	+ "OfferID int NOT NULL AUTO_INCREMENT,"
-				 	+ "LenderID int NOT NULL,"
+				 	+ "LenderID varchar(40) NOT NULL,"
 				 	+ "OfferName varchar(255),"
 				 	+ "Value DECIMAL(9," + decimals + ") NOT NULL,"
 				 	+ "InterestRate DECIMAL(6,3) NOT NULL,"
@@ -423,14 +421,15 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "ServiceFee DECIMAL(7," + decimals + "),"
 				 	+ "LoanType ENUM('Amortizing','Bullet','FixedFee','InterestOnly','Credit','Gift','Deposit','Bond','Salary') NOT NULL,"
 				 	+ "PRIMARY KEY (OfferID),"
-				 	+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID)"
+				 	+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID),"
+				 	+ "CONSTRAINT uc_nameID UNIQUE (LenderID,OfferName)"
 				 	+ ");";
 
 		 String offersTable = 
 				 "CREATE TABLE Offers"
 				 	+ "("
-				 	+ "LenderID int NOT NULL,"
-				 	+ "BorrowerID int NOT NULL,"
+				 	+ "LenderID varchar(40) NOT NULL,"
+				 	+ "BorrowerID varchar(40) NOT NULL,"
 				 	+ "ExpirationDate TIMESTAMP NOT NULL,"
 				 	+ "PreparedTerms int NOT NULL,"
 				 	+ "Sent ENUM('true','false') NOT NULL DEFAULT 'false',"
@@ -453,29 +452,19 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 String loanView = 
 				 "CREATE VIEW loans_all AS "
-				 	+ "SELECT Loans.LoanID, Loans.LenderID, Loans.BorrowerID, t1.Name as LenderName, t2.Name as BorrowerName, Loans.StartDate, Loans.Balance, Loans.InterestBalance, Loans.FeeBalance, Loans.AutoPay, Loans.LastUpdate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
-				 	+ "FROM Loans JOIN ("
-				 	+ "FinancialEntities AS t1, "
-				 	+ "FinancialEntities AS t2, "
-				 	+ "PreparedOffers) "
-		 			+ "ON Loans.LenderID = t1.UserID "
-		 			+ "AND Loans.BorrowerID = t2.UserID "
-		 			+ "AND Loans.Terms = PreparedOffers.OfferID;";
+				 	+ "SELECT Loans.LoanID, Loans.LenderID, Loans.BorrowerID, Loans.StartDate, Loans.Balance, Loans.InterestBalance, Loans.FeeBalance, Loans.AutoPay, Loans.LastUpdate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
+				 	+ "FROM Loans JOIN (PreparedOffers) "
+		 			+ "ON Loans.Terms = PreparedOffers.OfferID;";
 		 
 		 String offerView = 
 				"CREATE VIEW offer_view AS "
-				 	+ "SELECT Offers.LenderID, Offers.BorrowerID, t1.Name as LenderName, t2.Name as BorrowerName, Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
-				 	+ "FROM Offers JOIN ("
-				 	+ "FinancialEntities AS t1, "
-				 	+ "FinancialEntities AS t2, "
-				 	+ "PreparedOffers) "
-				 	+ "ON Offers.LenderID = t1.UserID "
-				 	+ "AND Offers.BorrowerID = t2.UserID "
-				 	+ "AND Offers.PreparedTerms = PreparedOffers.OfferID;";
+				 	+ "SELECT Offers.LenderID, Offers.BorrowerID,  Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
+				 	+ "FROM Offers JOIN (PreparedOffers) "
+				 	+ "ON Offers.PreparedTerms = PreparedOffers.OfferID;";
 		 
 		 String debtorView =
 				 "CREATE VIEW debtors AS "
-				 	+ "SELECT DISTINCT Name "
+				 	+ "SELECT DISTINCT UserID "
 				 	+ "From Loans JOIN FinancialEntities "
 				 	+ "ON Loans.BorrowerID=FinancialEntities.UserID;";
 		 
@@ -500,13 +489,16 @@ public final class SerenityLoans extends JavaPlugin {
 				log.info(String.format("[%s] Statement created successfully.",getDescription().getName()));
 			
 			statement.executeUpdate(financialEntityTable);
-			statement.executeUpdate(editFinancialEntities);
 			
 			if(debugLevel >=2)
 				log.info(String.format("[%s] Built FinancialEntities table successfully.",getDescription().getName()));
 			
+			statement.executeUpdate(financialInstitutionsTable);
+			
+			if(debugLevel >=2)
+				log.info(String.format("[%s] Built FinancialInstitutions table successfully.",getDescription().getName()));
+			
 			statement.executeUpdate(trustTable);
-			statement.executeUpdate(trustView);
 			
 			if(debugLevel >=2)
 				log.info(String.format("[%s] Built Trust table successfully.",getDescription().getName()));
