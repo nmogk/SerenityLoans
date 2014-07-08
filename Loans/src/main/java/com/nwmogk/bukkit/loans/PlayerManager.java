@@ -336,7 +336,7 @@ public class PlayerManager {
 		return true;
 	}
 
-	public void buildFinancialEntityInitialOffers(UUID playerID) {
+	private void buildFinancialEntityInitialOffers(UUID playerID) {
 
 		// Collect config info
 		double value = 100;
@@ -534,20 +534,20 @@ public class PlayerManager {
 		
 	}
 	
-	public Vector<Integer> getManagedEntities(int playerID){
-		Vector<Integer> results = new Vector<Integer>();
+	public Vector<UUID> getManagedEntities(UUID playerID){
+		Vector<UUID> results = new Vector<UUID>();
 		
-		String query = "SELECT UserID FROM FinancialEntities WHERE Manager=?;";
+		String query = "SELECT BankID FROM FinancialInstitutions WHERE Manager=?;";
 		
 		try {
 			PreparedStatement stmt = plugin.conn.prepareStatement(query);
 			
-			stmt.setInt(1, playerID);
+			stmt.setString(1, playerID.toString());
 			
 			ResultSet hits = stmt.executeQuery();
 			
 			while(hits.next()){
-				results.add(hits.getInt("UserID"));
+				results.add(UUID.fromString(hits.getString("BankID")));
 			}
 			
 		} catch (SQLException e) {
@@ -578,9 +578,17 @@ public class PlayerManager {
 		return result;
 	}
 	
-	public boolean createFinancialInstitution(String desiredName){
-		//TODO
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
+		//TODO default value inputs
 		
+		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, 435);
+	}
+	
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+		//TODO Implement FinancialInstitution creation.
+		
+		// from SerenityLoans must remember to do this in this method.
+		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
 		return false;
 	}
 

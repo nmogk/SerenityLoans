@@ -54,7 +54,6 @@ import com.nwmogk.bukkit.loans.listener.PlayerLoginListener;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -478,8 +477,6 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 String writeVersion = "INSERT INTO Info VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
 
-		 String insertCentralBank = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES ('CentralBank', 'CreditUnion', ?, ?);";
-		 
 		 Statement statement = null;
 		 
 		 try {
@@ -567,32 +564,8 @@ public final class SerenityLoans extends JavaPlugin {
 			
 			if(debugLevel >=2)
 				log.info(String.format("[%s] Wrote version info successfully.",getDescription().getName()));
-
-			PreparedStatement prep = conn.prepareStatement(insertCentralBank);
 			
-			double centralBankCash = 0;
-			if(getConfig().contains("economy.central-bank-balance"))
-				centralBankCash = getConfig().getDouble("economy.central-bank-balance");
 			
-			int centralBankScore = 850;
-			if(getConfig().contains("trust.credit-score.score-range.max"))
-				centralBankScore = getConfig().getInt("trust.credit-score.score-range.max");
-			
-			prep.setDouble(1, centralBankCash);
-			
-			prep.setDouble(2, centralBankScore);
-			
-			int cbResult = prep.executeUpdate();
-			
-			if(debugLevel >= 1){
-				if (cbResult == 1)
-					log.info(String.format("[%s] Central bank entry added.", getDescription().getName()));
-				else
-					log.warning(String.format("[%s] Central bank entry failed.", getDescription().getName()));
-					
-			}
-			
-			playerManager.buildFinancialEntityInitialOffers("CentralBank");
 			
 		 } catch (SQLException e) {
 			if(debugLevel >=2)
@@ -612,6 +585,23 @@ public final class SerenityLoans extends JavaPlugin {
 			 log.info(String.format("[%s] Database tables built successfully.", getDescription().getName()));
 		 
 		 
+		 double centralBankCash = 0;
+		 if(getConfig().contains("economy.central-bank-balance"))
+			 centralBankCash = getConfig().getDouble("economy.central-bank-balance");
+			
+		 int centralBankScore = 850;
+		 if(getConfig().contains("trust.credit-score.score-range.max"))
+			 centralBankScore = getConfig().getInt("trust.credit-score.score-range.max");
+		 
+		 boolean cbResult = playerManager.createFinancialInstitution("CentralBank", null, PlayerType.CREDIT_UNION, centralBankCash, centralBankScore);
+		 
+		 if(debugLevel >= 1){
+			 if (cbResult)
+				 log.info(String.format("[%s] Central bank entry added.", getDescription().getName()));
+			 else
+				 log.warning(String.format("[%s] Central bank entry failed.", getDescription().getName()));
+					
+			}
 	 }
 	 
 	 public static SerenityLoans getPlugin(){
