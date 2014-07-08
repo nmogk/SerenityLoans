@@ -577,5 +577,11 @@ public class PlayerManager {
 		
 		return result;
 	}
+	
+	public boolean createFinancialInstitution(String desiredName){
+		//TODO
+		
+		return false;
+	}
 
 }
