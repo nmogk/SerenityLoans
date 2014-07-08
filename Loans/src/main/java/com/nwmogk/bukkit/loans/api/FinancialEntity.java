@@ -57,5 +57,7 @@ public interface FinancialEntity extends Cloneable{
 	public PlayerType getPlayerType();
 	
 	public Timestamp getLastSystemUse();
+	
+	public FinancialEntity clone();
 
 }
