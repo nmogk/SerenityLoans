@@ -236,8 +236,8 @@ public String toString(){
 		//dollars = SerenityLoans.econ.currencyNamePlural();
 		
 		String result = "";
-		result += "Lender: " + lender.getName() + "\n";
-		result += "Borrower: " + borrower.getName() + "\n";
+//		result += "Lender: " + lender.getName() + "\n";
+//		result += "Borrower: " + borrower.getName() + "\n";
 		result += "Loan value: " + value + " " + dollars + "\n";
 		result += "Interest rate: " + interestRate + "% (weekly)\n";
 		result += "Minimum payment: " + minPayment + " " + dollars + "\n";
