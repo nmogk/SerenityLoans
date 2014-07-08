@@ -259,7 +259,7 @@ public class Loan implements Loanable {
 	}
 
 	public String getShortDescription(SerenityLoans plugin, boolean nameByLender) {
-		return String.format("%s: %s %F", nameByLender? getLender().getName() : getBorrower().getName(), SerenityLoans.econ.format(getValue()), new Date(startDate.getTime()));
+		return String.format("%s: %s %F", nameByLender? plugin.playerManager.entityNameLookup(getLender()) : plugin.playerManager.entityNameLookup(getBorrower()), SerenityLoans.econ.format(getValue()), new Date(startDate.getTime()));
 	}
 
 	public int getLoanID() {
@@ -273,8 +273,8 @@ public class Loan implements Loanable {
 			 String.format("    Fee balance: %s", SerenityLoans.econ.format(feeBalance)),
 			 String.format("    Open date: %F", new Date(startDate.getTime())),
 			 "",
-			 String.format("    Lender: %s", getLender().getName()),
-			 String.format("    Borrower: %s", getBorrower().getName()),
+			 String.format("    Lender: %s", plugin.playerManager.entityNameLookup(getLender())),
+			 String.format("    Borrower: %s", plugin.playerManager.entityNameLookup(getBorrower())),
 			 String.format("    Loan value: %s", SerenityLoans.econ.format(getValue())),
 			 String.format("    Interest rate: %s (%s)",  SerenityLoans.econ.formatPercent(getInterestRate()), Conf.getIntReportingString()),
 			 String.format("    Minimum payment: %s", SerenityLoans.econ.format(getMinPayment())),
