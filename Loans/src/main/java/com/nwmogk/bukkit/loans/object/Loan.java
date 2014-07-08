@@ -45,7 +45,6 @@ package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
 import java.util.Date;
-import java.util.LinkedList;
 
 import org.apache.commons.lang.ArrayUtils;
 
@@ -55,20 +54,18 @@ import com.nwmogk.bukkit.loans.Loanable;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.exception.InsufficientCashException;
-import com.nwmogk.bukkit.loans.exception.LoanException;
 
 
 public class Loan implements Loanable {
 	
-	private int loanID;
-	private double balance;				// Outstanding principle unpaid (plus compounded interest)
-	private double interestBalance;		// Balance of outstanding interest
-	private double feeBalance;			// Balance of outstanding fees
-	private ImmutableOffer terms;
-	private Timestamp startDate;
-	private Timestamp lastUpdate;
+	private final int loanID;
+	private final double balance;				// Outstanding principle unpaid (plus compounded interest)
+	private final double interestBalance;		// Balance of outstanding interest
+	private final double feeBalance;			// Balance of outstanding fees
+	private final ImmutableOffer terms;
+	private final Timestamp startDate;
+	private final Timestamp lastUpdate;
 
-	private LinkedList<PaymentStatement> paymentQueue;
 	
 	//TODO finish making this class immutable
 	
@@ -88,39 +85,39 @@ public class Loan implements Loanable {
 	 * was successful or not. If successful, this will close the loan.
 	 * @throws InsufficientCashException 
 	 */
-	public boolean payoff() throws InsufficientCashException {
-		// TODO do something about this method - remove it?
-//		previousState = new LoanState(this);
-		
-		double interestAddition =  getInterestRate() * balance;
-		
-		double amount = balance + interestAddition + interestBalance + feeBalance;
-		
-		if(getBorrower() == null || getLender() == null)
-			throw new LoanException(this);
-		if(!SerenityLoans.econ.has(getBorrower(), amount).callSuccess){
-			throw new InsufficientCashException(getBorrower(), "Borrower has insufficient cash to payoff.");
-		}
-		
-		interestBalance += interestAddition;
-		
-		SerenityLoans.econ.withdraw(getBorrower(), amount);
-		SerenityLoans.econ.deposit(getLender(), amount);
-		
-		balance = 0;
-		interestBalance = 0;
-		feeBalance = 0;
-		
-
-		
-//		borrower.closeLoan(this);
-//		lender.closeLoan(this);
-		
-//		newState = new LoanState(this);
-		
-		return true;
-		
-	}
+//	public boolean payoff() throws InsufficientCashException {
+//		// do something about this method - remove it?
+////		previousState = new LoanState(this);
+//		
+//		double interestAddition =  getInterestRate() * balance;
+//		
+//		double amount = balance + interestAddition + interestBalance + feeBalance;
+//		
+//		if(getBorrower() == null || getLender() == null)
+//			throw new LoanException(this);
+//		if(!SerenityLoans.econ.has(getBorrower(), amount).callSuccess){
+//			throw new InsufficientCashException(getBorrower(), "Borrower has insufficient cash to payoff.");
+//		}
+//		
+//		interestBalance += interestAddition;
+//		
+//		SerenityLoans.econ.withdraw(getBorrower(), amount);
+//		SerenityLoans.econ.deposit(getLender(), amount);
+//		
+//		balance = 0;
+//		interestBalance = 0;
+//		feeBalance = 0;
+//		
+//
+//		
+////		borrower.closeLoan(this);
+////		lender.closeLoan(this);
+//		
+////		newState = new LoanState(this);
+//		
+//		return true;
+//		
+//	}
 
 	public FinancialEntity getLender() {return terms.getLender();}
 
@@ -156,7 +153,7 @@ public class Loan implements Loanable {
 	
 	public double getBalance() {return balance;}
 
-	public PaymentStatement getOutstandingBill() {return paymentQueue.pollFirst();}
+	public PaymentStatement getOutstandingBill() {return null;} // TODO rethink this method in the interface
 
 	public LoanType getLoanType() {return terms.getLoanType();}
 
@@ -180,7 +177,7 @@ public class Loan implements Loanable {
 	 * 
 	 * @return
 	 */
-	public Date getLastUpdate(){
+	public Timestamp getLastUpdate(){
 		return lastUpdate;
 	}
 	
