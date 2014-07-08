@@ -463,7 +463,7 @@ public class LoanHandler implements CommandExecutor{
 	 * args will be not null, and contain only the arguments following the last loan
 	 * specification argument.
 	 */
-	protected static LoanSpec parseLoanArguments(FinancialEntity sender, String[] args, boolean isSenderLender){
+	protected static LoanSpec parseLoanArguments(FinancialEntity sender, String senderName, String[] args, boolean isSenderLender){
 		
 		LoanSpec result = new LoanSpec();
 		result.result = null;
@@ -474,7 +474,7 @@ public class LoanHandler implements CommandExecutor{
 		int remainingIndex = 2;
 		
 		if(args.length < 2){
-			result.errMessage = Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "$$c"});
+			result.errMessage = Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{senderName, "$$c"});
 			return result;
 		}
 			
@@ -482,7 +482,7 @@ public class LoanHandler implements CommandExecutor{
 		
 		if(target == null){
 			
-			result.errMessage = Conf.messageCenter("no-loan", new String[]{"$$p", "$$r", "$$c"}, new String[]{sender.getName(), args[1], "$$c"});
+			result.errMessage = Conf.messageCenter("no-loan", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
 			
 			return result;
 			
@@ -494,7 +494,7 @@ public class LoanHandler implements CommandExecutor{
 		Loan[] potentials = SerenityLoans.getPlugin().loanManager.getLoan(lender, borrower);
 		
 		if(potentials == null){
-			result.errMessage = Conf.messageCenter("no-loan", new String[]{"$$p", "$$r", "$$c"}, new String[]{sender.getName(), args[1], "$$c"});
+			result.errMessage = Conf.messageCenter("no-loan", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
 			
 			return result;
 			
@@ -518,13 +518,13 @@ public class LoanHandler implements CommandExecutor{
 				loanIndex = Integer.parseInt(args[2]);
 			}
 			catch (NumberFormatException e){
-				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{sender.getName(), args[1], "$$c"});
+				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
 				
 				return result;
 			}
 			
 			if (loanIndex >= potentials.length){
-				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{sender.getName(), args[1], "$$c"});
+				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
 				return result;
 			}
 			
