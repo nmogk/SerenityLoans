@@ -52,6 +52,7 @@ import java.sql.Timestamp;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.ListIterator;
+import java.util.UUID;
 import java.util.Vector;
 
 import org.bukkit.entity.Player;
@@ -242,10 +243,13 @@ public class LoanManager {
 		Loan[] result = new Loan[]{};
 		Vector<Loan> loansFound = new Vector<Loan>();
 		
-		String querySQL = String.format("SELECT LoanID FROM Loans WHERE LenderID=%d AND BorrowerID=%d ORDER BY LoanID;", lender.getUserID(), borrower.getUserID());
+		String querySQL = "SELECT LoanID FROM Loans WHERE LenderID=? AND BorrowerID=? ORDER BY LoanID;";
 		
 		try {
-			Statement stmt = plugin.conn.createStatement();
+			PreparedStatement stmt = plugin.conn.prepareStatement(querySQL);
+			
+			stmt.setString(1, lender.getUserID().toString());
+			stmt.setString(2, borrower.getUserID().toString());
 			
 			ResultSet rs = stmt.executeQuery(querySQL);
 			
@@ -288,8 +292,8 @@ public class LoanManager {
 			double feeBal = rs.getDouble("FeeBalance");
 			Timestamp start = rs.getTimestamp("StartDate");
 			Timestamp last = rs.getTimestamp("LastUpdate");
-			FinancialEntity lender = plugin.playerManager.getFinancialEntity(rs.getInt("LenderID"));
-			FinancialEntity borrower = plugin.playerManager.getFinancialEntity(rs.getInt("BorrowerID"));
+			FinancialEntity lender = plugin.playerManager.getFinancialEntity(UUID.fromString(rs.getString("LenderID")));
+			FinancialEntity borrower = plugin.playerManager.getFinancialEntity(UUID.fromString(rs.getString("BorrowerID")));
 			
 			
 			String offerQuery = String.format("SELECT * FROM PreparedOffers WHERE OfferID=%d;", termsID);
@@ -688,17 +692,17 @@ public class LoanManager {
 		if(recipient == null)
 			return;
 		
-		boolean isPlayer = recipient.getName().equalsIgnoreCase(theLoan.getBorrower().getName());
+		boolean isPlayer = recipient.getName().equalsIgnoreCase(plugin.playerManager.entityNameLookup(theLoan.getBorrower()));
 	
-		recipient.sendMessage(String.format("%s %s received a payment statement!", prfx, isPlayer? "You have" : theLoan.getBorrower().getName() + " has"));
+		recipient.sendMessage(String.format("%s %s received a payment statement!", prfx, isPlayer? "You have" : plugin.playerManager.entityNameLookup(theLoan.getBorrower()) + " has"));
 		recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
 		recipient.sendMessage(String.format("%s Details are given below:", prfx));
 		recipient.sendMessage(getPaymentStatement(theLoan.getLoanID()).toString(plugin));
-		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", theLoan.getLender().getName()));
+		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", plugin.playerManager.entityNameLookup(theLoan.getLender())));
 	}
 
 	private void creditScoreUpdate(LoanEvent le) {
-		// TODO Auto-generated method stub
+		// TODO Implement credit score algorithm
 		
 	}
 
