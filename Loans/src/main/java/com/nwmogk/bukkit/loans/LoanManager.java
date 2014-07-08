@@ -316,8 +316,9 @@ public class LoanManager {
 			long paymentTime = results.getLong("PaymentTime");
 			long paymentFrequency = results.getLong("PaymentFrequency");
 			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
+			LoanType loanT = LoanType.getFromString(results.getString("LoanType"));
 			
-			ImmutableOffer offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null);
+			ImmutableOffer offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, loanT, null);
 
 			Loan theLoan = new Loan(loanID, balance, interestBal, feeBal, offer, start, last);
 			
