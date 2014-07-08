@@ -158,7 +158,7 @@ public class PlayerManager {
 		return inFinancialEntitiesTable(playerIdLookup(entityName));
 	}
 	
-	private UUID playerIdLookup(String entityName) {
+	public UUID playerIdLookup(String entityName) {
 		//TODO Implement UUID lookup from name
 		return null;
 	}
