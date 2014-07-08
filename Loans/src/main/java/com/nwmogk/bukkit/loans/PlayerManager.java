@@ -162,6 +162,17 @@ public class PlayerManager {
 		//TODO Implement UUID lookup from name
 		return null;
 	}
+	
+	public String entityNameLookup(UUID entityID) {
+		// TODO
+		return null;
+	}
+	
+	public String entityNameLookup(FinancialEntity entity){
+		if(entity instanceof FinancialInstitution)
+			return ((FinancialInstitution) entity).getName();
+		return entityNameLookup(entity.getUserID());
+	}
 
 	public boolean inFinancialEntitiesTable(UUID entityID){
 		
