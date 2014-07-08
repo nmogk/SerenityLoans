@@ -210,7 +210,7 @@ public class EconomyManager {
 		} else if(entity.getPlayerType().equals(PlayerType.PLAYER)){
 			
 			if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID)) 
-				balance = econ.getBalance(entity.getName());
+				balance = econ.getBalance(plugin.playerManager.getOfflinePlayer(entity.getUserID()));
 			else
 				balance = entity.getCash();
 		}
@@ -261,7 +261,7 @@ public class EconomyManager {
 			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
 		
 		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
-			return new EconResult(econ.depositPlayer(entity.getName(), amount));
+			return new EconResult(econ.depositPlayer(plugin.playerManager.getOfflinePlayer(entity.getUserID()), amount));
 		
 		String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%d", Math.max(entity.getCash(), 0.0) + amount, entity.getUserID());
 		
@@ -299,7 +299,7 @@ public class EconomyManager {
 			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
 		
 		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
-			return new EconResult(econ.withdrawPlayer(entity.getName(), amount));
+			return new EconResult(econ.withdrawPlayer(plugin.playerManager.getOfflinePlayer(entity.getUserID()), amount));
 		
 		if(amount > entity.getCash())
 			return new EconResult(0, entity.getCash(), false, "Entity does not have sufficient funds.");
