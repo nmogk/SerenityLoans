@@ -60,6 +60,7 @@ import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.command.LoanHandler.LoanSpec;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.Loan;
 
 public class LoanBorrowerHandler {
@@ -246,7 +247,7 @@ public class LoanBorrowerHandler {
 
 	protected boolean payLoan(CommandSender sender, Command cmd, String alias, String[] args, boolean payOff) {
 
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
 		
 		
@@ -255,7 +256,7 @@ public class LoanBorrowerHandler {
 			return true;
 		}		
 		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(borrower, args, false);
+		LoanSpec loanSelection = LoanHandler.parseLoanArguments(borrower, sender.getName(), args, false);
 		
 		if(loanSelection.errMessage != null){
 			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
@@ -283,24 +284,24 @@ public class LoanBorrowerHandler {
 			return true;
 		}
 		
-		if(!SerenityLoans.econ.has(borrower, payAmount).callSuccess){
+		if(!plugin.econ.has(borrower, payAmount).callSuccess){
 			sender.sendMessage(String.format("%s You do not have enough money!", prfx));
 			return true;
 		}
 		
-		SerenityLoans.econ.withdraw(borrower, payAmount);
-		SerenityLoans.econ.deposit(lender, payAmount);
+		plugin.econ.withdraw(borrower, payAmount);
+		plugin.econ.deposit(lender, payAmount);
 		
 		plugin.loanManager.applyPayment(loanSelection.result, payAmount);
 		
-		sender.sendMessage(String.format("%s Payment of %s successfully applied to loan, %s.", prfx, SerenityLoans.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
+		sender.sendMessage(String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
 		
 		return false;
 	}
 
 	protected boolean viewStatement(CommandSender sender, Command cmd, String alias, String[] args) {
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
 		
 		
@@ -309,7 +310,7 @@ public class LoanBorrowerHandler {
 			return true;
 		}		
 		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(borrower, args, false);
+		LoanSpec loanSelection = LoanHandler.parseLoanArguments(borrower, sender.getName(), args, false);
 		
 		if(loanSelection.errMessage != null){
 			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
@@ -331,13 +332,13 @@ public class LoanBorrowerHandler {
 		if(recipient == null)
 			return true;
 		
-		boolean isPlayer = recipient.getName().equalsIgnoreCase(loanSelection.result.getBorrower().getName());
+		boolean isPlayer = recipient.getUniqueId().equals(loanSelection.result.getBorrower().getUserID());
 	
-		recipient.sendMessage(String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : loanSelection.result.getBorrower().getName() + " has"));
+		recipient.sendMessage(String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)loanSelection.result.getBorrower()).getName() + " has"));
 		recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
 		recipient.sendMessage(String.format("%s Details are given below:", prfx));
 		recipient.sendMessage(plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
-		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", loanSelection.result.getLender().getName()));
+		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", plugin.playerManager.entityNameLookup(loanSelection.result.getLender())));
 	
 		return false;
 	}
