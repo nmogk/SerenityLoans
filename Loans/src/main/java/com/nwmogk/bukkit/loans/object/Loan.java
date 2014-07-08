@@ -70,7 +70,7 @@ public class Loan implements Loanable {
 
 	private LinkedList<PaymentStatement> paymentQueue;
 	
-
+	//TODO finish making this class immutable
 	
 	public Loan(int loanID, double balance, double interestBalance, double feeBalance, ImmutableOffer terms, Timestamp startDate, Timestamp lastUpdate){
 		this.loanID = loanID;
@@ -89,7 +89,7 @@ public class Loan implements Loanable {
 	 * @throws InsufficientCashException 
 	 */
 	public boolean payoff() throws InsufficientCashException {
-		
+		// TODO do something about this method - remove it?
 //		previousState = new LoanState(this);
 		
 		double interestAddition =  getInterestRate() * balance;
@@ -259,7 +259,7 @@ public class Loan implements Loanable {
 	}
 
 	public String getShortDescription(SerenityLoans plugin, boolean nameByLender) {
-		return String.format("%s: %s %F", nameByLender? plugin.playerManager.entityNameLookup(getLender()) : plugin.playerManager.entityNameLookup(getBorrower()), SerenityLoans.econ.format(getValue()), new Date(startDate.getTime()));
+		return String.format("%s: %s %F", nameByLender? plugin.playerManager.entityNameLookup(getLender()) : plugin.playerManager.entityNameLookup(getBorrower()), plugin.econ.format(getValue()), new Date(startDate.getTime()));
 	}
 
 	public int getLoanID() {
@@ -268,16 +268,16 @@ public class Loan implements Loanable {
 
 	public String[] toString(SerenityLoans plugin) {
 		String[] result =  
-			{String.format("    Balance: %s", SerenityLoans.econ.format(balance)),
-			 String.format("    Interest balance: %s", SerenityLoans.econ.format(interestBalance)),
-			 String.format("    Fee balance: %s", SerenityLoans.econ.format(feeBalance)),
+			{String.format("    Balance: %s", plugin.econ.format(balance)),
+			 String.format("    Interest balance: %s", plugin.econ.format(interestBalance)),
+			 String.format("    Fee balance: %s", plugin.econ.format(feeBalance)),
 			 String.format("    Open date: %F", new Date(startDate.getTime())),
 			 "",
 			 String.format("    Lender: %s", plugin.playerManager.entityNameLookup(getLender())),
 			 String.format("    Borrower: %s", plugin.playerManager.entityNameLookup(getBorrower())),
-			 String.format("    Loan value: %s", SerenityLoans.econ.format(getValue())),
-			 String.format("    Interest rate: %s (%s)",  SerenityLoans.econ.formatPercent(getInterestRate()), Conf.getIntReportingString()),
-			 String.format("    Minimum payment: %s", SerenityLoans.econ.format(getMinPayment())),
+			 String.format("    Loan value: %s", plugin.econ.format(getValue())),
+			 String.format("    Interest rate: %s (%s)",  plugin.econ.formatPercent(getInterestRate()), Conf.getIntReportingString()),
+			 String.format("    Minimum payment: %s", plugin.econ.format(getMinPayment())),
 			 String.format("    Term: %s", Conf.buildTimeString(getTerm())),
 			 String.format("    Compounding period: %s", Conf.buildTimeString(getCompoundingPeriod())),
 			 String.format("    Payment time: %s", Conf.buildTimeString(getPaymentTime())),
@@ -285,11 +285,11 @@ public class Loan implements Loanable {
 			 String.format("    Loan type: %s", getLoanType())};
 
 		String[] lateFeeRelated = 
-			{String.format("    Late fee: %s", SerenityLoans.econ.format(getLateFee())),
+			{String.format("    Late fee: %s", plugin.econ.format(getLateFee())),
 			 String.format("    Grace period: %s", Conf.buildTimeString(getGracePeriod()))};
 		
 		String[] serviceFeeRelated = 
-			{String.format("    Service fee: %s", SerenityLoans.econ.format(getServiceFee())),
+			{String.format("    Service fee: %s", plugin.econ.format(getServiceFee())),
 			 String.format("    Service fee frequency: %s", Conf.buildTimeString(getServiceFeeFrequency()))};
 		
 		if(getLateFee() != 0)

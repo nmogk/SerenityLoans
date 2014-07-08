@@ -108,7 +108,7 @@ public final class ImmutableOffer implements LoanInfo {
 	
 	public String[] toString(SerenityLoans plugin){
 		
-		EconomyManager econ = SerenityLoans.getEcon();
+		EconomyManager econ = plugin.getEcon();
 		
 		String[] result =  
 			{String.format("    Lender: %s", plugin.playerManager.entityNameLookup(lender)),

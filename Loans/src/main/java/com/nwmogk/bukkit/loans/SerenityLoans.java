@@ -63,7 +63,7 @@ public final class SerenityLoans extends JavaPlugin {
 	
 	public static final Logger log = Logger.getLogger("Minecraft");
 	
-    public static EconomyManager econ = null;
+    public EconomyManager econ = null;
 //    public Permission perms = null;
 //    public Chat chat = null;
     
@@ -79,6 +79,7 @@ public final class SerenityLoans extends JavaPlugin {
     public PlayerManager playerManager;
 
 	public LoanManager loanManager;
+	public OfferManager offerManager;
     
 	public void onEnable(){
 		
@@ -617,7 +618,7 @@ public final class SerenityLoans extends JavaPlugin {
 		 return conn;
 	 }
 	 
-	 public static EconomyManager getEcon(){
+	 public EconomyManager getEcon(){
 		 return econ;
 	 }
 

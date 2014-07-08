@@ -640,11 +640,11 @@ public class LoanManager {
 		Loan theLoan = getLoan(le.loan);
 		PaymentStatement ps = getPaymentStatement(le.loan);
 		
-		if(! SerenityLoans.econ.has(theLoan.getBorrower(), ps.getMinimumPayment()).callSuccess)
+		if(! plugin.econ.has(theLoan.getBorrower(), ps.getMinimumPayment()).callSuccess)
 			return;
 		
-		SerenityLoans.econ.withdraw(theLoan.getBorrower(), ps.getMinimumPayment());
-		SerenityLoans.econ.deposit(theLoan.getLender(), ps.getMinimumPayment());
+		plugin.econ.withdraw(theLoan.getBorrower(), ps.getMinimumPayment());
+		plugin.econ.deposit(theLoan.getLender(), ps.getMinimumPayment());
 		
 		applyPayment(theLoan, ps.getMinimumPayment());
 		
