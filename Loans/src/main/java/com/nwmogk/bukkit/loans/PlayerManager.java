@@ -57,6 +57,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 
+import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
@@ -601,6 +602,21 @@ public class PlayerManager {
 		// from SerenityLoans must remember to do this in this method.
 		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
 		return false;
+	}
+	
+	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
+		FinancialEntity entity = getFinancialEntity(financialEntityID);
+		
+		if(entity == null)
+			return null;
+		
+		UUID playerID = entity.getUserID();
+		
+		if(entity instanceof FinancialInstitution)
+			playerID = ((FinancialInstitution)entity).getResponsibleParty();
+		
+		// TODO my own lookup
+		return null;
 	}
 
 }
