@@ -74,6 +74,7 @@ public class PlayerManager {
 		this.plugin = plugin;
 	}
 	
+	@Deprecated
 	public FinancialEntity getFinancialEntity(String name){
 		return getFinancialEntity(entityIdLookup(name));
 	}
@@ -155,6 +156,7 @@ public class PlayerManager {
 		return null;
 	}
 
+	@Deprecated
 	public boolean inFinancialEntitiesTable(String entityName) {
 		return inFinancialEntitiesTable(entityIdLookup(entityName));
 	}
@@ -570,6 +572,7 @@ public class PlayerManager {
 		return results;
 	}
 	
+	@Deprecated
 	public FinancialEntity getFinancialEntityRetryOnce(String name){
 		return getFinancialEntityRetryOnce(entityIdLookup(name));
 	}
