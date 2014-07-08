@@ -74,7 +74,7 @@ public class PlayerManager {
 	}
 	
 	public FinancialEntity getFinancialEntity(String name){
-		return getFinancialEntity(playerNameLookup(name));
+		return getFinancialEntity(playerIdLookup(name));
 	}
 	
 	public FinancialEntity getFinancialEntity(UUID userID){
@@ -155,10 +155,10 @@ public class PlayerManager {
 	}
 
 	public boolean inFinancialEntitiesTable(String entityName) {
-		return inFinancialEntitiesTable(playerNameLookup(entityName));
+		return inFinancialEntitiesTable(playerIdLookup(entityName));
 	}
 	
-	private UUID playerNameLookup(String entityName) {
+	private UUID playerIdLookup(String entityName) {
 		//TODO Implement UUID lookup from name
 		return null;
 	}
@@ -559,7 +559,7 @@ public class PlayerManager {
 	}
 	
 	public FinancialEntity getFinancialEntityRetryOnce(String name){
-		return getFinancialEntityRetryOnce(playerNameLookup(name));
+		return getFinancialEntityRetryOnce(playerIdLookup(name));
 	}
 	
 	public FinancialEntity getFinancialEntityRetryOnce(UUID userID){
