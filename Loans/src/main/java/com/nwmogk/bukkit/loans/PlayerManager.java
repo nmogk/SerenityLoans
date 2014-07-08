@@ -55,13 +55,16 @@ import java.sql.Statement;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.UUID;
 import java.util.Vector;
 
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import com.google.common.io.Files;
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
+import com.nwmogk.bukkit.loans.object.FinancialPlayer;
 
 public class PlayerManager {
 	
@@ -73,6 +76,7 @@ public class PlayerManager {
 	
 	public FinancialEntity getFinancialEntity(String name){
 		
+		//TODO Implement UUID lookup from name
 		String entityNameSearch = "SELECT * from FinancialEntities WHERE Name=?;";
 		ResultSet result = null;
 		
@@ -88,20 +92,42 @@ public class PlayerManager {
 		return buildEntity(result);
 	}
 	
-	public FinancialEntity getFinancialEntity(int userID){
+	public FinancialEntity getFinancialEntity(UUID userID){
+		return buildEntity(queryFinancialEntitiesTable(userID));
+	}
+	
+	private ResultSet queryFinancialEntitiesTable(UUID userID){
 		
-		String entityIDSearch = "SELECT * from FinancialEntities WHERE UserID="+ userID +";";
+		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
 		ResultSet result = null;
 		
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			result = stmt.executeQuery(entityIDSearch);
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			result = stmt.executeQuery();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
-		return buildEntity(result);
+		return result;
+	}
+	
+	private ResultSet queryFinancialInstitutionsTable(UUID userID){
+		
+		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
+		ResultSet result = null;
+		
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			result = stmt.executeQuery();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return result;
 	}
 	
 	private FinancialEntity buildEntity(ResultSet successfulQuery){
@@ -112,16 +138,28 @@ public class PlayerManager {
 			if(!successfulQuery.next())
 				return null;
 			
-			int userID = successfulQuery.getInt("UserID");
-			String name = successfulQuery.getString("Name");
+			String userString = successfulQuery.getString("UserID");
 			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
 			double cash = successfulQuery.getDouble("Cash");
 			int crScore = successfulQuery.getInt("CreditScore");
 			
-			int manager = successfulQuery.getInt("Manager");
-			manager = manager == 0? userID : manager;
+			UUID userID = UUID.fromString(userString);
 			
-			return new FinancialEntity(userID, name, pt, manager, cash, crScore);
+			if(pt.equals(PlayerType.PLAYER))
+				return new FinancialPlayer(userID, pt, cash, crScore);
+			
+				
+			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
+				
+			if(instituteQuery == null || !instituteQuery.next())
+				return null;
+				
+			String name = instituteQuery.getString("Name");
+			String managerString = instituteQuery.getString("Manager");
+			
+			UUID managerID = UUID.fromString(managerString);
+			
+			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
 			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
