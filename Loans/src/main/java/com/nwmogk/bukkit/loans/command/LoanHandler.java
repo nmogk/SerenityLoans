@@ -47,7 +47,7 @@
 
 package com.nwmogk.bukkit.loans.command;
 
-import java.sql.PreparedStatement;
+//import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -401,7 +401,7 @@ public class LoanHandler implements CommandExecutor{
 		
 		// Attempt to add sender to FinancialEntities table
 		
-		FinancialEntity player = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity player = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
 		
 		if(player == null){
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"}));
@@ -525,7 +525,6 @@ public class LoanHandler implements CommandExecutor{
 		
 		if(args.length < 2){
 			result.errMessage = Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "$$c"});
-			result.errMessage = "Player argument required.";
 			return result;
 		}
 			

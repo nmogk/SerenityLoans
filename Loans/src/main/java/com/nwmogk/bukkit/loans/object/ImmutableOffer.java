@@ -41,6 +41,8 @@
 
 package com.nwmogk.bukkit.loans.object;
 
+import java.sql.Timestamp;
+
 import org.apache.commons.lang.ArrayUtils;
 
 import com.nwmogk.bukkit.loans.Conf;
@@ -68,6 +70,8 @@ public final class ImmutableOffer implements LoanInfo {
 	private final long paymentTime;
 	private final long paymentFrequency;
 	private final long serviceFeeFrequency;
+	
+	private final Timestamp expDate;
 		
 	private LoanType loanType;
 
@@ -86,9 +90,10 @@ public final class ImmutableOffer implements LoanInfo {
 		paymentFrequency = loan.getPaymentFrequency();
 		serviceFeeFrequency = loan.getServiceFeeFrequency();
 		loanType = loan.getLoanType();
+		expDate = null;
 	}
 	
-	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType){
+	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType, Timestamp expDate){
 		this.lender = lender;
 		this.borrower = borrower;
 		this.value = value;
@@ -103,6 +108,7 @@ public final class ImmutableOffer implements LoanInfo {
 		this.paymentFrequency = paymentFrequency;
 		this.serviceFeeFrequency = serviceFeeFrequency;
 		this.loanType = loanType;
+		this.expDate = expDate;
 	}
 	
 	
@@ -165,4 +171,6 @@ public final class ImmutableOffer implements LoanInfo {
 	public double getServiceFee() {return serviceFee;}
 
 	public LoanType getLoanType() {return loanType;}
+	
+	public Timestamp getExpirationDate() {return expDate;}
 }
