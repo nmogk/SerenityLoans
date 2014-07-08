@@ -52,6 +52,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.DateFormat;
+import java.util.List;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -408,99 +409,48 @@ public class LoanHandler implements CommandExecutor{
 			return true;
 		}
 		
-		String query;
-		boolean details = false;
+		List<FinancialEntity> othersList = null;
 		
 		// Three cases
 		if((sentOffers && args.length == 1) || (args.length == 2 && args[1].equalsIgnoreCase(sender.getName()))){
-			query = "SELECT BorrowerName, ExpirationDate FROM offer_view WHERE LenderID=?;";
-			
+			othersList = plugin.offerManager.getOfferRecipientsFrom(player.getUserID());
 		} else if(args.length == 2){
-			query = sentOffers? "SELECT * FROM offer_view WHERE LenderID=? AND BorrowerName=?;" : "SELECT * FROM offer_view WHERE BorrowerID=? AND LenderName=?;";
-			details = true;
+			FinancialEntity other = plugin.playerManager.getFinancialEntityRetryOnce(args[1]);
+			ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
+		
+			sender.sendMessage(String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
+			sender.sendMessage(offer.toString(plugin));
+			
+			return true;
 		} else {
-			query = "SELECT LenderName, ExpirationDate FROM offer_view WHERE BorrowerID=?;";
-			
+			othersList = plugin.offerManager.getOfferSendersTo(player.getUserID());
 		}
 		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(query);
-			
-			stmt.setInt(1, player.getUserID());
-			
-			if(details)
-				stmt.setString(2, args[1]);
-			
-			ResultSet results = stmt.executeQuery();
-			
-			
-			if(details) {
-				
-				if(!results.next()){
-					sender.sendMessage(Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/loan viewoffers", args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
-					stmt.close();
-					return true;
-				}
-				
-				FinancialEntity lender = plugin.playerManager.getFinancialEntity(results.getInt("LenderID"));
-				FinancialEntity borrower = plugin.playerManager.getFinancialEntity(results.getInt("BorrowerID"));
-				double value = results.getDouble("Value");
-				double interestRate = results.getDouble("InterestRate");
-				double lateFee = results.getDouble("LateFee");
-				double minPayment = results.getDouble("MinPayment");
-				double serviceFee = results.getDouble("ServiceFee");
-				long term = results.getLong("Term");
-				long compoundingPeriod = results.getLong("CompoundingPeriod");
-				long gracePeriod = results.getLong("GracePeriod");
-				long paymentTime = results.getLong("PaymentTime");
-				long paymentFrequency = results.getLong("PaymentFrequency");
-				long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
-				
-				ImmutableOffer offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null);
-
-				
-				sender.sendMessage(String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
-				sender.sendMessage(offer.toString(plugin));
-				
-				stmt.close();
-				return true;
-			} else {
-				boolean hasGone = false;
-				
-				String lenderLabel = args.length == 1? "Lender" : "Recipient";
-				
-				String output = Conf.messageCenter(args.length == 1 && !sentOffers ? "received-offers" : "sent-offers", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"});
-				output += "\n    " + lenderLabel + " --- Expires";
-				
-				while(results.next()){
-					hasGone = true;
-					
-					String name = results.getString(1);
-					Timestamp exp = results.getTimestamp(2);
-					
-					output += String.format("\n    %s - %s", name, DateFormat.getDateInstance().format(exp));
-				}
-				
-				if(!hasGone){					
-					sender.sendMessage(Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/loan viewoffers", args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
-					stmt.close();
-					return true;
-				}
-				
-				sender.sendMessage(output.split("\n"));
-				stmt.close();
-				
-				return true;
-				
-			}
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
+		if(othersList.size() == 0){
+			sender.sendMessage(Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/loan viewoffers", args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
+			return true;
 		}
 		
+		String lenderLabel = args.length == 1? "Lender" : "Recipient";
+				
+		String output = Conf.messageCenter(args.length == 1 && !sentOffers ? "received-offers" : "sent-offers", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"});
+		output += "\n    " + lenderLabel + " --- Expires";
 		
+		for(FinancialEntity fe : othersList){
+			String name = plugin.playerManager.entityNameLookup(fe);
+			
+			ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), fe.getUserID()) : plugin.offerManager.getOffer(fe.getUserID(), player.getUserID());
+		
+			Timestamp exp = offer.getExpirationDate();
+			
+			output += String.format("\n    %s - %s", name, DateFormat.getDateInstance().format(exp));
+			
+		}
+				
+		sender.sendMessage(output.split("\n"));
+				
 		return true;
+				
 	}
 	
 	
