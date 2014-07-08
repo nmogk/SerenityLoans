@@ -96,8 +96,9 @@ public final class PlayerLoginListener implements Listener {
 		
 		try{
 			
+			// TODO remove SQL from this class
+			
 			String offerSQL = "SELECT DISTINCT LenderID FROM Offers WHERE Sent='false' AND BorrowerID=?;";
-			//String nameSQL = "SELECT Name FROM FinancialEntities WHERE UserID=?;";
 			String setTrue = "UPDATE Offers SET Sent='true' WHERE BorrowerID=? AND LenderID=?;";
 			String psQuery = "SELECT DISTINCT LoanID FROM PaymentStatements WHERE BillAmountPaid < BillAmount;";
 			
