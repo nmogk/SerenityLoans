@@ -48,6 +48,7 @@ import com.nwmogk.bukkit.loans.EconomyManager;
 import com.nwmogk.bukkit.loans.LoanInfo;
 import com.nwmogk.bukkit.loans.LoanType;
 import com.nwmogk.bukkit.loans.SerenityLoans;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 public final class ImmutableOffer implements LoanInfo {
 	

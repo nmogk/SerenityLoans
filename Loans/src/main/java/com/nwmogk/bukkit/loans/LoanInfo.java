@@ -42,7 +42,7 @@
 
 package com.nwmogk.bukkit.loans;
 
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 
 

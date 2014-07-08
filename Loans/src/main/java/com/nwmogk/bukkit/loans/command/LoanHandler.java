@@ -60,7 +60,7 @@ import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.SerenityLoans;
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 

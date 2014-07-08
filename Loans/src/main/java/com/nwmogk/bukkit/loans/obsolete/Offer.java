@@ -4,7 +4,7 @@ import com.nwmogk.bukkit.loans.LoanInfo;
 import com.nwmogk.bukkit.loans.LoanType;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.Terms;
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 
 /**

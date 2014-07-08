@@ -42,7 +42,7 @@
 
 package com.nwmogk.bukkit.loans.exception;
 
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 public class InsufficientCashException extends Exception {
 
