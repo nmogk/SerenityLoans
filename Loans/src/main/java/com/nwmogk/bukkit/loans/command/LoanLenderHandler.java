@@ -103,220 +103,218 @@ public class LoanLenderHandler {
 	 */
 	protected boolean sendOffer(CommandSender sender, Command cmd, String alias, String[] args, boolean isQuick){
 		// Check ability of sender to use loan system
-				// Sender already determined to be an online player
-				if(!plugin.playerManager.inFinancialEntitiesTable(sender.getName())) {
+		// Sender already determined to be an online player
+		
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		
+		if(lender == null) {		
+			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
+			return true;
+		}
 					
-					// Attempt to add sender to FinancialEntities table
-					if(!plugin.playerManager.addToFinancialEntitiesTable(sender.getName())){
-						
-						sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
-						return true;
-					}
-					
-				}
+		
 				
 				
-				//======================= Parse Inputs ========================
+		//======================= Parse Inputs ========================
 
-				// args was already determined to have at least length 2 before this command was called.
-				if(args.length < 2)
-					return false;
+		// args was already determined to have at least length 2 before this command was called.
+		if(args.length < 2)
+			return false;
 				
-				// Collect financialEntity target info
-				// This is potentially not safe input!!!
-				String entityTarget = args[1];
+		// Collect financialEntity target info
+		// This is potentially not safe input!!!
+		String entityTarget = args[1];
 				
-				if(entityTarget.equalsIgnoreCase(sender.getName())){
-					sender.sendMessage(Conf.messageCenter("meta-offer-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
-					return true;
-				}
+		if(entityTarget.equalsIgnoreCase(sender.getName())){
+			sender.sendMessage(Conf.messageCenter("meta-offer-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
+			return true;
+		}
 				
-				if(entityTarget.equalsIgnoreCase("CentralBank")){
-					sender.sendMessage(Conf.messageCenter("offer-government", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-					return true;
-				}
+		if(entityTarget.equalsIgnoreCase("CentralBank")){
+			sender.sendMessage(Conf.messageCenter("offer-government", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		}
 				
-				// Check if other entity is in FinancialEntities table
-				if(!plugin.playerManager.inFinancialEntitiesTable(entityTarget)) {
+		// Check if other entity is in FinancialEntities table
+		if(!plugin.playerManager.inFinancialEntitiesTable(entityTarget)) {
 					
-					// Add to table if possible
-					if(!plugin.playerManager.addToFinancialEntitiesTable(entityTarget)){
+			// Add to table if possible
+			if(!plugin.playerManager.addToFinancialEntitiesTable(entityTarget)){
 						
-						sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-						return true;
-					}
-					
-					
-				}
-				// Parse expiration time
-				String timeString = "1w";
-				
-				// The expiration string is assumed to be the remainder of the line
-				// Spaces are removed, and the string is parsed into a length
-				if (args.length > 2) {
-					for(int i = 2; i < args.length; i++)
-						timeString += args[i];
-				} else if(plugin.getConfig().contains("loan.default-offer-time"))
-					timeString = plugin.getConfig().getString("loan.default-offer-time");
-				
-				// Parsing string
-				long expirationTime = Conf.parseTime(timeString);
-				
-				if(expirationTime == 0){
-					sender.sendMessage(Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-					return true;
-				}
-
-				// Create expiration time
-				Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
-				
-				// Get relevant financialEntityIDs
-				int lenderID = plugin.playerManager.getFinancialEntityID(sender.getName());
-				int borrowerID = plugin.playerManager.getFinancialEntityID(entityTarget);
-				
-				// This should always fail, since users were added to the table to get here.
-				if(lenderID == 0 || borrowerID == 0) {
-					sender.sendMessage(prfx + " Users not found. This is a bug. Please report.");
-					return true;
-				}
-				
-				// Check if offer is in PreparedOffers table
-				
-				String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
-				
-				String offerName = isQuick? "default" : "prepared";
-				
-				String offerQuery = 
-						"SELECT " + columns + " from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='" + offerName + "';";
-				
-				String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=" + borrowerID + " AND TargetID=" + lenderID + ";";
-				
-				String deleteOldOffer = "DELETE FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-				String checkDeleted = "SELECT * FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-				
-				try {
-					
-					Statement stmt = plugin.getConnection().createStatement();
-					
-					stmt.executeUpdate(deleteOldOffer);
-					
-					ResultSet shouldBeEmpty = stmt.executeQuery(checkDeleted);
-					
-					if(shouldBeEmpty.next()){
-						sender.sendMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-						stmt.close();
-						return true;
-					}
-
-					ResultSet ignoreResult = stmt.executeQuery(ignoreQuery);
-					
-					if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
-						
-						sender.sendMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-						stmt.close();
-						return true;
-					}
-					
-					ResultSet theOffer = stmt.executeQuery(offerQuery);
-					
-					if(!theOffer.next()){
-						sender.sendMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
-						stmt.close();
-						return true;
-					}
-					
-					double value = theOffer.getDouble("Value");
-					double interestRate = theOffer.getDouble("InterestRate");
-					long term = theOffer.getLong("Term");
-					long compoundingPeriod = theOffer.getLong("CompoundingPeriod");
-					long gracePeriod = theOffer.getLong("GracePeriod");
-					long paymentTime = theOffer.getLong("PaymentTime");
-					long paymentFrequency = theOffer.getLong("PaymentFrequency");
-					double lateFee = theOffer.getDouble("LateFee");
-					double minPayment = theOffer.getDouble("MinPayment");
-					long serviceFeeFrequency = theOffer.getLong("ServiceFeeFrequency");
-					double serviceFee = theOffer.getDouble("ServiceFee");
-					String loanType = theOffer.getString("LoanType");
-					
-					String newOffer = "INSERT INTO PreparedOffers (" + columns + ") VALUES (";
-					newOffer += lenderID + ", ";
-					newOffer += "'inprogress', ";
-					newOffer += value + ", ";
-					newOffer += interestRate + ", ";
-					newOffer += term + ", ";
-					newOffer += compoundingPeriod + ", ";
-					newOffer += gracePeriod + ", ";
-					newOffer += paymentTime + ", ";
-					newOffer += paymentFrequency + ", ";
-					newOffer += lateFee + ", ";
-					newOffer += minPayment + ", ";
-					newOffer += serviceFeeFrequency + ", ";
-					newOffer += serviceFee + ", '";
-					newOffer += loanType + "');";
-					
-					stmt.executeUpdate(newOffer);
-					
-					String newOfferQuery = 
-							"SELECT OfferID from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
-					
-					ResultSet theNewOffer = stmt.executeQuery(newOfferQuery);
-					
-					theNewOffer.next();
-					
-					int preparedOfferID = theNewOffer.getInt("OfferID");
-					
-					String sentOfferString = "INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (";
-					sentOfferString += lenderID + ", ";
-					sentOfferString += borrowerID + ", ";
-					sentOfferString += "?, ";
-					sentOfferString += preparedOfferID + ");";
-					
-					PreparedStatement offerStmt = plugin.conn.prepareStatement(sentOfferString);
-					offerStmt.setTimestamp(1, expDate);
-					
-					String cleanUpdate = "UPDATE PreparedOffers SET OfferName='' WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
-							
-					offerStmt.executeUpdate();
-					stmt.executeUpdate(cleanUpdate);
-					
-					Player recipient = null;
-					
-					recipient = plugin.playerManager.getPlayer(borrowerID);
-					
-					if(recipient == null){
-						sender.sendMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-						stmt.close();
-						return true;
-					}
-					// Send message
-					
-					if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
-						sender.sendMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-						return true;
-					}
-					
-					String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
-					String commandName = recipient.getName().equals(entityTarget)? "/loan" : "/crunion";
-					
-					sender.sendMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-					sender.sendMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-					
-					String sentUpdate = "UPDATE Offers SET Sent='true' WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-					
-					stmt.executeUpdate(sentUpdate);
-					
-					sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
-					
-					stmt.close();
-					
-					return true;
-					
-				} catch (SQLException e) {
-					SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-					e.printStackTrace();
-				}
-				
+				sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
 				return true;
+			}
+					
+					
+		}
+		// Parse expiration time
+		String timeString = "1w";
+				
+		// The expiration string is assumed to be the remainder of the line
+		// Spaces are removed, and the string is parsed into a length
+		if (args.length > 2) {
+			for(int i = 2; i < args.length; i++)
+				timeString += args[i];
+		} else if(plugin.getConfig().contains("loan.default-offer-time"))
+			timeString = plugin.getConfig().getString("loan.default-offer-time");
+				
+		// Parsing string
+		long expirationTime = Conf.parseTime(timeString);
+				
+		if(expirationTime == 0){
+			sender.sendMessage(Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		}
+
+		// Create expiration time
+		Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
+				
+		// Get relevant financialEntityIDs
+		int lenderID = plugin.playerManager.getFinancialEntityID(sender.getName());
+		int borrowerID = plugin.playerManager.getFinancialEntityID(entityTarget);
+				
+		// This should always fail, since users were added to the table to get here.
+		if(lenderID == 0 || borrowerID == 0) {
+			sender.sendMessage(prfx + " Users not found. This is a bug. Please report.");
+			return true;
+		}
+				
+		// Check if offer is in PreparedOffers table
+				
+		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
+				
+		String offerName = isQuick? "default" : "prepared";
+				
+		String offerQuery = "SELECT " + columns + " from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='" + offerName + "';";
+				
+		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=" + borrowerID + " AND TargetID=" + lenderID + ";";
+				
+		String deleteOldOffer = "DELETE FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
+		String checkDeleted = "SELECT * FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
+				
+		try {
+					
+			Statement stmt = plugin.getConnection().createStatement();
+					
+			stmt.executeUpdate(deleteOldOffer);
+				
+			ResultSet shouldBeEmpty = stmt.executeQuery(checkDeleted);
+					
+			if(shouldBeEmpty.next()){
+				sender.sendMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+				stmt.close();
+				return true;
+			}
+
+			ResultSet ignoreResult = stmt.executeQuery(ignoreQuery);
+					
+			if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
+						
+				sender.sendMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+				stmt.close();
+				return true;
+			}
+					
+			ResultSet theOffer = stmt.executeQuery(offerQuery);
+					
+			if(!theOffer.next()){
+				sender.sendMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
+				stmt.close();
+				return true;
+			}
+					
+			double value = theOffer.getDouble("Value");
+			double interestRate = theOffer.getDouble("InterestRate");
+			long term = theOffer.getLong("Term");
+			long compoundingPeriod = theOffer.getLong("CompoundingPeriod");
+			long gracePeriod = theOffer.getLong("GracePeriod");
+			long paymentTime = theOffer.getLong("PaymentTime");
+			long paymentFrequency = theOffer.getLong("PaymentFrequency");
+			double lateFee = theOffer.getDouble("LateFee");
+			double minPayment = theOffer.getDouble("MinPayment");
+			long serviceFeeFrequency = theOffer.getLong("ServiceFeeFrequency");
+			double serviceFee = theOffer.getDouble("ServiceFee");
+			String loanType = theOffer.getString("LoanType");
+					
+			String newOffer = "INSERT INTO PreparedOffers (" + columns + ") VALUES (";
+			newOffer += lenderID + ", ";
+			newOffer += "'inprogress', ";
+			newOffer += value + ", ";
+			newOffer += interestRate + ", ";
+			newOffer += term + ", ";
+			newOffer += compoundingPeriod + ", ";
+			newOffer += gracePeriod + ", ";
+			newOffer += paymentTime + ", ";
+			newOffer += paymentFrequency + ", ";
+			newOffer += lateFee + ", ";
+			newOffer += minPayment + ", ";
+			newOffer += serviceFeeFrequency + ", ";
+			newOffer += serviceFee + ", '";
+			newOffer += loanType + "');";
+					
+			stmt.executeUpdate(newOffer);
+			
+			String newOfferQuery = 
+					"SELECT OfferID from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
+			
+			ResultSet theNewOffer = stmt.executeQuery(newOfferQuery);
+			
+			theNewOffer.next();
+					
+			int preparedOfferID = theNewOffer.getInt("OfferID");
+					
+			String sentOfferString = "INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (";
+			sentOfferString += lenderID + ", ";
+			sentOfferString += borrowerID + ", ";
+			sentOfferString += "?, ";
+			sentOfferString += preparedOfferID + ");";
+					
+			PreparedStatement offerStmt = plugin.conn.prepareStatement(sentOfferString);
+			offerStmt.setTimestamp(1, expDate);
+					
+			String cleanUpdate = "UPDATE PreparedOffers SET OfferName='' WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
+						
+			offerStmt.executeUpdate();
+			stmt.executeUpdate(cleanUpdate);
+					
+			Player recipient = null;
+			
+			recipient = plugin.playerManager.getPlayer(borrowerID);
+					
+			if(recipient == null){
+				sender.sendMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+				stmt.close();
+				return true;
+			}
+			// Send message
+			
+			if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
+				sender.sendMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+				return true;
+			}
+					
+			String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
+			String commandName = recipient.getName().equals(entityTarget)? "/loan" : "/crunion";
+					
+			sender.sendMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+			sender.sendMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+					
+			String sentUpdate = "UPDATE Offers SET Sent='true' WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
+			
+			stmt.executeUpdate(sentUpdate);
+					
+			sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+			
+			stmt.close();
+					
+			return true;
+					
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+				
+		return true;
 	}
 
 	
@@ -390,7 +388,7 @@ public class LoanLenderHandler {
 			return true;
 		}
 		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, args, true);
+		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, sender.getName(), args, true);
 		
 		
 		if(loanSelection.errMessage != null){
@@ -427,7 +425,7 @@ public class LoanLenderHandler {
 		
 		plugin.loanManager.applyPayment(theLoan, amount);
 		
-		sender.sendMessage(Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrower.getName(), SerenityLoans.econ.format(amount)}));
+		sender.sendMessage(Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrower.getName(), plugin.econ.format(amount)}));
 
 		return true;
 	}
@@ -442,7 +440,7 @@ public class LoanLenderHandler {
 			return true;
 		}		
 		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, args, true);
+		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, sender.getName(), args, true);
 		
 		
 		if(loanSelection.errMessage != null){
@@ -507,7 +505,7 @@ public class LoanLenderHandler {
 		String recipientName = recipient.getName().equals(newLender.getName())? "You" : recipient.getName();
 		String commandName = recipient.getName().equals(newLender.getName())? "/loan" : "/crunion";
 		
-		newLender.sendMessage(String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientName, lender.getName(), SerenityLoans.econ.format(amount)));
+		newLender.sendMessage(String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientName, lender.getName(), plugin.econ.format(amount)));
 		newLender.sendMessage(String.format(prfx + "Type '%s viewsaleoffer' to view details.", commandName));
 		newLender.sendMessage(String.format(prfx + "Type '%s buy' to purchase loan.", commandName));
 	
@@ -528,13 +526,13 @@ public class LoanLenderHandler {
 		
 		LoanSale ls = pendingSales.get(buyer);
 		
-		if(!SerenityLoans.econ.has(buyer, ls.amount).callSuccess){
-			sender.sendMessage(String.format(prfx + " You do not have enough money to buy this loan. Cost is %s.", SerenityLoans.econ.format(ls.amount)));
+		if(!plugin.econ.has(buyer, ls.amount).callSuccess){
+			sender.sendMessage(String.format(prfx + " You do not have enough money to buy this loan. Cost is %s.", plugin.econ.format(ls.amount)));
 			return true;
 		}
 		
-		SerenityLoans.econ.withdraw(buyer, ls.amount);
-		SerenityLoans.econ.deposit(ls.theLoan.getLender(), ls.amount);
+		plugin.econ.withdraw(buyer, ls.amount);
+		plugin.econ.deposit(ls.theLoan.getLender(), ls.amount);
 		
 		String updateSQL = String.format("UPDATE Loans SET LenderID=%d WHERE LoanID=%d", buyer.getUserID(), ls.theLoan.getLoanID());
 		
@@ -574,7 +572,7 @@ public class LoanLenderHandler {
 		
 		LoanSale ls = pendingSales.get(buyer);
 		
-		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", SerenityLoans.econ.format(ls.amount)));
+		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
 		sender.sendMessage(ls.theLoan.toString(plugin));
 		
 		
@@ -612,9 +610,9 @@ public class LoanLenderHandler {
 			Double value = Double.parseDouble(parsedArg[1]);
 			
 			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("Value below configured minimum of %s", SerenityLoans.econ.format(minValue)));
+				throw new InvalidLoanTermsException(String.format("Value below configured minimum of %s", plugin.econ.format(minValue)));
 			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("Value above configured minimum of %s", SerenityLoans.econ.format(maxValue)));
+				throw new InvalidLoanTermsException(String.format("Value above configured minimum of %s", plugin.econ.format(maxValue)));
 			
 			objective = value.toString();
 			
@@ -641,9 +639,9 @@ public class LoanLenderHandler {
 			Double value = perc.doubleValue();
 			
 			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("InterestRate below configured minimum of %s", SerenityLoans.econ.formatPercent(minValue)));
+				throw new InvalidLoanTermsException(String.format("InterestRate below configured minimum of %s", plugin.econ.formatPercent(minValue)));
 			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("InterestRate above configured minimum of %s", SerenityLoans.econ.formatPercent(maxValue)));
+				throw new InvalidLoanTermsException(String.format("InterestRate above configured minimum of %s", plugin.econ.formatPercent(maxValue)));
 			
 			objective = value.toString();
 			
@@ -801,9 +799,9 @@ public class LoanLenderHandler {
 			Double value = Double.parseDouble(parsedArg[1]);
 			
 			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("LateFee below configured minimum of %s", SerenityLoans.econ.format(minValue)));
+				throw new InvalidLoanTermsException(String.format("LateFee below configured minimum of %s", plugin.econ.format(minValue)));
 			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("LateFee above configured minimum of %s", SerenityLoans.econ.format(maxValue)));
+				throw new InvalidLoanTermsException(String.format("LateFee above configured minimum of %s", plugin.econ.format(maxValue)));
 			
 			objective = value.toString();
 			
@@ -830,9 +828,9 @@ public class LoanLenderHandler {
 			Double value = Double.parseDouble(parsedArg[1]);
 			
 			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("MinPayment below configured minimum of %s", percentageRule? SerenityLoans.econ.formatPercent(minValue) : SerenityLoans.econ.format(minValue)));
+				throw new InvalidLoanTermsException(String.format("MinPayment below configured minimum of %s", percentageRule? plugin.econ.formatPercent(minValue) : plugin.econ.format(minValue)));
 			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("MinPayment above configured minimum of %s", percentageRule? SerenityLoans.econ.formatPercent(maxValue) : SerenityLoans.econ.format(maxValue)));
+				throw new InvalidLoanTermsException(String.format("MinPayment above configured minimum of %s", percentageRule? plugin.econ.formatPercent(maxValue) : plugin.econ.format(maxValue)));
 			
 			objective = value.toString();
 			
@@ -892,9 +890,9 @@ public class LoanLenderHandler {
 			Double value = Double.parseDouble(parsedArg[1]);
 			
 			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFee below configured minimum of %s", SerenityLoans.econ.format(minValue)));
+				throw new InvalidLoanTermsException(String.format("ServiceFee below configured minimum of %s", plugin.econ.format(minValue)));
 			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFee above configured minimum of %s", SerenityLoans.econ.format(maxValue)));
+				throw new InvalidLoanTermsException(String.format("ServiceFee above configured minimum of %s", plugin.econ.format(maxValue)));
 			
 			objective = value.toString();
 			
@@ -969,9 +967,9 @@ private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, 
 		String loanType = results.getString("LoanType");
 		
 		String[] result =  
-			{String.format("    Loan value: %s", SerenityLoans.econ.format(value)),
-			 String.format("    Interest rate: %s (%s)",  SerenityLoans.econ.formatPercent(interestRate), Conf.getIntReportingString()),
-			 String.format("    Minimum payment: %s", SerenityLoans.econ.format(minPayment)),
+			{String.format("    Loan value: %s", plugin.econ.format(value)),
+			 String.format("    Interest rate: %s (%s)",  plugin.econ.formatPercent(interestRate), Conf.getIntReportingString()),
+			 String.format("    Minimum payment: %s", plugin.econ.format(minPayment)),
 			 String.format("    Term: %s", Conf.buildTimeString(term)),
 			 String.format("    Compounding period: %s", Conf.buildTimeString(compoundingPeriod)),
 			 String.format("    Payment time: %s", Conf.buildTimeString(paymentTime)),
@@ -979,11 +977,11 @@ private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, 
 			 String.format("    Loan type: %s", loanType)};
 
 		String[] lateFeeRelated = 
-			{String.format("    Late fee: %s", SerenityLoans.econ.format(lateFee)),
+			{String.format("    Late fee: %s", plugin.econ.format(lateFee)),
 			 String.format("    Grace period: %s", Conf.buildTimeString(gracePeriod))};
 		
 		String[] serviceFeeRelated = 
-			{String.format("    Service fee: %s", SerenityLoans.econ.format(serviceFee)),
+			{String.format("    Service fee: %s", plugin.econ.format(serviceFee)),
 			 String.format("    Service fee frequency: %s", Conf.buildTimeString(serviceFeeFrequency))};
 		
 		sender.sendMessage(String.format(prfx + " Details for %soffering.", isDefault? "default ":""));
