@@ -61,7 +61,7 @@ import java.util.logging.Logger;
 
 public final class SerenityLoans extends JavaPlugin {
 	
-	public static final Logger log = Logger.getLogger("Minecraft");
+	public Logger log;
 	
     public EconomyManager econ = null;
 //    public Permission perms = null;
@@ -82,6 +82,8 @@ public final class SerenityLoans extends JavaPlugin {
 	public OfferManager offerManager;
     
 	public void onEnable(){
+		
+		log = Logger.getLogger("Minecraft" + getDescription().getName());
 		
 		this.saveDefaultConfig();
 		plugin = this;
