@@ -65,11 +65,12 @@ public class Loan implements Loanable {
 	private final ImmutableOffer terms;
 	private final Timestamp startDate;
 	private final Timestamp lastUpdate;
+	private final int termsID;
 
 	
 	//TODO finish making this class immutable
 	
-	public Loan(int loanID, double balance, double interestBalance, double feeBalance, ImmutableOffer terms, Timestamp startDate, Timestamp lastUpdate){
+	public Loan(int loanID, double balance, double interestBalance, double feeBalance, ImmutableOffer terms, Timestamp startDate, Timestamp lastUpdate, int termsID){
 		this.loanID = loanID;
 		this.balance = balance;
 		this.interestBalance = interestBalance;
@@ -77,6 +78,7 @@ public class Loan implements Loanable {
 		this.terms = terms;
 		this.startDate = startDate;
 		this.lastUpdate = lastUpdate;
+		this.termsID = termsID;
 	}
 	
 
@@ -300,5 +302,7 @@ public class Loan implements Loanable {
 	public Timestamp getStartTime() {
 		return (Timestamp) startDate.clone();
 	}
+	
+	public int getTermsId(){return termsID;}
 	
 }

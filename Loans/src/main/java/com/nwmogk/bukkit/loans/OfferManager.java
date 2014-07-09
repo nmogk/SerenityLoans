@@ -63,13 +63,18 @@ public class OfferManager {
 	
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID){
 		String query = "SELECT * FROM offer_view WHERE LenderID=? AND BorrowerID=?;";
+		String query2 = "SELECT PreparedTerms FROM Offers WHERE LenderID=? AND BorrowerID=?;";
 		ImmutableOffer offer = null;
 		
 		try {
 			PreparedStatement stmt = plugin.conn.prepareStatement(query);
+			PreparedStatement stmt2 = plugin.conn.prepareStatement(query2);
 			
 			stmt.setString(1, lenderID.toString());
 			stmt.setString(2, borrowerID.toString());
+			
+			stmt2.setString(1, lenderID.toString());
+			stmt2.setString(2, borrowerID.toString());
 			
 			ResultSet results = stmt.executeQuery();
 			
@@ -91,7 +96,11 @@ public class OfferManager {
 			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
 			Timestamp expDate = results.getTimestamp("ExpirationDate");
 			
-			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate);
+			results = stmt2.executeQuery();
+			
+			int termsID = results.getInt(1);
+			
+			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
 
 			
 			stmt.close();

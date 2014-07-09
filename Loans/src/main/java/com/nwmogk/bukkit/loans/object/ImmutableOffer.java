@@ -57,6 +57,8 @@ public final class ImmutableOffer implements LoanInfo {
 	private final FinancialEntity lender;
 	private final FinancialEntity borrower;
 	
+	private final int termsID;
+	
 	private final double value;
 	private final double interestRate;
 	
@@ -91,9 +93,10 @@ public final class ImmutableOffer implements LoanInfo {
 		serviceFeeFrequency = loan.getServiceFeeFrequency();
 		loanType = loan.getLoanType();
 		expDate = null;
+		termsID = loan.getTermsId();
 	}
 	
-	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType, Timestamp expDate){
+	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType, Timestamp expDate, int termsID){
 		this.lender = lender;
 		this.borrower = borrower;
 		this.value = value;
@@ -109,6 +112,7 @@ public final class ImmutableOffer implements LoanInfo {
 		this.serviceFeeFrequency = serviceFeeFrequency;
 		this.loanType = loanType;
 		this.expDate = expDate;
+		this.termsID = termsID;
 	}
 	
 	
@@ -173,4 +177,6 @@ public final class ImmutableOffer implements LoanInfo {
 	public LoanType getLoanType() {return loanType;}
 	
 	public Timestamp getExpirationDate() {return expDate;}
+	
+	public int getPreparedTermsId(){return termsID;}
 }
