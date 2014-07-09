@@ -211,24 +211,16 @@ public class LoanLenderHandler {
 
 	
 	protected boolean retractOffer(CommandSender sender, Command cmd, String alias, String[] args){
-		String updateSQL = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
 		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
-			
-			stmt.setInt(1, plugin.playerManager.getFinancialEntityID(sender.getName()));
-			stmt.setInt(2, plugin.playerManager.getFinancialEntityID(args[1]));
-			
-			stmt.executeUpdate();
-		} catch (SQLException e) {
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
+		
+		if(borrower != null && plugin.offerManager.removeOffer(((Player)sender).getUniqueId(), borrower.getUserID()))
+			sender.sendMessage(prfx + " Operation successful.");
+		else
 			sender.sendMessage(Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " retractoffer", args[1]}));
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		sender.sendMessage(prfx + " Operation successful.");
 		
 		return true;
+		
 	}
 	
 	protected boolean loanOfferingCommand(CommandSender sender, Command cmd,
