@@ -297,6 +297,31 @@ public class PlayerManager {
 	public boolean inFinancialEntitiesTable(String entityName) {
 		return inFinancialEntitiesTable(entityIdLookup(entityName));
 	}
+	
+	public boolean isIgnoring(UUID userId, UUID targetId){
+		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(ignoreQuery);
+			
+			ps.setString(1, userId.toString());
+			ps.setString(2, targetId.toString());
+			
+			ResultSet ignoreResult = ps.executeQuery();
+			
+			if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
+				ps.close();
+				return true;
+			}
+			else
+				ps.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return false;
+	}
 
 	public boolean toggleIgnore(UUID playerId, UUID targetId){
 		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
