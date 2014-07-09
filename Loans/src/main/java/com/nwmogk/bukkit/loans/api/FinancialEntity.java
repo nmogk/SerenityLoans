@@ -44,8 +44,6 @@ package com.nwmogk.bukkit.loans.api;
 import java.sql.Timestamp;
 import java.util.UUID;
 
-import com.nwmogk.bukkit.loans.PlayerType;
-
 public interface FinancialEntity extends Cloneable{
 	
 	public UUID getUserID();

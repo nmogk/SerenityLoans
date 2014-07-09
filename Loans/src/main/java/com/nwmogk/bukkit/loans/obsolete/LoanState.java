@@ -40,10 +40,11 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.obsolete;
 
 import java.util.Date;
 
+import com.nwmogk.bukkit.loans.api.LoanInfo;
 import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 

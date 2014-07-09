@@ -63,6 +63,7 @@ import org.bukkit.entity.Player;
 
 import com.google.common.io.Files;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.FinancialPlayer;
 

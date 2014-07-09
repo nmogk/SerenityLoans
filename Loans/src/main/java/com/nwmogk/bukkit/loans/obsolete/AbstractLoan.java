@@ -2,7 +2,7 @@ package com.nwmogk.bukkit.loans.obsolete;
 
 import java.util.LinkedList;
 
-import com.nwmogk.bukkit.loans.Loanable;
+import com.nwmogk.bukkit.loans.api.Loanable;
 import com.nwmogk.bukkit.loans.event.LoanStateUpdateEvent;
 import com.nwmogk.bukkit.loans.event.LoanStateUpdateListener;
 import com.nwmogk.bukkit.loans.event.PaymentStatementIssueEvent;

@@ -39,7 +39,7 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
 /*
  * I am not sure if this enum even matters.

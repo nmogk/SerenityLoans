@@ -42,7 +42,7 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
 import net.milkbowl.vault.economy.EconomyResponse;
 

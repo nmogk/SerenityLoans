@@ -58,6 +58,7 @@ import java.util.Vector;
 import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.LoanType;
 import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.PaymentStatement;

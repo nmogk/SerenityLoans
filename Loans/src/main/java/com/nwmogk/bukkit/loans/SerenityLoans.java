@@ -48,6 +48,7 @@ package com.nwmogk.bukkit.loans;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.*;
 
+import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.command.LoanHandler;
 import com.nwmogk.bukkit.loans.exception.DatabaseVersionMismatchException;
 import com.nwmogk.bukkit.loans.listener.PlayerLoginListener;
