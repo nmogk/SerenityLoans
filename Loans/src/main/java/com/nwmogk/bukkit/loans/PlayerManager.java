@@ -51,17 +51,26 @@ import java.nio.charset.Charset;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import com.google.common.io.Files;
+import com.nwmogk.bukkit.evilmidget38.UUIDFetcher;
+import com.nwmogk.bukkit.evilmidget38.NameFetcher;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
@@ -119,17 +128,42 @@ public class PlayerManager {
 		return false;
 	}
 
-	public UUID entityIdLookup(String entityName) {
-		//TODO Implement UUID lookup from name
-		return null;
+	public UUID entityIdLookup(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		
+		UUID result = getFinancialInstituteID(entityName);
+		
+		if(result != null)
+			return result;
+		
+		Callable<Map<String,UUID>> fetcher = new UUIDFetcher(Arrays.asList(entityName));
+		Future<Map<String,UUID>> answer = plugin.threads.submit(fetcher);
+		
+		//TODO configure timeout settings
+		result = answer.get(10L, TimeUnit.SECONDS).get(entityName);
+		
+		return result;
 	}
 
-	public String entityNameLookup(UUID entityID) {
-		// TODO
-		return null;
+	public String entityNameLookup(UUID entityID) throws InterruptedException, ExecutionException, TimeoutException {
+		
+		FinancialInstitution bank = getFinancialInstitution(entityID);
+		if(bank != null)
+			return bank.getName();
+		
+		Player player = plugin.getServer().getPlayer(entityID);
+		
+		if(player != null)
+			return player.getName();
+		
+		Callable<Map<UUID,String>> fetcher = new NameFetcher(Arrays.asList(entityID));
+		Future<Map<UUID,String>> answer = plugin.threads.submit(fetcher);
+		
+		String result = answer.get(10L, TimeUnit.SECONDS).get(entityID);
+		
+		return result;
 	}
 
-	public String entityNameLookup(FinancialEntity entity){
+	public String entityNameLookup(FinancialEntity entity) throws InterruptedException, ExecutionException, TimeoutException{
 		if(entity instanceof FinancialInstitution)
 			return ((FinancialInstitution) entity).getName();
 		return entityNameLookup(entity.getUserID());
@@ -140,7 +174,7 @@ public class PlayerManager {
 	}
 	
 	@Deprecated
-	public FinancialEntity getFinancialEntity(String name){
+	public FinancialEntity getFinancialEntity(String name) throws InterruptedException, ExecutionException, TimeoutException{
 		return getFinancialEntity(entityIdLookup(name));
 	}
 
@@ -190,6 +224,10 @@ public class PlayerManager {
 
 		return result;
 	}
+	
+	public FinancialInstitution getFinancialInstitution(UUID bankId){
+		return (FinancialInstitution) buildEntity(queryFinancialInstitutionsTable(bankId));
+	}
 
 	public Vector<UUID> getManagedEntities(UUID playerID){
 		Vector<UUID> results = new Vector<UUID>();
@@ -226,8 +264,24 @@ public class PlayerManager {
 		if(entity instanceof FinancialInstitution)
 			playerID = ((FinancialInstitution)entity).getResponsibleParty();
 		
-		// TODO my own lookup
-		return null;
+		// TODO look for ways to improve
+		
+		OfflinePlayer[] allPlayers = plugin.getServer().getOfflinePlayers();
+		
+		OfflinePlayer result = null;
+		
+		for(OfflinePlayer op : allPlayers){
+			if(op.getUniqueId().equals(playerID)){
+				result = op;
+				break;
+			}
+		}
+		
+		// Bukkit claims this is inefficient, but it would be
+		// convenient.
+		//return plugin.getServer().getOfflinePlayer(playerID);
+		
+		return result;
 	}
 
 	/**
@@ -275,7 +329,7 @@ public class PlayerManager {
 	}
 	
 	@Deprecated
-	public FinancialEntity getFinancialEntityAdd(String name){
+	public FinancialEntity getFinancialEntityAdd(String name) throws InterruptedException, ExecutionException, TimeoutException{
 		return getFinancialEntityAdd(entityIdLookup(name));
 	}
 
@@ -295,7 +349,7 @@ public class PlayerManager {
 	}
 
 	@Deprecated
-	public boolean inFinancialEntitiesTable(String entityName) {
+	public boolean inFinancialEntitiesTable(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
 		return inFinancialEntitiesTable(entityIdLookup(entityName));
 	}
 	
