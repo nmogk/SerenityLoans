@@ -45,6 +45,7 @@ package com.nwmogk.bukkit.loans;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.LinkedList;
 import java.util.List;
@@ -160,5 +161,26 @@ public class OfferManager {
 	}
 	
 
-
+	public double getTermsValue(int preparedTermsId){
+		String query = String.format("SELECT Value FROM PreparedOffers WHERE OfferID=%d;", preparedTermsId);
+		double result = -1;
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet res = stmt.executeQuery(query);
+			
+			if(!res.next())
+				return result;
+			
+			result = res.getDouble(1);
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return result;
+		
+	}
 }

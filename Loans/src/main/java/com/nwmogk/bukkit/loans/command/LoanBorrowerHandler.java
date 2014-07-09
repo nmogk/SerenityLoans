@@ -61,6 +61,7 @@ import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.command.LoanHandler.LoanSpec;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
+import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 
 public class LoanBorrowerHandler {
@@ -75,7 +76,7 @@ public class LoanBorrowerHandler {
 	
 	protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, String[] args){
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
 		
 		if(borrower == null){
 			sender.sendMessage(prfx + " You are not able to use this commmand.");
@@ -89,45 +90,39 @@ public class LoanBorrowerHandler {
 			return true;
 		}
 		
-		String offerQuery = String.format("SELECT * FROM Offers WHERE LenderID=%d AND BorrowerID=%d;", lender.getUserID(), borrower.getUserID());
+		
+		ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
+		
+		if(theOffer == null){
+			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", plugin.playerManager.entityNameLookup(lender)));
+			return true;
+		}
+		
+		Timestamp expires = theOffer.getExpirationDate();
+		
+		if(expires.before(new Date())){
+			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", plugin.playerManager.entityNameLookup(lender)));
+			return true;
+		}
+		
+		int termsID = theOffer.getPreparedTermsId();
+		
+		double value = plugin.offerManager.getTermsValue(termsID);
+		
+		if(!plugin.econ.has(lender, value).callSuccess){
+			
+			sender.sendMessage(String.format(prfx + " %s does not have enough money to loan!", plugin.playerManager.entityNameLookup(lender)));
+			return true;
+		}
+		
+		plugin.econ.withdraw(lender, value);
+		plugin.econ.deposit(borrower, value);
+		
 		
 		int loanID = 0;
 		
 		try {
 			Statement stmt = plugin.conn.createStatement();
-			
-			ResultSet theOffer = stmt.executeQuery(offerQuery);
-			
-			if(!theOffer.next()){
-				sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lender.getName()));
-				stmt.close();
-				return true;
-			}
-			
-			Timestamp ts = theOffer.getTimestamp("ExpirationDate");
-			
-			if(ts.before(new Date())){
-				sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lender.getName()));
-				stmt.close();
-				return true;
-			}
-			
-			int termsID = theOffer.getInt("PreparedTerms");
-			
-			String loanBalanceQuery = String.format("SELECT Value FROM PreparedOffers WHERE OfferID=%d;", termsID);
-			
-			ResultSet balance = stmt.executeQuery(loanBalanceQuery);
-			
-			double value = balance.getDouble("Value");
-			
-			if(!SerenityLoans.econ.has(lender, value).callSuccess){
-				
-				sender.sendMessage(String.format(prfx + " %s does not have enough money to loan!", lender.getName()));
-				return true;
-			}
-			
-			SerenityLoans.econ.withdraw(lender, value);
-			SerenityLoans.econ.deposit(borrower, value);
 			
 			
 			String loanBuilder = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES (%d, %d, %d, %f, ?, ?);", lender.getUserID(), borrower.getUserID(), termsID, value );
