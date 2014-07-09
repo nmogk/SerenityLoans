@@ -58,8 +58,99 @@ public class OfferManager {
 	
 	private SerenityLoans plugin;
 	
+	public enum OfferExitStatus{SUCCESS, IGNORED, UNKNOWN, OVERWRITE_FAIL};
+	
+	
 	public OfferManager(SerenityLoans plugin){
 		this.plugin = plugin;
+	}
+	
+	public OfferExitStatus createOffer(UUID lenderID, UUID borrowerID, String preparedOfferName, Timestamp offerExpiry){
+		if(plugin.playerManager.isIgnoring(borrowerID, lenderID))
+			return OfferExitStatus.IGNORED;
+		
+		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
+		String copyColumns = "copy.Value, copy.InterestRate, copy.Term, copy.CompoundingPeriod, copy.GracePeriod, copy.PaymentTime, copy.PaymentFrequency, copy.LateFee, copy.MinPayment, copy.ServiceFeeFrequency, copy.ServiceFee, copy.LoanType";
+		
+		
+		String offerCopy = String.format("INSERT INTO PreparedOffers (%s) SELECT ?, 'inprogress', %s FROM PreparedOffers copy WHERE LenderID=? AND OfferName=?;", columns, copyColumns);
+		String offerQuery = "SELECT OfferID from PreparedOffers WHERE LenderID=? AND OfferName='inprogress';";
+		String offerNameUpdate = "UPDATE PreparedOffers SET OfferName='' WHERE LenderID=? AND OfferName='inprogress';";
+		String deleteOldOffer = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
+		String checkDeleted = "SELECT * FROM Offers WHERE LenderID=? AND BorrowerID=?;";
+		
+		
+		try {
+			PreparedStatement offerTermsCopier = plugin.conn.prepareStatement(offerCopy);
+			
+			offerTermsCopier.setString(1, lenderID.toString());
+			offerTermsCopier.setString(2, lenderID.toString());
+			offerTermsCopier.setString(3, preparedOfferName);
+			
+			int output = offerTermsCopier.executeUpdate();
+			
+			if(output != 1)
+				return OfferExitStatus.UNKNOWN;
+			
+			PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
+			
+			offerIdFinder.setString(1, lenderID.toString());
+			
+			ResultSet newOfferId = offerIdFinder.executeQuery();
+			
+			if(!newOfferId.next()){
+				return OfferExitStatus.UNKNOWN;
+			}
+			
+			int offerId = newOfferId.getInt(1);
+			
+			PreparedStatement renameOffer = plugin.conn.prepareStatement(offerNameUpdate);
+			
+			renameOffer.setString(1, lenderID.toString());
+			
+			output = renameOffer.executeUpdate();
+			
+			if(output != 1)
+				return OfferExitStatus.UNKNOWN;
+			
+			PreparedStatement deleteOldOfferSQL = plugin.conn.prepareStatement(deleteOldOffer);
+			PreparedStatement checkDeletedSQL = plugin.conn.prepareStatement(checkDeleted);
+			
+			deleteOldOfferSQL.setString(1, lenderID.toString());
+			deleteOldOfferSQL.setString(2, borrowerID.toString());
+			checkDeletedSQL.setString(1, lenderID.toString());
+			checkDeletedSQL.setString(2, borrowerID.toString());
+			
+			output = deleteOldOfferSQL.executeUpdate();
+			ResultSet shouldBeEmpty = checkDeletedSQL.executeQuery();
+			
+			if(output != 1 || output != 0 || shouldBeEmpty.next())
+				return OfferExitStatus.OVERWRITE_FAIL;
+			
+			String sentOfferString = String.format("INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (?, ?, ?, %d);", offerId);
+			
+			PreparedStatement buildOffer = plugin.conn.prepareStatement(sentOfferString);
+			
+			buildOffer.setString(1, lenderID.toString());
+			buildOffer.setString(2, borrowerID.toString());
+			buildOffer.setTimestamp(3, offerExpiry);
+			
+			output = buildOffer.executeUpdate();
+			
+			if(output != 1)
+				return OfferExitStatus.UNKNOWN;
+			
+			offerTermsCopier.close();
+			offerIdFinder.close();
+			renameOffer.close();
+			deleteOldOfferSQL.close();
+			checkDeletedSQL.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return OfferExitStatus.SUCCESS;
 	}
 	
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID){
@@ -184,6 +275,35 @@ public class OfferManager {
 		
 		return result;
 		
+	}
+	
+	public boolean registerOfferSend(UUID lenderId, UUID borrowerId){
+		String sentUpdate = "UPDATE Offers SET Sent='true' WHERE LenderID=? AND BorrowerID=?;";
+
+		try {
+			
+			PreparedStatement stmt = plugin.conn.prepareStatement(sentUpdate);
+			
+			stmt.setString(1, lenderId.toString());
+			stmt.setString(2, borrowerId.toString());
+			
+			int result = stmt.executeUpdate();
+			
+			if(result != 1){
+				stmt.close();
+				return false;
+			}
+			
+			stmt.close();
+					
+			return true;
+					
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return false;
 	}
 	
 	public boolean removeOffer(UUID lenderId, UUID borrowerId){

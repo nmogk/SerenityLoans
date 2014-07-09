@@ -61,6 +61,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.loans.Conf;
+import com.nwmogk.bukkit.loans.OfferManager.OfferExitStatus;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.command.LoanHandler.LoanSpec;
 import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;
@@ -111,9 +112,7 @@ public class LoanLenderHandler {
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
 			return true;
 		}
-					
 		
-				
 				
 		//======================= Parse Inputs ========================
 
@@ -134,19 +133,15 @@ public class LoanLenderHandler {
 			sender.sendMessage(Conf.messageCenter("offer-government", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
 			return true;
 		}
-				
+			
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
+		
 		// Check if other entity is in FinancialEntities table
-		if(!plugin.playerManager.inFinancialEntitiesTable(entityTarget)) {
-					
-			// Add to table if possible
-			if(!plugin.playerManager.addPlayer(entityTarget)){
-						
-				sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-				return true;
-			}
-					
-					
+		if(borrower == null) {			
+			sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
 		}
+		
 		// Parse expiration time
 		String timeString = "1w";
 				
@@ -169,150 +164,47 @@ public class LoanLenderHandler {
 		// Create expiration time
 		Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
 				
-		// Get relevant financialEntityIDs
-		int lenderID = plugin.playerManager.getFinancialEntityID(sender.getName());
-		int borrowerID = plugin.playerManager.getFinancialEntityID(entityTarget);
-				
-		// This should always fail, since users were added to the table to get here.
-		if(lenderID == 0 || borrowerID == 0) {
-			sender.sendMessage(prfx + " Users not found. This is a bug. Please report.");
-			return true;
-		}
-				
 		// Check if offer is in PreparedOffers table
-				
-		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
-				
 		String offerName = isQuick? "default" : "prepared";
+		
+		OfferExitStatus exit = plugin.offerManager.createOffer(lender.getUserID(), borrower.getUserID(), offerName, expDate);
 				
-		String offerQuery = "SELECT " + columns + " from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='" + offerName + "';";
-				
-		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=" + borrowerID + " AND TargetID=" + lenderID + ";";
-				
-		String deleteOldOffer = "DELETE FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-		String checkDeleted = "SELECT * FROM Offers WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-				
-		try {
-					
-			Statement stmt = plugin.getConnection().createStatement();
-					
-			stmt.executeUpdate(deleteOldOffer);
-				
-			ResultSet shouldBeEmpty = stmt.executeQuery(checkDeleted);
-					
-			if(shouldBeEmpty.next()){
-				sender.sendMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-				stmt.close();
-				return true;
-			}
-
-			ResultSet ignoreResult = stmt.executeQuery(ignoreQuery);
-					
-			if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
-						
-				sender.sendMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-				stmt.close();
-				return true;
-			}
-					
-			ResultSet theOffer = stmt.executeQuery(offerQuery);
-					
-			if(!theOffer.next()){
-				sender.sendMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
-				stmt.close();
-				return true;
-			}
-					
-			double value = theOffer.getDouble("Value");
-			double interestRate = theOffer.getDouble("InterestRate");
-			long term = theOffer.getLong("Term");
-			long compoundingPeriod = theOffer.getLong("CompoundingPeriod");
-			long gracePeriod = theOffer.getLong("GracePeriod");
-			long paymentTime = theOffer.getLong("PaymentTime");
-			long paymentFrequency = theOffer.getLong("PaymentFrequency");
-			double lateFee = theOffer.getDouble("LateFee");
-			double minPayment = theOffer.getDouble("MinPayment");
-			long serviceFeeFrequency = theOffer.getLong("ServiceFeeFrequency");
-			double serviceFee = theOffer.getDouble("ServiceFee");
-			String loanType = theOffer.getString("LoanType");
-					
-			String newOffer = "INSERT INTO PreparedOffers (" + columns + ") VALUES (";
-			newOffer += lenderID + ", ";
-			newOffer += "'inprogress', ";
-			newOffer += value + ", ";
-			newOffer += interestRate + ", ";
-			newOffer += term + ", ";
-			newOffer += compoundingPeriod + ", ";
-			newOffer += gracePeriod + ", ";
-			newOffer += paymentTime + ", ";
-			newOffer += paymentFrequency + ", ";
-			newOffer += lateFee + ", ";
-			newOffer += minPayment + ", ";
-			newOffer += serviceFeeFrequency + ", ";
-			newOffer += serviceFee + ", '";
-			newOffer += loanType + "');";
-					
-			stmt.executeUpdate(newOffer);
-			
-			String newOfferQuery = 
-					"SELECT OfferID from PreparedOffers WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
-			
-			ResultSet theNewOffer = stmt.executeQuery(newOfferQuery);
-			
-			theNewOffer.next();
-					
-			int preparedOfferID = theNewOffer.getInt("OfferID");
-					
-			String sentOfferString = "INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (";
-			sentOfferString += lenderID + ", ";
-			sentOfferString += borrowerID + ", ";
-			sentOfferString += "?, ";
-			sentOfferString += preparedOfferID + ");";
-					
-			PreparedStatement offerStmt = plugin.conn.prepareStatement(sentOfferString);
-			offerStmt.setTimestamp(1, expDate);
-					
-			String cleanUpdate = "UPDATE PreparedOffers SET OfferName='' WHERE LenderID=" + lenderID + " AND OfferName='inprogress';";
-						
-			offerStmt.executeUpdate();
-			stmt.executeUpdate(cleanUpdate);
-					
-			Player recipient = null;
-			
-			recipient = plugin.playerManager.getPlayer(borrowerID);
-					
-			if(recipient == null){
-				sender.sendMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-				stmt.close();
-				return true;
-			}
-			// Send message
-			
-			if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
-				sender.sendMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-				return true;
-			}
-					
-			String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
-			String commandName = recipient.getName().equals(entityTarget)? "/loan" : "/crunion";
-					
-			sender.sendMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-			sender.sendMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-					
-			String sentUpdate = "UPDATE Offers SET Sent='true' WHERE LenderID=" + lenderID + " AND BorrowerID=" + borrowerID + ";";
-			
-			stmt.executeUpdate(sentUpdate);
-					
-			sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
-			
-			stmt.close();
-					
+		switch(exit){
+		case IGNORED:
+			sender.sendMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
 			return true;
-					
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
+		case OVERWRITE_FAIL:
+			sender.sendMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		case SUCCESS:
+			break;
+		case UNKNOWN:
+			sender.sendMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
+			return true;
 		}
+		
+		Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
+		
+		if(recipient == null){
+			sender.sendMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		}
+		
+		if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
+			sender.sendMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		}
+		
+		// Send message
+		
+		String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
+		String commandName = recipient.getName().equals(entityTarget)? "/loan" : "/crunion";
+					
+		sender.sendMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+		sender.sendMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+					
+		if(plugin.offerManager.registerOfferSend(lender.getUserID(), borrower.getUserID()))	
+			sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
 				
 		return true;
 	}
