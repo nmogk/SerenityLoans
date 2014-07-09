@@ -61,10 +61,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
@@ -74,7 +72,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.bukkit.OfflinePlayer;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import com.google.common.io.Files;
@@ -231,7 +228,7 @@ public class PlayerManager {
 			return false;
 		}
 		
-		buildFinancialEntityInitialOffers(playerID);
+		plugin.offerManager.buildFinancialEntityInitialOffers(playerID);
 		
 		if(SerenityLoans.debugLevel >= 2)
 			SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), playerID.toString()));
@@ -607,128 +604,7 @@ public class PlayerManager {
 		return null;
 	}
 
-	private void buildFinancialEntityInitialOffers(UUID playerID) {
 	
-		// Collect config info
-		double value = 100;
-		double interestRate = 0.05;
-		
-		double minPayment = 15;
-		double lateFee = 0;
-		double serviceFee = 0;
-		
-		long term = 2419200000L;
-		long compoundingPeriod = 604800000L;
-		long paymentTime = 604800000L;
-		long paymentFrequency = 2419200000L;
-		long gracePeriod  = 0L;
-		long serviceFeeFrequency =  0L;
-		String loanType = "'Bullet'";
-		
-		FileConfiguration config = plugin.getConfig();
-		
-		String valuePath = 		"loan.terms-constraints.principal-value.default";
-		String interestPath = 	"loan.terms-constraints.interest.default";
-		String compoundPath = 	"loan.terms-constraints.interest.compounding.default";
-		String minPath = 		"loan.terms-constraints.min-payment.default";
-		String termPath = 		"loan.terms-constraints.term.default";
-		String paytimePath = 	"loan.terms-constraints.payment-time.default";
-		String payfreqPath = 	"loan.terms-constraints.payment-frequency.default";
-		String latePath = 		"loan.terms-constraints.fees.late-fee.default";
-		String gracePath = 		"loan.terms-constraints.fees.grace-period.default";
-		String servicePath = 	"loan.terms-constraints.fees.service-fee.default";
-		String servfreqPath = 	"loan.terms-constraints.fees.service-fee-frequency.default";
-	
-		if(config.contains(valuePath) && config.isDouble(valuePath))
-			value = Math.max(0, config.getDouble(valuePath));
-	
-		if(config.contains(interestPath) && config.isDouble(interestPath))
-			interestRate = Math.max(0, config.getDouble(interestPath));
-		
-		if(config.contains(minPath) && config.isDouble(minPath))
-			minPayment = Math.max(0, config.getDouble(minPath));
-		
-		if(config.contains(latePath) && config.isDouble(latePath))
-			lateFee = Math.max(0, config.getDouble(latePath));
-		
-		if(config.contains(servicePath) && config.isDouble(servicePath))
-			serviceFee = Math.max(0, config.getDouble(servicePath));
-		
-		if(config.contains(termPath) && config.isString(termPath)){
-			long temp = Conf.parseTime(config.getString(termPath));
-			term = temp == 0? term : temp;
-		}
-		
-		if(config.contains(compoundPath) && config.isString(compoundPath)){
-			long temp = Conf.parseTime(config.getString(compoundPath));
-			compoundingPeriod = temp == 0? compoundingPeriod : temp;
-		}
-		
-		if(config.contains(paytimePath) && config.isString(paytimePath)){
-			long temp = Conf.parseTime(config.getString(paytimePath));
-			paymentTime = temp == 0? paymentTime : temp;
-		}
-		
-		if(config.contains(payfreqPath) && config.isString(payfreqPath)){
-			long temp = Conf.parseTime(config.getString(payfreqPath));
-			paymentFrequency = temp == 0? paymentFrequency : temp;
-		}
-		
-		if(config.contains(gracePath) && config.isString(gracePath))
-			gracePeriod = Conf.parseTime(config.getString(gracePath));
-		
-		if(config.contains(servfreqPath) && config.isString(servfreqPath))
-			serviceFeeFrequency = Conf.parseTime(config.getString(servfreqPath));
-		
-		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
-		
-		String query1 = "SELECT OfferName FROM PreparedOffers WHERE LenderID=?";
-		String query2 = "INSERT INTO PreparedOffers (" + columns + ") VALUES (?, ?, " + value + ", " + interestRate + ", " + term + ", " + compoundingPeriod + ", " + gracePeriod + ", " + paymentTime + ", " + paymentFrequency + ", " + lateFee + ", " + minPayment + ", " + serviceFeeFrequency + ", " + serviceFee + ", " + loanType + ");";
-		// TODO move to OfferManager
-		try {
-			
-			// build two PreparedOffers
-			
-			PreparedStatement stmt1 = plugin.conn.prepareStatement(query1);
-			
-			stmt1.setString(1, playerID.toString());
-			
-			ResultSet existingOffers = stmt1.executeQuery();
-			
-			Set<String> searchSet = new HashSet<String>();
-			
-			while(existingOffers.next()){
-				searchSet.add(existingOffers.getString("OfferName"));
-			}
-			
-			PreparedStatement stmt2 = plugin.conn.prepareStatement(query2);
-			
-			stmt2.setString(1, playerID.toString());
-			
-			
-			if(searchSet.size() == 0 || !searchSet.contains("default")){
-			
-			stmt2.setString(2, "default");
-			stmt2.executeUpdate();
-			}
-			
-			if(searchSet.size() == 0 || !searchSet.contains("prepared")){
-			stmt2.setString(2, "prepared");
-			
-			stmt2.executeUpdate();
-			}
-			
-			stmt1.close();
-			stmt2.close();
-			
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-	
-				
-	}
 
 	private ResultSet queryFinancialEntitiesTable(UUID userID){
 		
