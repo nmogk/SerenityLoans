@@ -653,6 +653,9 @@ public class PlayerManager {
 			stmt.setString(2, targetId.toString());
 			
 			stmt.executeUpdate();
+			
+			ps.close();
+			stmt.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();

@@ -175,12 +175,37 @@ public class OfferManager {
 			
 			result = res.getDouble(1);
 			
+			stmt.close();
+			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
 		return result;
+		
+	}
+	
+	public boolean removeOffer(UUID lenderId, UUID borrowerId){
+		String update = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
+		int exit = -1;
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(update);
+			
+			ps.setString(1, lenderId.toString());
+			ps.setString(2, borrowerId.toString());
+			
+			exit = ps.executeUpdate();
+			
+			ps.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+			return false;
+		}
+		
+		return exit == 0 || exit == 1;
 		
 	}
 }

@@ -83,7 +83,9 @@ public class LoanBorrowerHandler {
 			return true;
 		}
 		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(args[1]);
+		String lenderName = args[1];
+		
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(lenderName);
 		
 		if(lender == null) {
 			sender.sendMessage(prfx + " Lender entity not found.");
@@ -94,14 +96,14 @@ public class LoanBorrowerHandler {
 		ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
 		
 		if(theOffer == null){
-			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", plugin.playerManager.entityNameLookup(lender)));
+			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
 			return true;
 		}
 		
 		Timestamp expires = theOffer.getExpirationDate();
 		
 		if(expires.before(new Date())){
-			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", plugin.playerManager.entityNameLookup(lender)));
+			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
 			return true;
 		}
 		
@@ -111,7 +113,7 @@ public class LoanBorrowerHandler {
 		
 		if(!plugin.econ.has(lender, value).callSuccess){
 			
-			sender.sendMessage(String.format(prfx + " %s does not have enough money to loan!", plugin.playerManager.entityNameLookup(lender)));
+			sender.sendMessage(String.format(prfx + " %s does not have enough money to loan!", lenderName));
 			return true;
 		}
 		
@@ -146,29 +148,18 @@ public class LoanBorrowerHandler {
 		
 		boolean setToIgnore = plugin.playerManager.toggleIgnore(requester.getUserID(), target.getUserID());
 		
-		sender.sendMessage(String.format(prfx + " %s ignoring %s.", setToIgnore? "Now" : "No longer",target.getName()));
+		sender.sendMessage(String.format(prfx + " %s ignoring %s.", setToIgnore? "Now" : "No longer", args[1]));
 		
 		return true;
 	}
 
 	protected boolean rejectOffer(CommandSender sender, Command cmd, String alias, String[] args){
-		String updateSQL = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
+		boolean success = plugin.offerManager.removeOffer(((Player)sender).getUniqueId(), plugin.playerManager.entityIdLookup(args[1]));
 		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
-			
-			stmt.setInt(2, plugin.playerManager.getFinancialEntityID(sender.getName()));
-			stmt.setInt(1, plugin.playerManager.getFinancialEntityID(args[1]));
-			
-			stmt.executeUpdate();
-		} catch (SQLException e) {
+		if(success)
+			sender.sendMessage(prfx + " Offer removed successfully.");
+		else
 			sender.sendMessage(prfx + " Unable to complete request.");
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-			return true;
-		}
-		
-		sender.sendMessage(prfx + " Offer removed successfully.");
 		
 		return true;
 	}
