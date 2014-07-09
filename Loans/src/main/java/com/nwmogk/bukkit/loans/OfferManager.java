@@ -256,6 +256,51 @@ public class OfferManager {
 		return list;
 	}
 	
+	public ImmutableOffer getPreparedOffer(UUID lenderId, String offerName){
+		String query = "SELECT * FROM PreparedOffers WHERE LenderID=? AND OfferName=?;";
+		ImmutableOffer offer = null;
+		
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(query);
+			
+			stmt.setString(1, lenderId.toString());
+			stmt.setString(2, offerName);
+			
+			ResultSet results = stmt.executeQuery();
+			
+			if(!results.next()){
+				stmt.close();
+				return null;
+			}
+			
+			FinancialEntity lender = plugin.playerManager.getFinancialEntity(lenderId);
+			FinancialEntity borrower = null;
+			double value = results.getDouble("Value");
+			double interestRate = results.getDouble("InterestRate");
+			double lateFee = results.getDouble("LateFee");
+			double minPayment = results.getDouble("MinPayment");
+			double serviceFee = results.getDouble("ServiceFee");
+			long term = results.getLong("Term");
+			long compoundingPeriod = results.getLong("CompoundingPeriod");
+			long gracePeriod = results.getLong("GracePeriod");
+			long paymentTime = results.getLong("PaymentTime");
+			long paymentFrequency = results.getLong("PaymentFrequency");
+			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
+			Timestamp expDate = null;
+			int termsID = results.getInt("OfferID");
+			
+			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
+
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return offer;
+	}
+	
 
 	public double getTermsValue(int preparedTermsId){
 		String query = String.format("SELECT Value FROM PreparedOffers WHERE OfferID=%d;", preparedTermsId);

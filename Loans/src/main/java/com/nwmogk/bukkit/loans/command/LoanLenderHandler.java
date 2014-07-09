@@ -45,19 +45,12 @@
 
 package com.nwmogk.bukkit.loans.command;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
-import java.text.DecimalFormat;
-import java.text.ParsePosition;
 import java.util.Date;
 import java.util.HashMap;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.loans.Conf;
@@ -66,6 +59,7 @@ import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.command.LoanHandler.LoanSpec;
 import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 
@@ -450,34 +444,26 @@ public class LoanLenderHandler {
 	}
 
 
-private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, boolean isDefault) {
+	private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, boolean isDefault) {
 
-	String querySQL = String.format("SELECT * FROM PreparedOffers WHERE LenderID=%d AND OfferName='%s'", player.getUserID(), isDefault? "default" : "prepared" );
+		ImmutableOffer results = plugin.offerManager.getPreparedOffer(player.getUserID(), isDefault? "default" : "prepared");
 	
-	try {
-		Statement stmt = plugin.conn.createStatement();
-		
-		ResultSet results = stmt.executeQuery(querySQL);
-		
-		if(!results.next()){
-			sender.sendMessage(prfx + " No applicable offers to view.");
-			stmt.close();
-			return true;
-		}
-		
-		double value = results.getDouble("Value");
-		double interestRate = results.getDouble("InterestRate");
-		double lateFee = results.getDouble("LateFee");
-		double minPayment = results.getDouble("MinPayment");
-		double serviceFee = results.getDouble("ServiceFee");
-		long term = results.getLong("Term");
-		long compoundingPeriod = results.getLong("CompoundingPeriod");
-		long gracePeriod = results.getLong("GracePeriod");
-		long paymentTime = results.getLong("PaymentTime");
-		long paymentFrequency = results.getLong("PaymentFrequency");
-		long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
-		String loanType = results.getString("LoanType");
-		
+		if(results == null)
+			return false;
+	
+		double value = results.getValue();
+		double interestRate = results.getInterestRate();
+		double lateFee = results.getLateFee();
+		double minPayment = results.getMinPayment();
+		double serviceFee = results.getServiceFee();
+		long term = results.getTerm();
+		long compoundingPeriod = results.getCompoundingPeriod();
+		long gracePeriod = results.getGracePeriod();
+		long paymentTime = results.getPaymentTime();
+		long paymentFrequency = results.getPaymentFrequency();
+		long serviceFeeFrequency = results.getServiceFeeFrequency();
+		String loanType = results.getLoanType().toString();
+	
 		String[] result =  
 			{String.format("    Loan value: %s", plugin.econ.format(value)),
 			 String.format("    Interest rate: %s (%s)",  plugin.econ.formatPercent(interestRate), Conf.getIntReportingString()),
@@ -491,29 +477,23 @@ private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, 
 		String[] lateFeeRelated = 
 			{String.format("    Late fee: %s", plugin.econ.format(lateFee)),
 			 String.format("    Grace period: %s", Conf.buildTimeString(gracePeriod))};
-		
+			
 		String[] serviceFeeRelated = 
 			{String.format("    Service fee: %s", plugin.econ.format(serviceFee)),
 			 String.format("    Service fee frequency: %s", Conf.buildTimeString(serviceFeeFrequency))};
-		
+			
 		sender.sendMessage(String.format(prfx + " Details for %soffering.", isDefault? "default ":""));
 		sender.sendMessage(result);
-		
+			
 		if(lateFee != 0)
 			sender.sendMessage(lateFeeRelated);
 		if(serviceFee != 0)
 			sender.sendMessage(serviceFeeRelated);
-		
-		stmt.close();
+			
 		return true;
-	} catch (SQLException e) {
-		SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-		e.printStackTrace();
+		
+		
 	}
-	
-	return false;
-}
-
 
 
 
