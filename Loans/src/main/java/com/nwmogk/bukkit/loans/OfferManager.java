@@ -159,7 +159,11 @@ public class OfferManager {
 	}
 	
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID){
-		String query = "SELECT * FROM offer_view WHERE LenderID=? AND BorrowerID=?;";
+		return getOffer(lenderID, borrowerID, false);
+	}
+	
+	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID, boolean filterSent){
+		String query = String.format("SELECT * FROM offer_view WHERE LenderID=? AND BorrowerID=?%s;", filterSent? " AND Sent='false'" : "");
 		String query2 = "SELECT PreparedTerms FROM Offers WHERE LenderID=? AND BorrowerID=?;";
 		ImmutableOffer offer = null;
 		
@@ -234,7 +238,11 @@ public class OfferManager {
 	}
 	
 	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID){
-		String query = "SELECT LenderID FROM Offers WHERE BorrowerID=?;";
+		return getOfferSendersTo(borrowerID, false);
+	}
+	
+	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID, boolean filterSent){
+		String query = String.format("SELECT LenderID FROM Offers WHERE BorrowerID=?%s;", filterSent? " AND Sent='false'" : "");
 		LinkedList<FinancialEntity> list = new LinkedList<FinancialEntity>();
 		
 		try {

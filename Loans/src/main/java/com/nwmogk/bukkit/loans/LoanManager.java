@@ -51,6 +51,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.UUID;
 import java.util.Vector;
@@ -446,6 +447,37 @@ public class LoanManager {
 			result = loansFound.toArray(result);
 		
 		return result;
+	}
+	
+	public List<Loan> getLoansWithOutstandingStatements(UUID borrowerId){
+		String psQuery = "SELECT DISTINCT LoanID FROM PaymentStatements WHERE BillAmountPaid < BillAmount;";
+		LinkedList<Loan> result = new LinkedList<Loan>();
+		
+		Statement paymentStatements;
+		try {
+			paymentStatements = plugin.conn.createStatement();
+			
+			ResultSet loansWithStatements = paymentStatements.executeQuery(psQuery);
+			
+			while(loansWithStatements.next()){
+				int loanId = loansWithStatements.getInt(1);
+				
+				Loan potential = getLoan(loanId);
+				
+				if(potential.getBorrower().getUserID().equals(borrowerId))
+					result.add(potential);
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		if (result.size() == 0)
+				return null;
+		return result;
+		
+		
 	}
 	
 	public PaymentStatement getPaymentStatement(int loanID) {
