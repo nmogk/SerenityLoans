@@ -61,7 +61,7 @@ import java.util.logging.Logger;
 
 public final class SerenityLoans extends JavaPlugin {
 	
-	public Logger log;
+	public static Logger log;
 	
     public EconomyManager econ = null;
 //    public Permission perms = null;
