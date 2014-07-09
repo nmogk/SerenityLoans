@@ -466,6 +466,8 @@ public class LoanManager {
 			Timestamp dueDate = rs.getTimestamp("DueDate");
 			double amountPaid = rs.getDouble("BillAmountPaid");
 			
+			stmt.close();
+			
 			return new PaymentStatement(statementID, loanID, billAmount, minimum, statementDate, dueDate, amountPaid);
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
@@ -473,6 +475,26 @@ public class LoanManager {
 		}
 		
 		return null;
+	}
+	
+	public boolean setLender(int loanId, UUID newLenderId){
+		String updateSQL = String.format("UPDATE Loans SET LenderID=? WHERE LoanID=%d;", loanId);
+		int result = -1;
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(updateSQL);
+			
+			ps.setString(1, newLenderId.toString());
+			
+			result = ps.executeUpdate();
+			
+			ps.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return result == 1;
 	}
 
 	/**

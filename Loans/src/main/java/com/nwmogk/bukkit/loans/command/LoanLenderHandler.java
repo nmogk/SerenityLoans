@@ -403,8 +403,10 @@ public class LoanLenderHandler {
 	}
 	
 	protected boolean buyLoan(CommandSender sender, Command cmd, String alias, String[] args){
-		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(sender.getName());			
+		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());			
 		
+		
+		// Pending Sales are not persistent across restarts.
 		if(!pendingSales.containsKey(buyer)){
 			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan.");
 			return true;
@@ -420,30 +422,12 @@ public class LoanLenderHandler {
 		plugin.econ.withdraw(buyer, ls.amount);
 		plugin.econ.deposit(ls.theLoan.getLender(), ls.amount);
 		
-		String updateSQL = String.format("UPDATE Loans SET LenderID=%d WHERE LoanID=%d", buyer.getUserID(), ls.theLoan.getLoanID());
+		if(plugin.loanManager.setLender(ls.theLoan.getLoanID(), buyer.getUserID()))
+			sender.sendMessage(prfx + " Purchase processed successfully!");
+		else
+			sender.sendMessage(prfx + " Error processing purchase.");
 		
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			int returnCode = stmt.executeUpdate(updateSQL);
-			
-			if(returnCode == 1)
-				sender.sendMessage(prfx + " Purchase processed successfully!");
-			else
-				sender.sendMessage(prfx + " Error processing purchase.");
-			
-			stmt.close();
-			
-			return true;
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return false;
-		
+		return true;
 	}
 	
 	protected boolean viewSaleOffer(CommandSender sender, Command cmd, String alias,
