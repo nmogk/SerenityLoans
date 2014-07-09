@@ -67,6 +67,7 @@ import com.nwmogk.bukkit.loans.command.LoanHandler.LoanSpec;
 import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.object.Loan;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 
 public class LoanLenderHandler {
 	
@@ -209,7 +210,6 @@ public class LoanLenderHandler {
 		return true;
 	}
 
-	
 	protected boolean retractOffer(CommandSender sender, Command cmd, String alias, String[] args){
 		
 		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
@@ -226,7 +226,7 @@ public class LoanLenderHandler {
 	protected boolean loanOfferingCommand(CommandSender sender, Command cmd,
 			String alias, String[] args, boolean isDefault) {
 		
-		FinancialEntity player = plugin.playerManager.getFinancialEntityAdd(sender.getName());
+		FinancialEntity player = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		
 		if(player == null){
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " " + (isDefault? "default ": "") +  "offering"}));
@@ -263,8 +263,10 @@ public class LoanLenderHandler {
 	}
 
 	protected boolean forgiveLoan(CommandSender sender, Command cmd, String alias, String[] args){
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(sender.getName());
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
+		String borrowerName = args[1];
+		
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(borrowerName);
 		
 		if(lender == null){
 			sender.sendMessage(Conf.messageCenter("generic-problem", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " forgive"}));
@@ -281,7 +283,7 @@ public class LoanLenderHandler {
 		}
 		
 		if(loanSelection.multipleValues){
-			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrower.getName()}));
+			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
 			
 			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 			for(int i = 0; i < allLoans.length ; i++){
@@ -299,7 +301,7 @@ public class LoanLenderHandler {
 			try{
 				amount = Double.parseDouble(toParse[0]);
 			} catch (NumberFormatException e){
-				sender.sendMessage(Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrower.getName()}));
+				sender.sendMessage(Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
 				return true;
 			}
 		} else 
@@ -309,15 +311,15 @@ public class LoanLenderHandler {
 		
 		plugin.loanManager.applyPayment(theLoan, amount);
 		
-		sender.sendMessage(Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrower.getName(), plugin.econ.format(amount)}));
+		sender.sendMessage(Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName, plugin.econ.format(amount)}));
 
 		return true;
 	}
 	
 	protected boolean sellLoan (CommandSender sender, Command cmd, String alias, String[] args){
-		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(sender.getName());
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
+		String borrowerName = args[1];
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(borrowerName);
 					
 		if(lender == null){
 			sender.sendMessage(Conf.messageCenter("generic-problem", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " sell"}));
@@ -333,7 +335,7 @@ public class LoanLenderHandler {
 		}
 		
 		if(loanSelection.multipleValues){
-			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " sell", borrower.getName()}));
+			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " sell", borrowerName}));
 			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 			for(int i = 0; i < allLoans.length ; i++){
 				sender.sendMessage(String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
@@ -370,7 +372,7 @@ public class LoanLenderHandler {
 		}
 		
 		if(!newLender.hasPermission("serenityloans.loan.lend") && !newLender.hasPermission("serenityloans.crunion.lend")){
-			sender.sendMessage(String.format(prfx + " %s does not have permission to buy loan.", recipient.getName()));
+			sender.sendMessage(String.format(prfx + " %s does not have permission to buy loan.", toParse[0]));
 			return true;
 		}
 		
@@ -386,10 +388,10 @@ public class LoanLenderHandler {
 		
 		// Send message
 		
-		String recipientName = recipient.getName().equals(newLender.getName())? "You" : recipient.getName();
-		String commandName = recipient.getName().equals(newLender.getName())? "/loan" : "/crunion";
+		String recipientName = recipient.getUserID().equals(newLender.getUniqueId())? "You" : ((FinancialInstitution)recipient).getName();
+		String commandName = recipient.getUserID().equals(newLender.getUniqueId())? "/loan" : "/crunion";
 		
-		newLender.sendMessage(String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientName, lender.getName(), plugin.econ.format(amount)));
+		newLender.sendMessage(String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientName, sender.getName(), plugin.econ.format(amount)));
 		newLender.sendMessage(String.format(prfx + "Type '%s viewsaleoffer' to view details.", commandName));
 		newLender.sendMessage(String.format(prfx + "Type '%s buy' to purchase loan.", commandName));
 	
