@@ -621,5 +621,45 @@ public class PlayerManager {
 		// TODO my own lookup
 		return null;
 	}
+	
+	public boolean toggleIgnore(UUID playerId, UUID targetId){
+		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
+		
+		boolean setToIgnore = true;
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(querySQL);
+			
+			ps.setString(1, playerId.toString());
+			ps.setString(2, targetId.toString());
+			
+			ResultSet currentTrust = ps.executeQuery();
+			
+			String updateSQL;
+			
+			if(currentTrust.next()){
+				setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
+				
+				String ignoreString = setToIgnore? "'true'" : "'false'";
+				updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
+				
+			} else {
+				updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
+			}
+			
+			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
+			
+			stmt.setString(1, playerId.toString());
+			stmt.setString(2, targetId.toString());
+			
+			stmt.executeUpdate();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return setToIgnore;
+		
+	}
 
 }

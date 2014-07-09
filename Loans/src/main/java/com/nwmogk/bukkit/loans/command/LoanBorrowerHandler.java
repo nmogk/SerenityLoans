@@ -131,7 +131,7 @@ public class LoanBorrowerHandler {
 	
 	protected boolean ignoreOffers(CommandSender sender, Command cmd,  String alias, String[] args){
 		
-		FinancialEntity requester = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity requester = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
 		FinancialEntity target = plugin.playerManager.getFinancialEntityRetryOnce(args[1]);
 		
 		if(requester == null){
@@ -139,48 +139,16 @@ public class LoanBorrowerHandler {
 			return true;
 		}
 		
-		
-		
 		if(target == null){
 			sender.sendMessage(prfx + " Cannot ignore this entity.");
 			return true;
 		}
 		
-		boolean setToIgnore = true;
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			String querySQL = String.format("SELECT IgnoreOffers FROM Trust WHERE UserID=%d AND TargetID=%d;", requester.getUserID(), target.getUserID());
-			
-			ResultSet status = stmt.executeQuery(querySQL);
-			
-			if(status.next()){
-				setToIgnore = !Boolean.parseBoolean(status.getString("IgnoreOffers"));
-				
-				String ignoreString = setToIgnore? "'true'" : "'false'";
-				String updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=%d AND TargetID=%d;",  ignoreString, requester.getUserID(), target.getUserID());
-			
-				stmt.executeUpdate(updateSQL);
-			} else {
-				
-				String insertSQL = String.format("INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (%d, %d, 'true');", requester.getUserID(), target.getUserID());
-				
-				stmt.executeUpdate(insertSQL);
-			}
-			
-			
-		} catch (SQLException e) {
-			sender.sendMessage(prfx + " Unable to complete request.");
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-			return true;
-		}
+		boolean setToIgnore = plugin.playerManager.toggleIgnore(requester.getUserID(), target.getUserID());
 		
 		sender.sendMessage(String.format(prfx + " %s ignoring %s.", setToIgnore? "Now" : "No longer",target.getName()));
 		
 		return true;
-		
 	}
 
 	protected boolean rejectOffer(CommandSender sender, Command cmd, String alias, String[] args){
