@@ -78,7 +78,7 @@ public final class PlayerLoginListener implements Listener {
 			SerenityLoans.log.info(String.format("[%s] Attempting to add player %s to system.", plugin.getDescription().getName(), evt.getPlayer().getName()));
 		
 		
-		if(!plugin.playerManager.addToFinancialEntitiesTable(evt.getPlayer().getUniqueId()))
+		if(!plugin.playerManager.addPlayer(evt.getPlayer().getUniqueId()))
 			return;
 		
 		if(!evt.getPlayer().hasPermission("serenityloans.loan.borrow"))

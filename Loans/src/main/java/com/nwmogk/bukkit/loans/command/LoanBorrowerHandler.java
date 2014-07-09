@@ -72,7 +72,7 @@ public class LoanBorrowerHandler {
 	
 	protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, String[] args){
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		
 		if(borrower == null){
 			sender.sendMessage(prfx + " You are not able to use this commmand.");
@@ -81,7 +81,7 @@ public class LoanBorrowerHandler {
 		
 		String lenderName = args[1];
 		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(lenderName);
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
 		
 		if(lender == null) {
 			sender.sendMessage(prfx + " Lender entity not found.");
@@ -129,8 +129,8 @@ public class LoanBorrowerHandler {
 	
 	protected boolean ignoreOffers(CommandSender sender, Command cmd,  String alias, String[] args){
 		
-		FinancialEntity requester = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
-		FinancialEntity target = plugin.playerManager.getFinancialEntityRetryOnce(args[1]);
+		FinancialEntity requester = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
+		FinancialEntity target = plugin.playerManager.getFinancialEntityAdd(args[1]);
 		
 		if(requester == null){
 			sender.sendMessage(prfx + " You are not able to use this command.");
@@ -162,7 +162,7 @@ public class LoanBorrowerHandler {
 
 	protected boolean payLoan(CommandSender sender, Command cmd, String alias, String[] args, boolean payOff) {
 
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
 		
 		
@@ -216,7 +216,7 @@ public class LoanBorrowerHandler {
 
 	protected boolean viewStatement(CommandSender sender, Command cmd, String alias, String[] args) {
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
 		
 		

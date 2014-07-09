@@ -74,107 +74,208 @@ public class PlayerManager {
 		this.plugin = plugin;
 	}
 	
-	@Deprecated
-	public FinancialEntity getFinancialEntity(String name){
-		return getFinancialEntity(entityIdLookup(name));
-	}
-	
-	public FinancialEntity getFinancialEntity(UUID userID){
-		return buildEntity(queryFinancialEntitiesTable(userID));
-	}
-	
-	private ResultSet queryFinancialEntitiesTable(UUID userID){
-		
-		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
-		ResultSet result = null;
-		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
-			stmt.setString(1, userID.toString());
-			result = stmt.executeQuery();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return result;
-	}
-	
-	private ResultSet queryFinancialInstitutionsTable(UUID userID){
-		
-		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
-		ResultSet result = null;
-		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
-			stmt.setString(1, userID.toString());
-			result = stmt.executeQuery();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return result;
-	}
-	
-	private FinancialEntity buildEntity(ResultSet successfulQuery){
-		if(successfulQuery == null)
-			return null;
-		
-		try {
-			if(!successfulQuery.next())
-				return null;
-			
-			String userString = successfulQuery.getString("UserID");
-			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
-			double cash = successfulQuery.getDouble("Cash");
-			int crScore = successfulQuery.getInt("CreditScore");
-			
-			UUID userID = UUID.fromString(userString);
-			
-			if(pt.equals(PlayerType.PLAYER))
-				return new FinancialPlayer(userID, pt, cash, crScore);
-			
-				
-			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
-				
-			if(instituteQuery == null || !instituteQuery.next())
-				return null;
-				
-			String name = instituteQuery.getString("Name");
-			String managerString = instituteQuery.getString("Manager");
-			
-			UUID managerID = UUID.fromString(managerString);
-			
-			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return null;
+	/**
+	 * 
+	 * 
+	 * 
+	 * @param entityName
+	 * @return true if the entity is in the FinancialEntities table
+	 * by the end of the method.
+	 */
+	public boolean addPlayer(UUID playerID) {
+		return addPlayer(playerID, null);
 	}
 
-	@Deprecated
-	public boolean inFinancialEntitiesTable(String entityName) {
-		return inFinancialEntitiesTable(entityIdLookup(entityName));
+	public void addPlayers(Player[] players){
+		
+		String update = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES (?,?,?,?);";
+		PreparedStatement stmt = null;
+		
+		try {
+			stmt = plugin.getConnection().prepareStatement(update);
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		for(Player aPlayer : players){
+			addPlayer(aPlayer.getUniqueId(), stmt);
+		}
+		
 	}
-	
+
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
+		//TODO default value inputs
+		
+		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, 435);
+	}
+
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+		//TODO Implement FinancialInstitution creation.
+		
+		// from SerenityLoans must remember to do this in this method.
+		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
+		return false;
+	}
+
 	public UUID entityIdLookup(String entityName) {
 		//TODO Implement UUID lookup from name
 		return null;
 	}
-	
+
 	public String entityNameLookup(UUID entityID) {
 		// TODO
 		return null;
 	}
-	
+
 	public String entityNameLookup(FinancialEntity entity){
 		if(entity instanceof FinancialInstitution)
 			return ((FinancialInstitution) entity).getName();
 		return entityNameLookup(entity.getUserID());
+	}
+
+	public FinancialEntity getFinancialEntity(UUID userID){
+		return buildEntity(queryFinancialEntitiesTable(userID));
+	}
+	
+	@Deprecated
+	public FinancialEntity getFinancialEntity(String name){
+		return getFinancialEntity(entityIdLookup(name));
+	}
+
+	/**
+	 * Reads the FinancialInstitutions table, and returns the UUID associated
+	 * with the given name or null, if the name is not present. 
+	 * 
+	 * @param entityName
+	 * @return
+	 */
+	public UUID getFinancialInstituteID(String entityName) {
+		
+		String query = "SELECT BankID from FinancialInstitutions WHERE Name=?;";
+		String idString = null;
+		UUID result = null;
+		
+		try {
+			PreparedStatement stmt = plugin.getConnection().prepareStatement(query);
+			
+			stmt.setString(1, entityName);
+			
+			ResultSet candidates = stmt.executeQuery();
+			
+			if(!candidates.next()){
+				
+				if(SerenityLoans.debugLevel >=2){
+					SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
+				}
+				
+				return result;
+				
+			}
+			
+			idString = candidates.getString("BankID");
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		result = UUID.fromString(idString);
+		
+		if(SerenityLoans.debugLevel >=2){
+			SerenityLoans.log.info(String.format("[%s] FinancialEntityID for " + entityName + "=" + result, plugin.getDescription().getName()));
+		}
+
+		return result;
+	}
+
+	public Vector<UUID> getManagedEntities(UUID playerID){
+		Vector<UUID> results = new Vector<UUID>();
+		
+		String query = "SELECT BankID FROM FinancialInstitutions WHERE Manager=?;";
+		
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(query);
+			
+			stmt.setString(1, playerID.toString());
+			
+			ResultSet hits = stmt.executeQuery();
+			
+			while(hits.next()){
+				results.add(UUID.fromString(hits.getString("BankID")));
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+		
+		}
+		
+		return results;
+	}
+
+	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
+		FinancialEntity entity = getFinancialEntity(financialEntityID);
+		
+		if(entity == null)
+			return null;
+		
+		UUID playerID = entity.getUserID();
+		
+		if(entity instanceof FinancialInstitution)
+			playerID = ((FinancialInstitution)entity).getResponsibleParty();
+		
+		// TODO my own lookup
+		return null;
+	}
+
+	/**
+	 * This method returns a player object, given a financialEntityID.
+	 * This method ensures that either a real player is given or the
+	 * player who is the manager of a credit union if the given ID is
+	 * a credit union.
+	 * 
+	 * If the given ID is not in the FinancialEntities table or the player
+	 * is offline, this method returns null.
+	 * 
+	 * @param financialEntityID
+	 * @return
+	 */
+	public Player getPlayer(UUID financialEntityID) {
+		
+		FinancialEntity entity = getFinancialEntity(financialEntityID);
+		
+		if(entity == null)
+			return null;
+		
+		UUID playerID = entity.getUserID();
+		
+		if(entity instanceof FinancialInstitution)
+			playerID = ((FinancialInstitution)entity).getResponsibleParty();
+		
+		return plugin.getServer().getPlayer(playerID);
+		
+	}
+	
+	public FinancialEntity getFinancialEntityAdd(UUID userID){
+		
+		FinancialEntity result = getFinancialEntity(userID);
+		
+		if(result == null){
+			if(!plugin.playerManager.addPlayer(userID)){
+						
+				return null;
+			}
+			
+			result = plugin.playerManager.getFinancialEntity(userID);
+		}
+		
+		return result;
+	}
+	
+	@Deprecated
+	public FinancialEntity getFinancialEntityAdd(String name){
+		return getFinancialEntityAdd(entityIdLookup(name));
 	}
 
 	public boolean inFinancialEntitiesTable(UUID entityID){
@@ -192,38 +293,55 @@ public class PlayerManager {
 		return answer;
 	}
 
-	/**
-	 * 
-	 * 
-	 * 
-	 * @param entityName
-	 * @return true if the entity is in the FinancialEntities table
-	 * by the end of the method.
-	 */
-	public boolean addToFinancialEntitiesTable(UUID playerID) {
-		return addToFinancialEntitiesTable(playerID, null);
+	@Deprecated
+	public boolean inFinancialEntitiesTable(String entityName) {
+		return inFinancialEntitiesTable(entityIdLookup(entityName));
 	}
-	
-	public void addToFinancialEntitiesTable(Player[] players){
+
+	public boolean toggleIgnore(UUID playerId, UUID targetId){
+		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
 		
-		String update = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		PreparedStatement stmt = null;
+		boolean setToIgnore = true;
 		
 		try {
-			stmt = plugin.getConnection().prepareStatement(update);
+			PreparedStatement ps = plugin.conn.prepareStatement(querySQL);
+			
+			ps.setString(1, playerId.toString());
+			ps.setString(2, targetId.toString());
+			
+			ResultSet currentTrust = ps.executeQuery();
+			
+			String updateSQL;
+			
+			if(currentTrust.next()){
+				setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
+				
+				String ignoreString = setToIgnore? "'true'" : "'false'";
+				updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
+				
+			} else {
+				updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
+			}
+			
+			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
+			
+			stmt.setString(1, playerId.toString());
+			stmt.setString(2, targetId.toString());
+			
+			stmt.executeUpdate();
+			
+			ps.close();
+			stmt.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
-		for(Player aPlayer : players){
-			addToFinancialEntitiesTable(aPlayer.getUniqueId(), stmt);
-		}
+		return setToIgnore;
 		
 	}
-	
-	
-	private boolean addToFinancialEntitiesTable(UUID playerID, PreparedStatement statement){
+
+	private boolean addPlayer(UUID playerID, PreparedStatement statement){
 		boolean white = false;
 		boolean black = false;
 		
@@ -241,7 +359,7 @@ public class PlayerManager {
 		if(player == null){
 			if(SerenityLoans.debugLevel >= 2)
 				SerenityLoans.log.info(String.format("[%s] Player %s is not online.", plugin.getDescription().getName(), playerID.toString()));
-
+	
 			return false;
 		}
 		
@@ -350,8 +468,47 @@ public class PlayerManager {
 		return true;
 	}
 
-	private void buildFinancialEntityInitialOffers(UUID playerID) {
+	private FinancialEntity buildEntity(ResultSet successfulQuery){
+		if(successfulQuery == null)
+			return null;
+		
+		try {
+			if(!successfulQuery.next())
+				return null;
+			
+			String userString = successfulQuery.getString("UserID");
+			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
+			double cash = successfulQuery.getDouble("Cash");
+			int crScore = successfulQuery.getInt("CreditScore");
+			
+			UUID userID = UUID.fromString(userString);
+			
+			if(pt.equals(PlayerType.PLAYER))
+				return new FinancialPlayer(userID, pt, cash, crScore);
+			
+				
+			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
+				
+			if(instituteQuery == null || !instituteQuery.next())
+				return null;
+				
+			String name = instituteQuery.getString("Name");
+			String managerString = instituteQuery.getString("Manager");
+			
+			UUID managerID = UUID.fromString(managerString);
+			
+			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
 
+	private void buildFinancialEntityInitialOffers(UUID playerID) {
+	
 		// Collect config info
 		double value = 100;
 		double interestRate = 0.05;
@@ -381,10 +538,10 @@ public class PlayerManager {
 		String gracePath = 		"loan.terms-constraints.fees.grace-period.default";
 		String servicePath = 	"loan.terms-constraints.fees.service-fee.default";
 		String servfreqPath = 	"loan.terms-constraints.fees.service-fee-frequency.default";
-
+	
 		if(config.contains(valuePath) && config.isDouble(valuePath))
 			value = Math.max(0, config.getDouble(valuePath));
-
+	
 		if(config.contains(interestPath) && config.isDouble(interestPath))
 			interestRate = Math.max(0, config.getDouble(interestPath));
 		
@@ -469,200 +626,42 @@ public class PlayerManager {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
-
+	
 				
 	}
 
-	/**
-	 * Reads the FinancialInstitutions table, and returns the UUID associated
-	 * with the given name or null, if the name is not present. 
-	 * 
-	 * @param entityName
-	 * @return
-	 */
-	public UUID getFinancialInstituteID(String entityName) {
+	private ResultSet queryFinancialEntitiesTable(UUID userID){
 		
-		String query = "SELECT BankID from FinancialInstitutions WHERE Name=?;";
-		String idString = null;
-		UUID result = null;
+		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
+		ResultSet result = null;
 		
 		try {
-			PreparedStatement stmt = plugin.getConnection().prepareStatement(query);
-			
-			stmt.setString(1, entityName);
-			
-			ResultSet candidates = stmt.executeQuery();
-			
-			if(!candidates.next()){
-				
-				if(SerenityLoans.debugLevel >=2){
-					SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
-				}
-				
-				return result;
-				
-			}
-			
-			idString = candidates.getString("BankID");
-			
-			stmt.close();
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			result = stmt.executeQuery();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
-		result = UUID.fromString(idString);
-		
-		if(SerenityLoans.debugLevel >=2){
-			SerenityLoans.log.info(String.format("[%s] FinancialEntityID for " + entityName + "=" + result, plugin.getDescription().getName()));
-		}
-
 		return result;
 	}
 
-	/**
-	 * This method returns a player object, given a financialEntityID.
-	 * This method ensures that either a real player is given or the
-	 * player who is the manager of a credit union if the given ID is
-	 * a credit union.
-	 * 
-	 * If the given ID is not in the FinancialEntities table or the player
-	 * is offline, this method returns null.
-	 * 
-	 * @param financialEntityID
-	 * @return
-	 */
-	public Player getPlayer(UUID financialEntityID) {
+	private ResultSet queryFinancialInstitutionsTable(UUID userID){
 		
-		FinancialEntity entity = getFinancialEntity(financialEntityID);
-		
-		if(entity == null)
-			return null;
-		
-		UUID playerID = entity.getUserID();
-		
-		if(entity instanceof FinancialInstitution)
-			playerID = ((FinancialInstitution)entity).getResponsibleParty();
-		
-		return plugin.getServer().getPlayer(playerID);
-		
-	}
-	
-	public Vector<UUID> getManagedEntities(UUID playerID){
-		Vector<UUID> results = new Vector<UUID>();
-		
-		String query = "SELECT BankID FROM FinancialInstitutions WHERE Manager=?;";
+		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
+		ResultSet result = null;
 		
 		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(query);
-			
-			stmt.setString(1, playerID.toString());
-			
-			ResultSet hits = stmt.executeQuery();
-			
-			while(hits.next()){
-				results.add(UUID.fromString(hits.getString("BankID")));
-			}
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-		
-		}
-		
-		return results;
-	}
-	
-	@Deprecated
-	public FinancialEntity getFinancialEntityRetryOnce(String name){
-		return getFinancialEntityRetryOnce(entityIdLookup(name));
-	}
-	
-	public FinancialEntity getFinancialEntityRetryOnce(UUID userID){
-		
-		FinancialEntity result = getFinancialEntity(userID);
-		
-		if(result == null){
-			if(!plugin.playerManager.addToFinancialEntitiesTable(userID)){
-						
-				return null;
-			}
-			
-			result = plugin.playerManager.getFinancialEntity(userID);
-		}
-		
-		return result;
-	}
-	
-	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
-		//TODO default value inputs
-		
-		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, 435);
-	}
-	
-	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
-		//TODO Implement FinancialInstitution creation.
-		
-		// from SerenityLoans must remember to do this in this method.
-		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
-		return false;
-	}
-	
-	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
-		FinancialEntity entity = getFinancialEntity(financialEntityID);
-		
-		if(entity == null)
-			return null;
-		
-		UUID playerID = entity.getUserID();
-		
-		if(entity instanceof FinancialInstitution)
-			playerID = ((FinancialInstitution)entity).getResponsibleParty();
-		
-		// TODO my own lookup
-		return null;
-	}
-	
-	public boolean toggleIgnore(UUID playerId, UUID targetId){
-		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
-		
-		boolean setToIgnore = true;
-		
-		try {
-			PreparedStatement ps = plugin.conn.prepareStatement(querySQL);
-			
-			ps.setString(1, playerId.toString());
-			ps.setString(2, targetId.toString());
-			
-			ResultSet currentTrust = ps.executeQuery();
-			
-			String updateSQL;
-			
-			if(currentTrust.next()){
-				setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
-				
-				String ignoreString = setToIgnore? "'true'" : "'false'";
-				updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
-				
-			} else {
-				updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
-			}
-			
-			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
-			
-			stmt.setString(1, playerId.toString());
-			stmt.setString(2, targetId.toString());
-			
-			stmt.executeUpdate();
-			
-			ps.close();
-			stmt.close();
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			result = stmt.executeQuery();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
-		return setToIgnore;
-		
+		return result;
 	}
 
 }

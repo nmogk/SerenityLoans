@@ -400,7 +400,7 @@ public class LoanHandler implements CommandExecutor{
 		
 		// Attempt to add sender to FinancialEntities table
 		
-		FinancialEntity player = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		FinancialEntity player = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		
 		if(player == null){
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"}));
@@ -413,7 +413,7 @@ public class LoanHandler implements CommandExecutor{
 		if((sentOffers && args.length == 1) || (args.length == 2 && args[1].equalsIgnoreCase(sender.getName()))){
 			othersList = plugin.offerManager.getOfferRecipientsFrom(player.getUserID());
 		} else if(args.length == 2){
-			FinancialEntity other = plugin.playerManager.getFinancialEntityRetryOnce(args[1]);
+			FinancialEntity other = plugin.playerManager.getFinancialEntityAdd(args[1]);
 			ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
 		
 			sender.sendMessage(String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));

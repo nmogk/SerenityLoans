@@ -105,7 +105,7 @@ public class LoanLenderHandler {
 		// Check ability of sender to use loan system
 		// Sender already determined to be an online player
 		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(((Player)sender).getUniqueId());
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		
 		if(lender == null) {		
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
@@ -139,7 +139,7 @@ public class LoanLenderHandler {
 		if(!plugin.playerManager.inFinancialEntitiesTable(entityTarget)) {
 					
 			// Add to table if possible
-			if(!plugin.playerManager.addToFinancialEntitiesTable(entityTarget)){
+			if(!plugin.playerManager.addPlayer(entityTarget)){
 						
 				sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
 				return true;
@@ -342,7 +342,7 @@ public class LoanLenderHandler {
 	protected boolean loanOfferingCommand(CommandSender sender, Command cmd,
 			String alias, String[] args, boolean isDefault) {
 		
-		FinancialEntity player = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity player = plugin.playerManager.getFinancialEntityAdd(sender.getName());
 		
 		if(player == null){
 			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " " + (isDefault? "default ": "") +  "offering"}));
@@ -379,7 +379,7 @@ public class LoanLenderHandler {
 	}
 
 	protected boolean forgiveLoan(CommandSender sender, Command cmd, String alias, String[] args){
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(sender.getName());
 		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
 		
 		if(lender == null){
@@ -432,7 +432,7 @@ public class LoanLenderHandler {
 	
 	protected boolean sellLoan (CommandSender sender, Command cmd, String alias, String[] args){
 		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(sender.getName());
 		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
 					
 		if(lender == null){
@@ -469,7 +469,7 @@ public class LoanLenderHandler {
 			return true;
 		}
 		
-		FinancialEntity recipient = plugin.playerManager.getFinancialEntityRetryOnce(toParse[0]);
+		FinancialEntity recipient = plugin.playerManager.getFinancialEntityAdd(toParse[0]);
 		
 		
 		if(recipient == null){
@@ -517,7 +517,7 @@ public class LoanLenderHandler {
 	}
 	
 	protected boolean buyLoan(CommandSender sender, Command cmd, String alias, String[] args){
-		FinancialEntity buyer = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());			
+		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(sender.getName());			
 		
 		if(!pendingSales.containsKey(buyer)){
 			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan.");
@@ -563,7 +563,7 @@ public class LoanLenderHandler {
 	protected boolean viewSaleOffer(CommandSender sender, Command cmd, String alias,
 			String[] args) {
 	
-		FinancialEntity buyer = plugin.playerManager.getFinancialEntityRetryOnce(sender.getName());
+		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(sender.getName());
 		
 		if(!pendingSales.containsKey(buyer)){
 			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan");

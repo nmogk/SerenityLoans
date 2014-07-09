@@ -161,7 +161,7 @@ public final class SerenityLoans extends JavaPlugin {
 		if(debugLevel >= 1)
 			log.info(String.format("[%s] Attempting to add players to the system...", getDescription().getName()));
 		
-		playerManager.addToFinancialEntitiesTable(getServer().getOnlinePlayers());
+		playerManager.addPlayers(getServer().getOnlinePlayers());
 		
 		getServer().getPluginManager().registerEvents(new PlayerLoginListener(this), this);
 		
