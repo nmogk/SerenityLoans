@@ -425,7 +425,7 @@ public class LoanManager {
 		}
 	}
 
-	public void buildLoanEvents(int loanID) {
+	private void buildLoanEvents(int loanID) {
 		
 		Loan theLoan = getLoan(loanID);
 		
@@ -871,6 +871,51 @@ public class LoanManager {
 			e.printStackTrace();
 		}
 		
+	}
+	
+	public boolean createLoan(UUID lenderID, UUID borrowerID, int termsID, double value){
+		String insertLoan = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES (%s, %s, %d, %f, ?, ?);", lenderID.toString(), borrowerID.toString(), termsID, value );
+		String offerDestruct = String.format("DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;");
+		String whatsNew = String.format("SELECT LoanID FROM Loans WHERE Terms=%d;", termsID);
+		
+		boolean exitFlag = false;
+		int loanID = 0;
+		
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(insertLoan);
+			
+			stmt.setTimestamp(1, new Timestamp(new Date().getTime()));
+			stmt.setTimestamp(2, new Timestamp(new Date().getTime()));
+			
+			if(stmt.executeUpdate() != 1)
+				return false;
+			
+			PreparedStatement stmt2 = plugin.conn.prepareStatement(offerDestruct);
+			
+			stmt2.setString(1, lenderID.toString());
+			stmt2.setString(2, borrowerID.toString());
+			
+			stmt2.executeUpdate();
+			
+			Statement search = plugin.conn.createStatement();
+			
+			ResultSet loanResult = search.executeQuery(whatsNew);
+			
+			loanResult.next();
+			
+			loanID = loanResult.getInt(1);
+			
+			stmt.close();
+			stmt2.close();
+			search.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		buildLoanEvents(loanID);
+		
+		return exitFlag;
 	}
 
 }

@@ -118,48 +118,13 @@ public class LoanBorrowerHandler {
 		plugin.econ.withdraw(lender, value);
 		plugin.econ.deposit(borrower, value);
 		
+		boolean returnSuccess = plugin.loanManager.createLoan(lender.getUserID(), borrower.getUserID(), termsID, value);
 		
-		int loanID = 0;
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			
-			String loanBuilder = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES (%d, %d, %d, %f, ?, ?);", lender.getUserID(), borrower.getUserID(), termsID, value );
-			
-			PreparedStatement ps = plugin.conn.prepareStatement(loanBuilder);
-			
-			ps.setTimestamp(1, new Timestamp(new Date().getTime()));
-			ps.setTimestamp(2, new Timestamp(new Date().getTime()));
-			
-			int returnCode = ps.executeUpdate();
-			
-			if(returnCode == 1){
-				sender.sendMessage(prfx + " Successfully processed loan!");
-			} else {
-				sender.sendMessage(prfx + " Loan not processed!");
-			}
-			
-			String offerDestruct = String.format("DELETE FROM Offers WHERE LenderID=%d AND BorrowerID=%d;", lender.getUserID(), borrower.getUserID());
-			
-			stmt.executeUpdate(offerDestruct);
-			
-			String whatsNew = String.format("SELECT LoanID FROM Loans WHERE Terms=%d;", termsID);
-			
-			ResultSet rs = stmt.executeQuery(whatsNew);
-			rs.next();
-			
-			loanID = rs.getInt("LoanID");
-			
-			stmt.close();
-			
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
+		if(returnSuccess){
+			sender.sendMessage(prfx + " Successfully processed loan!");
+		} else {
+			sender.sendMessage(prfx + " Loan not processed!");
 		}
-		
-		plugin.loanManager.buildLoanEvents(loanID);
 		
 		return true;
 	}
