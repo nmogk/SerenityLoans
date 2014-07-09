@@ -61,8 +61,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
@@ -86,6 +87,7 @@ public class PlayerManager {
 	
 	private SerenityLoans plugin;
 	
+	// Each table that this class manages has a lock object.
 	private final Object financialEntitiesLock = new Object();
 	private final Object financialInstitutionsLock = new Object();
 	@SuppressWarnings("unused")
@@ -94,6 +96,11 @@ public class PlayerManager {
 	@SuppressWarnings("unused")
 	private final Object creditHistoryLock = new Object();
 	
+	/**
+	 * Creates a PlayerManager object with the specified plugin reference.
+	 * 
+	 * @param plugin SerenityLoans object with which this PlayerManager is associated.
+	 */
 	public PlayerManager(SerenityLoans plugin){
 		this.plugin = plugin;
 	}
@@ -102,26 +109,31 @@ public class PlayerManager {
 	
 	/**
 	 * 
+	 * Attempts to add a Player corresponding to the given UUID to the 
+	 * FinancialEntities table. Will fail if given a UUID that does not
+	 * represent an online Player unless the UUID is already present
+	 * in the table. In this case, the method reports that the entity
+	 * exists. This method will check for the existence of a white or
+	 * black list if the settings specify, and will filter potential
+	 * users appropriately. These lists are plugin specific, not the
+	 * ones for the server as a whole.
 	 * 
-	 * 
-	 * @param entityName
+	 * @param playerID UUID of the player to be added.
 	 * @return true if the entity is in the FinancialEntities table
-	 * by the end of the method.
+	 * by the end of the method, false otherwise.
 	 */
 	public boolean addPlayer(UUID playerID){
-		boolean white = false;
-		boolean black = false;
-		
+		// Check to see if the entity is already in the table
 		if(inFinancialEntitiesTable(playerID)){
 			
 			if(SerenityLoans.debugLevel >= 2)
 				SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), playerID.toString()));
-			
-			
+
 			return true;
 		
 		}
 		
+		// Check to ensure that the given ID represents an online player.
 		Player player = plugin.getServer().getPlayer(playerID);
 		if(player == null){
 			if(SerenityLoans.debugLevel >= 2)
@@ -130,25 +142,58 @@ public class PlayerManager {
 			return false;
 		}
 		
+		return addPlayers(new Player[]{player});
+		
+	}
+
+
+	/**
+	 * 
+	 * Attempts to add all Players given to the 
+	 * FinancialEntities table. This method will check for the existence of a white or
+	 * black list if the settings specify, and will filter potential
+	 * users appropriately. These lists are plugin specific, not the
+	 * ones for the server as a whole.
+	 * 
+	 * @param players Array of the players to be added.
+	 * @return true if all players were added successfully, false otherwise.
+	 */
+	public boolean addPlayers(Player[] players){
+		boolean result = true;
+		
+		
+		
+		// Flags for controlling the use of white or black list
+		// Actual values set later
+		boolean white = false;
+		boolean black = false;
+		Set<String> names = null;
+				
+		
+		// Sets the white/black list flags.
+		// If both are set, this method behaves as if using a whitelist.
 		if(plugin.getConfig().contains("options.use-whitelist"))
 			white = plugin.getConfig().getBoolean("options.use-whitelist");
 		else if(plugin.getConfig().contains("options.use-blacklist"))
 			black = plugin.getConfig().getBoolean("options.use-blacklist");
 		
+		// Check to see if player is allowed to use system.
+		// FIXME Implement a UUID based white/black list system 
 		if(white || black) {
 			if(SerenityLoans.debugLevel >= 2)
 				SerenityLoans.log.info(String.format("[%s] Using a white/black list.", plugin.getDescription().getName()));
 			
-			
+			// Currently only supports ASCII encoding
 			Charset charset = Charset.forName("US-ASCII");
 			
 			String fname = white? "whitelist":"blacklist";
 			File list = new File(plugin.getDataFolder().getAbsolutePath() + fname + ".txt");
 			
-			LinkedList<String> names = new LinkedList<String>();
+			names = new HashSet<String>();
 				
 			try {
 				
+				// Creates the list file if it doesn't exist.
 				if(!list.exists()){
 					
 					list.createNewFile();
@@ -158,12 +203,14 @@ public class PlayerManager {
 				
 					BufferedReader reader = Files.newReader(list, charset);
 			
+					// This expects each name to be a separate line
 					while(true){
 						String name = reader.readLine();
 						
 						if(name == null)
 							break;
 						
+						// Building a list of names in the file
 						names.add(name);
 					}
 				
@@ -177,84 +224,143 @@ public class PlayerManager {
 				e.printStackTrace();
 			}
 			
-			boolean nameFound = false;
 			
-			for(String candidate : names) {
-				nameFound |= playerID.toString().equals(candidate);
-			}
-			
-			if(!(nameFound && white) && !(!nameFound && black))
-				return false;
 			
 		}
 		
-		
-		String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		int rowsUpdated = 0;
-		
-		try {
-			
-			PreparedStatement stmt = plugin.getConnection().prepareStatement(update);
-			
-			stmt.setString(1, playerID.toString());
-			stmt.setString(2, "Player");
-			
-			double cash = 100;
-			int crScore = 465;
-			
-			if(plugin.getConfig().contains("economy.initial-money"))
-				cash = plugin.getConfig().getDouble("economy.initial-money");
-			if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
-				crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
-			
-			stmt.setDouble(3, cash);
-			stmt.setInt(4, crScore);
-			
-			synchronized(financialEntitiesLock){
-				rowsUpdated = stmt.executeUpdate();
-			}
-			
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			
-		}
-		
-		if(rowsUpdated != 1){
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), playerID.toString()));
-			
-			return false;
-		}
-		
-		plugin.offerManager.buildFinancialEntityInitialOffers(playerID);
-		
-		if(SerenityLoans.debugLevel >= 2)
-			SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), playerID.toString()));
-		
-		
-		return true;
-	}
-
-
-
-	public void addPlayers(Player[] players){
-		
+		// Loop through all of the players given
 		for(Player aPlayer : players){
-			addPlayer(aPlayer.getUniqueId());
+			
+			// Check to see if the entity is already in the table
+			if(inFinancialEntitiesTable(aPlayer.getUniqueId())){
+				
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), aPlayer.getName()));
+
+				continue;
+			
+			}
+			
+			// Check player name against the white/black list
+			if(white || black){
+				boolean nameFound = names.contains(aPlayer.getName());
+				
+				if(!(nameFound && white) && !(!nameFound && black)){
+					result = false;
+					continue;
+				}
+					
+			}
+			
+			
+			String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
+			int rowsUpdated = 0;
+			
+			try {
+				
+				PreparedStatement stmt = plugin.getConnection().prepareStatement(update);
+				
+				stmt.setString(1, aPlayer.getUniqueId().toString());
+				stmt.setString(2, "Player");
+				
+				double cash = 100;
+				int crScore = 465;
+				
+				// Collect configured defaults for initial values
+				if(plugin.getConfig().contains("economy.initial-money"))
+					cash = plugin.getConfig().getDouble("economy.initial-money");
+				if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
+					crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
+				
+				stmt.setDouble(3, cash);
+				stmt.setInt(4, crScore);
+				
+				synchronized(financialEntitiesLock){
+					rowsUpdated = stmt.executeUpdate();
+				}
+				
+				stmt.close();
+				
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+				
+			}
+			
+			// A single row should have been affected by the addition
+			if(rowsUpdated != 1){
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), aPlayer.getName()));
+				
+				result = false;
+			}
+			
+			// Add offers entries for this entity
+			plugin.offerManager.buildFinancialEntityInitialOffers(aPlayer.getUniqueId());
+			
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), aPlayer.getName()));
+			
+			
 		}
 		
+		return result;
 	}
 
+	/**
+	 * Attempts to create a FinancialInstitution with the given name and manager. The
+	 * initial cash of the Institution is set to 0, and the credit score is set to that
+	 * of the manager. The type of the Institution is assumed to be Credit Union.
+	 * The manager must be a player.
+	 * The method will give assign a UUID to the new FinancialInstitution and add it to
+	 * the FinancialEntities table. If a FinancialInstitution already exists, this 
+	 * method will return success if the manager is the same, or fail if the existing
+	 * FinancialInstitution is managed by another entity.
+	 * 
+	 * @param desiredName The name of the new FinancialInstitution. Must be unique.
+	 * @param manager The entity which manages this FinancialInstitution.
+	 * @return true if the FinancialInstitution exists in the table at the end of the method,
+	 * false otherwise.
+	 */
 	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
-		//TODO default value inputs
-		
-		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, 435);
+		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, manager.getCreditScore());
 	}
 
+	/**
+	 * 
+	 * Attempts to create a FinancialInstitution with the given name, manager, entity type,
+	 * initial cash, credit score. The manager must be a player.
+	 * The method will give assign a UUID to the new FinancialInstitution and add it to
+	 * the FinancialEntities table. If a FinancialInstitution already exists, this 
+	 * method will return success if the manager is the same, or fail if the existing
+	 * FinancialInstitution is managed by another entity.
+	 * 
+	 * @param desiredName The name of the new FinancialInstitution. Must be unique.
+	 * @param manager The entity which manages this FinancialInstitution.
+	 * @param type Type of Institution. Must be one of PlayerType excluding "Player".
+	 * @param initialCash Initial account balance.
+	 * @param crScore Initial creadit score.
+	 * @return true if the FinancialInstitution exists in the table at the end of the method,
+	 * false otherwise.
+	 */
 	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+		
+		// Manager must be a player (yeah yeah)
+		if(manager.getPlayerType() != PlayerType.PLAYER)
+			return false;
+		
+		// Name check. Names must be unique
+		UUID existingId = getFinancialInstituteID(desiredName);
+		if(existingId != null){
+			FinancialInstitution currentHolder = getFinancialInstitution(existingId);
+			
+			if(currentHolder.getResponsibleParty().equals(manager.getUserID()))
+				return true;
+			else
+				return false;
+		}
+		
 		//TODO Implement FinancialInstitution creation.
+		
 		
 		// from SerenityLoans must remember to do this in this method.
 		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
@@ -474,6 +580,21 @@ public class PlayerManager {
 	public boolean inFinancialEntitiesTable(UUID entityID){
 		
 		ResultSet result = queryFinancialEntitiesTable(entityID);
+		boolean answer = false;
+		
+		try {
+			answer = result.next();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return answer;
+	}
+	
+	public boolean inFinancialInstitutionsTable(UUID entityID){
+		
+		ResultSet result = queryFinancialInstitutionsTable(entityID);
 		boolean answer = false;
 		
 		try {
