@@ -11,6 +11,15 @@
  * and checks if a particular entity is in the table. This class also
  * performs white-list and black-list checking of added players.
  * 
+ * This class also performs database calls on the FinancialInstitutions,
+ * Memberships, CreditHistory, and Trust tables. All methods of this class
+ * are thread-safe.
+ * 
+ * This class handles name and uuid lookups from the Mojang account service
+ * using evilmidget38's fetchers. These methods may block, so should not
+ * be run from the main thread. In addition, these methods rely on the
+ * caller to handle potential exceptions.
+ * 
  * 
  * ========================================================================
  *                            LICENSE INFORMATION
@@ -80,9 +89,19 @@ public class PlayerManager {
 	
 	private SerenityLoans plugin;
 	
+	private final Object financialEntitiesLock = new Object();
+	private final Object financialInstitutionsLock = new Object();
+	@SuppressWarnings("unused")
+	private final Object membershipsLock = new Object();
+	private final Object trustLock = new Object();
+	@SuppressWarnings("unused")
+	private final Object creditHistoryLock = new Object();
+	
 	public PlayerManager(SerenityLoans plugin){
 		this.plugin = plugin;
 	}
+	
+	
 	
 	/**
 	 * 
@@ -92,24 +111,141 @@ public class PlayerManager {
 	 * @return true if the entity is in the FinancialEntities table
 	 * by the end of the method.
 	 */
-	public boolean addPlayer(UUID playerID) {
-		return addPlayer(playerID, null);
+	public boolean addPlayer(UUID playerID){
+		boolean white = false;
+		boolean black = false;
+		
+		if(inFinancialEntitiesTable(playerID)){
+			
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), playerID.toString()));
+			
+			
+			return true;
+		
+		}
+		
+		Player player = plugin.getServer().getPlayer(playerID);
+		if(player == null){
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Player %s is not online.", plugin.getDescription().getName(), playerID.toString()));
+	
+			return false;
+		}
+		
+		if(plugin.getConfig().contains("options.use-whitelist"))
+			white = plugin.getConfig().getBoolean("options.use-whitelist");
+		else if(plugin.getConfig().contains("options.use-blacklist"))
+			black = plugin.getConfig().getBoolean("options.use-blacklist");
+		
+		if(white || black) {
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Using a white/black list.", plugin.getDescription().getName()));
+			
+			
+			Charset charset = Charset.forName("US-ASCII");
+			
+			String fname = white? "whitelist":"blacklist";
+			File list = new File(plugin.getDataFolder().getAbsolutePath() + fname + ".txt");
+			
+			LinkedList<String> names = new LinkedList<String>();
+				
+			try {
+				
+				if(!list.exists()){
+					
+					list.createNewFile();
+					return false;
+					
+				} else {
+				
+					BufferedReader reader = Files.newReader(list, charset);
+			
+					while(true){
+						String name = reader.readLine();
+						
+						if(name == null)
+							break;
+						
+						names.add(name);
+					}
+				
+				}
+		
+			} catch (FileNotFoundException e) {
+				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+				e.printStackTrace();
+			} catch (IOException e) {
+				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+				e.printStackTrace();
+			}
+			
+			boolean nameFound = false;
+			
+			for(String candidate : names) {
+				nameFound |= playerID.toString().equals(candidate);
+			}
+			
+			if(!(nameFound && white) && !(!nameFound && black))
+				return false;
+			
+		}
+		
+		
+		String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
+		int rowsUpdated = 0;
+		
+		try {
+			
+			PreparedStatement stmt = plugin.getConnection().prepareStatement(update);
+			
+			stmt.setString(1, playerID.toString());
+			stmt.setString(2, "Player");
+			
+			double cash = 100;
+			int crScore = 465;
+			
+			if(plugin.getConfig().contains("economy.initial-money"))
+				cash = plugin.getConfig().getDouble("economy.initial-money");
+			if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
+				crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
+			
+			stmt.setDouble(3, cash);
+			stmt.setInt(4, crScore);
+			
+			synchronized(financialEntitiesLock){
+				rowsUpdated = stmt.executeUpdate();
+			}
+			
+			stmt.close();
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			
+		}
+		
+		if(rowsUpdated != 1){
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), playerID.toString()));
+			
+			return false;
+		}
+		
+		buildFinancialEntityInitialOffers(playerID);
+		
+		if(SerenityLoans.debugLevel >= 2)
+			SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), playerID.toString()));
+		
+		
+		return true;
 	}
+
+
 
 	public void addPlayers(Player[] players){
 		
-		String update = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		PreparedStatement stmt = null;
-		
-		try {
-			stmt = plugin.getConnection().prepareStatement(update);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
 		for(Player aPlayer : players){
-			addPlayer(aPlayer.getUniqueId(), stmt);
+			addPlayer(aPlayer.getUniqueId());
 		}
 		
 	}
@@ -196,19 +332,22 @@ public class PlayerManager {
 			
 			stmt.setString(1, entityName);
 			
-			ResultSet candidates = stmt.executeQuery();
+			synchronized(financialInstitutionsLock){
+				ResultSet candidates = stmt.executeQuery();
 			
-			if(!candidates.next()){
-				
-				if(SerenityLoans.debugLevel >=2){
-					SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
+			
+				if(!candidates.next()){
+					
+					if(SerenityLoans.debugLevel >=2){
+						SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
+					}
+					
+					return result;
+					
 				}
 				
-				return result;
-				
+				idString = candidates.getString("BankID");
 			}
-			
-			idString = candidates.getString("BankID");
 			
 			stmt.close();
 		} catch (SQLException e) {
@@ -239,10 +378,12 @@ public class PlayerManager {
 			
 			stmt.setString(1, playerID.toString());
 			
-			ResultSet hits = stmt.executeQuery();
-			
-			while(hits.next()){
-				results.add(UUID.fromString(hits.getString("BankID")));
+			synchronized(financialInstitutionsLock){
+				ResultSet hits = stmt.executeQuery();
+				
+				while(hits.next()){
+					results.add(UUID.fromString(hits.getString("BankID")));
+				}
 			}
 			
 		} catch (SQLException e) {
@@ -362,14 +503,17 @@ public class PlayerManager {
 			ps.setString(1, userId.toString());
 			ps.setString(2, targetId.toString());
 			
-			ResultSet ignoreResult = ps.executeQuery();
-			
-			if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
-				ps.close();
-				return true;
+			synchronized(trustLock){
+				ResultSet ignoreResult = ps.executeQuery();
+				
+				if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
+					ps.close();
+					return true;
+				}
+				
+				else
+					ps.close();
 			}
-			else
-				ps.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
@@ -389,29 +533,32 @@ public class PlayerManager {
 			ps.setString(1, playerId.toString());
 			ps.setString(2, targetId.toString());
 			
-			ResultSet currentTrust = ps.executeQuery();
+			synchronized(trustLock){
 			
-			String updateSQL;
-			
-			if(currentTrust.next()){
-				setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
+				ResultSet currentTrust = ps.executeQuery();
 				
-				String ignoreString = setToIgnore? "'true'" : "'false'";
-				updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
+				String updateSQL;
 				
-			} else {
-				updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
+				if(currentTrust.next()){
+					setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
+					
+					String ignoreString = setToIgnore? "'true'" : "'false'";
+					updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
+					
+				} else {
+					updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
+				}
+				
+				PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
+				
+				stmt.setString(1, playerId.toString());
+				stmt.setString(2, targetId.toString());
+				
+				stmt.executeUpdate();
+				
+				ps.close();
+				stmt.close();
 			}
-			
-			PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
-			
-			stmt.setString(1, playerId.toString());
-			stmt.setString(2, targetId.toString());
-			
-			stmt.executeUpdate();
-			
-			ps.close();
-			stmt.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
@@ -419,133 +566,6 @@ public class PlayerManager {
 		
 		return setToIgnore;
 		
-	}
-
-	private boolean addPlayer(UUID playerID, PreparedStatement statement){
-		boolean white = false;
-		boolean black = false;
-		
-		if(inFinancialEntitiesTable(playerID)){
-			
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), playerID.toString()));
-			
-			
-			return true;
-		
-		}
-		
-		Player player = plugin.getServer().getPlayer(playerID);
-		if(player == null){
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Player %s is not online.", plugin.getDescription().getName(), playerID.toString()));
-	
-			return false;
-		}
-		
-		if(plugin.getConfig().contains("options.use-whitelist"))
-			white = plugin.getConfig().getBoolean("options.use-whitelist");
-		else if(plugin.getConfig().contains("options.use-blacklist"))
-			black = plugin.getConfig().getBoolean("options.use-blacklist");
-		
-		if(white || black) {
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Using a white/black list.", plugin.getDescription().getName()));
-			
-			
-			Charset charset = Charset.forName("US-ASCII");
-			
-			String fname = white? "whitelist":"blacklist";
-			File list = new File(plugin.getDataFolder().getAbsolutePath() + fname + ".txt");
-			
-			LinkedList<String> names = new LinkedList<String>();
-				
-			try {
-				
-				if(!list.exists()){
-					
-					list.createNewFile();
-					return false;
-					
-				} else {
-				
-					BufferedReader reader = Files.newReader(list, charset);
-			
-					while(true){
-						String name = reader.readLine();
-						
-						if(name == null)
-							break;
-						
-						names.add(name);
-					}
-				
-				}
-		
-			} catch (FileNotFoundException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			} catch (IOException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			}
-			
-			boolean nameFound = false;
-			
-			for(String candidate : names) {
-				nameFound |= playerID.toString().equals(candidate);
-			}
-			
-			if(!(nameFound && white) && !(!nameFound && black))
-				return false;
-			
-		}
-		
-		
-		String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		int rowsUpdated = 0;
-		
-		try {
-			
-			PreparedStatement stmt = statement == null? plugin.getConnection().prepareStatement(update) : statement;
-			
-			stmt.setString(1, playerID.toString());
-			stmt.setString(2, "Player");
-			
-			double cash = 100;
-			int crScore = 465;
-			
-			if(plugin.getConfig().contains("economy.initial-money"))
-				cash = plugin.getConfig().getDouble("economy.initial-money");
-			if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
-				crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
-			
-			stmt.setDouble(3, cash);
-			stmt.setInt(4, crScore);
-			
-			rowsUpdated = stmt.executeUpdate();
-			
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			
-		}
-		
-		if(rowsUpdated != 1){
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), playerID.toString()));
-			
-			return false;
-		}
-		
-		buildFinancialEntityInitialOffers(playerID);
-		
-		if(SerenityLoans.debugLevel >= 2)
-			SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), playerID.toString()));
-		
-		
-		return true;
 	}
 
 	private FinancialEntity buildEntity(ResultSet successfulQuery){
@@ -664,7 +684,7 @@ public class PlayerManager {
 		
 		String query1 = "SELECT OfferName FROM PreparedOffers WHERE LenderID=?";
 		String query2 = "INSERT INTO PreparedOffers (" + columns + ") VALUES (?, ?, " + value + ", " + interestRate + ", " + term + ", " + compoundingPeriod + ", " + gracePeriod + ", " + paymentTime + ", " + paymentFrequency + ", " + lateFee + ", " + minPayment + ", " + serviceFeeFrequency + ", " + serviceFee + ", " + loanType + ");";
-		
+		// TODO move to OfferManager
 		try {
 			
 			// build two PreparedOffers
@@ -718,7 +738,9 @@ public class PlayerManager {
 		try {
 			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
 			stmt.setString(1, userID.toString());
-			result = stmt.executeQuery();
+			synchronized(financialEntitiesLock){
+				result = stmt.executeQuery();
+			}
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
@@ -735,7 +757,9 @@ public class PlayerManager {
 		try {
 			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
 			stmt.setString(1, userID.toString());
-			result = stmt.executeQuery();
+			synchronized(financialInstitutionsLock){
+				result = stmt.executeQuery();
+			}
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
