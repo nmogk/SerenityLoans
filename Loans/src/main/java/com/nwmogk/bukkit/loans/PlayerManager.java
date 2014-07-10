@@ -348,6 +348,10 @@ public class PlayerManager {
 		if(manager.getPlayerType() != PlayerType.PLAYER)
 			return false;
 		
+		// Institution must not be a player
+		if(type.equals(PlayerType.PLAYER))
+			return false;
+		
 		// Name check. Names must be unique
 		UUID existingId = getFinancialInstituteID(desiredName);
 		if(existingId != null){
@@ -359,12 +363,49 @@ public class PlayerManager {
 				return false;
 		}
 		
-		//TODO Implement FinancialInstitution creation.
+		UUID instituteId = null;
 		
+		// Pick an unoccupied UUID
+		do {
+			instituteId = UUID.randomUUID();
+		} while(inFinancialEntitiesTable(instituteId));
 		
-		// from SerenityLoans must remember to do this in this method.
-		//playerManager.buildFinancialEntityInitialOffers("CentralBank");
-		return false;
+		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
+		String fInstituteString = "INSERT INTO FinancialInstitutions (UserID, Name, Manager) VALUES (?, ?, ?);";
+		
+		boolean success = true;
+		
+		try {
+			PreparedStatement ps1 = plugin.conn.prepareStatement(fEntityString);
+			PreparedStatement ps2 = plugin.conn.prepareStatement(fInstituteString);
+			
+			ps1.setString(1, instituteId.toString());
+			ps1.setString(2, type.toString());
+			
+			ps2.setString(1, instituteId.toString());
+			ps2.setString(2, desiredName);
+			ps2.setString(3, manager.getUserID().toString());
+			
+			// I should probably acquire both locks at the same time, but I don't think
+			// a problem is likely.
+			synchronized(financialEntitiesLock){
+				success &= ps1.executeUpdate() == 1;
+			}
+			
+			synchronized(financialInstitutionsLock){
+				success &= ps2.executeUpdate() == 1;
+			}
+			
+			ps1.close();
+			ps2.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		plugin.offerManager.buildFinancialEntityInitialOffers(instituteId);
+		
+		return success;
 	}
 
 	public UUID entityIdLookup(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
