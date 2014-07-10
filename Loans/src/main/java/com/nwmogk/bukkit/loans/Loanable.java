@@ -40,11 +40,9 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans.api;
+package com.nwmogk.bukkit.loans;
 
 import java.sql.Timestamp;
-
-
 
 //import com.nwmogk.bukkit.loans.exception.InsufficientCashException;
 //import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;

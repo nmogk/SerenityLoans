@@ -47,10 +47,10 @@ import org.apache.commons.lang.ArrayUtils;
 
 import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.EconomyManager;
+import com.nwmogk.bukkit.loans.LoanInfo;
+import com.nwmogk.bukkit.loans.LoanType;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
-import com.nwmogk.bukkit.loans.api.LoanInfo;
-import com.nwmogk.bukkit.loans.api.LoanType;
 
 public final class ImmutableOffer implements LoanInfo {
 	

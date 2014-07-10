@@ -59,12 +59,10 @@ import java.util.LinkedList;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
-import com.nwmogk.bukkit.loans.api.Loanable;
 import com.nwmogk.bukkit.loans.exception.ConfigurationException;
 import com.nwmogk.bukkit.loans.object.CreditCard;
 import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.PaymentStatement;
-import com.nwmogk.bukkit.loans.obsolete.LoanState;
 
 
 public class CreditHistory {

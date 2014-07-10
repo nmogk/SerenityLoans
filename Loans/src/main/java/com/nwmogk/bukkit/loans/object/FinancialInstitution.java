@@ -48,7 +48,7 @@ import java.sql.Timestamp;
 import java.util.UUID;
 
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
-import com.nwmogk.bukkit.loans.api.PlayerType;
+import com.nwmogk.bukkit.loans.PlayerType;
 
 public final class FinancialInstitution implements FinancialEntity {
 

@@ -40,9 +40,9 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans.api;
+package com.nwmogk.bukkit.loans;
 
-import com.nwmogk.bukkit.loans.SerenityLoans;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 
 

@@ -48,7 +48,6 @@ package com.nwmogk.bukkit.loans;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.*;
 
-import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.command.LoanHandler;
 import com.nwmogk.bukkit.loans.exception.DatabaseVersionMismatchException;
 import com.nwmogk.bukkit.loans.listener.PlayerLoginListener;
@@ -58,14 +57,16 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
 public final class SerenityLoans extends JavaPlugin {
 	
-	public static Logger log;
+	public static final Logger log = Logger.getLogger("Minecraft");
 	
+    public EconomyManager econ = null;
+//    public Permission perms = null;
+//    public Chat chat = null;
+    
     // Incrementing these numbers will force a rebuild of the database.
     public static final int dbMajorVersion = 0;
     public static final int dbMinorVersion = 6;
@@ -75,19 +76,12 @@ public final class SerenityLoans extends JavaPlugin {
     public static int debugLevel;
     
     public Connection conn = null;
-    
     public PlayerManager playerManager;
-    public EconomyManager econ;
+
 	public LoanManager loanManager;
 	public OfferManager offerManager;
-	
-	public ExecutorService threads;
     
 	public void onEnable(){
-		
-		log = Logger.getLogger("Minecraft" + getDescription().getName());
-		
-		this.threads = Executors.newCachedThreadPool();
 		
 		this.saveDefaultConfig();
 		plugin = this;

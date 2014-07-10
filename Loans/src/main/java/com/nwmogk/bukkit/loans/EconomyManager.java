@@ -51,9 +51,7 @@ import net.milkbowl.vault.economy.Economy;
 
 import org.bukkit.plugin.RegisteredServiceProvider;
 
-import com.nwmogk.bukkit.loans.api.EconResult;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
-import com.nwmogk.bukkit.loans.api.PlayerType;
 
 public class EconomyManager {
 

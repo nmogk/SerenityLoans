@@ -4,18 +4,15 @@ import java.io.File;
 import java.util.Vector;
 
 import com.nwmogk.bukkit.loans.obsolete.Offer;
-
+import com.nwmogk.bukkit.loans.Terms;
 import org.bukkit.configuration.*;
 import org.bukkit.configuration.file.*;
-
 import com.nwmogk.bukkit.loans.*;
-import com.nwmogk.bukkit.loans.api.Terms;
 import com.nwmogk.bukkit.loans.exception.InsufficientCashException;
 import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;
 import com.nwmogk.bukkit.loans.object.Loan;
 
 import org.junit.Test;
-
 import static org.junit.Assert.*;
 
 
