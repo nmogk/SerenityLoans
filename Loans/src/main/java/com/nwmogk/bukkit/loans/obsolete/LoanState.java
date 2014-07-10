@@ -3,11 +3,12 @@
  *                               DESCRIPTION
  * ========================================================================
  * 
- * File: LoanType.java
+ * File: LoanState.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This enum provides identifiers for the different types of loans. It also
- * provides string parsing to get the proper identifier.
+ * This class contains the information that defines the state of a loan.
+ * Objects of this class are immutable, so they will not change after 
+ * initial creation. This class may be redundant with the Loan class.
  * 
  * 
  * ========================================================================
@@ -39,34 +40,40 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.obsolete;
+
+import java.util.Date;
+
+import com.nwmogk.bukkit.loans.api.LoanInfo;
+import com.nwmogk.bukkit.loans.object.ImmutableOffer;
+import com.nwmogk.bukkit.loans.object.Loan;
 
 /*
- * I am not sure if this enum even matters.
+ * May be redundant with the Loan class
  */
-public enum LoanType {
+
+public class LoanState{
 	
-	INTERESTONLY, FIXEDFEE, CREDIT, GIFT, DEPOSIT, BULLET, AMORTIZING, BOND, SALARY;
-	
-	public static LoanType getFromString(String input){
-		if(input.equalsIgnoreCase("InterestOnly"))
-			return INTERESTONLY;
-		else if(input.equalsIgnoreCase("FixedFee"))
-			return FIXEDFEE;
-		else if(input.equalsIgnoreCase("Credit"))
-			return CREDIT;
-		else if(input.equalsIgnoreCase("Gift"))
-			return GIFT;
-		else if(input.equalsIgnoreCase("Deposit"))
-			return DEPOSIT;
-		else if(input.equalsIgnoreCase("Bond"))
-			return BOND;
-		else if(input.equalsIgnoreCase("Salary"))
-			return SALARY;
-		else if(input.equalsIgnoreCase("Amortizing"))
-			return AMORTIZING;
-		else
-			return BULLET;
+	public final double balance;
+	public final double interestBalance;
+	public final double feeBalance;
+	public final LoanInfo terms;
+	public final long startDate;
+	public final long lastUpdate;
+
+	public LoanState(double balance, double interestBalance, double feeBalance, 
+			LoanInfo terms, Date startDate, Date lastUpdate) {
+		this.balance = balance;
+		this.interestBalance = interestBalance;
+		this.feeBalance = feeBalance;
+		this.terms = terms;
+		this.startDate = startDate.getTime();
+		this.lastUpdate = lastUpdate.getTime();
 	}
 	
+	public LoanState(Loan loan){
+		this(loan.getBalance(), loan.getInterestBalance(), loan.getFeesOutstanding(), 
+				new ImmutableOffer(loan), loan.getStartDate(), loan.getLastUpdate());
+	}
+
 }

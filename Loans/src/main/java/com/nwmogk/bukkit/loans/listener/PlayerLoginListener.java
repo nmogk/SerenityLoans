@@ -42,11 +42,7 @@
 
 package com.nwmogk.bukkit.loans.listener;
 
-import java.sql.Statement;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
 
@@ -57,6 +53,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.SerenityLoans;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.Loan;
 
@@ -94,87 +91,61 @@ public final class PlayerLoginListener implements Listener {
 		
 		toCheck.add(0, playerID);
 		
-		try{
+		
 			
-			// TODO remove SQL from this class
+		boolean firstRun = true;
+		
+		for(UUID i : toCheck){
 			
-			String offerSQL = "SELECT DISTINCT LenderID FROM Offers WHERE Sent='false' AND BorrowerID=?;";
-			String setTrue = "UPDATE Offers SET Sent='true' WHERE BorrowerID=? AND LenderID=?;";
-			String psQuery = "SELECT DISTINCT LoanID FROM PaymentStatements WHERE BillAmountPaid < BillAmount;";
+			List<Loan> loanSet = plugin.loanManager.getLoansWithOutstandingStatements(i);
+			FinancialEntity currentEntity = plugin.playerManager.getFinancialEntity(i);
+			Player recipient = evt.getPlayer();
 			
-			PreparedStatement offerQuery = plugin.conn.prepareStatement(offerSQL);
-			//PreparedStatement nameQuery = plugin.conn.prepareStatement(nameSQL);
-			PreparedStatement setUpdate = plugin.conn.prepareStatement(setTrue);
-			Statement paymentStatements = plugin.conn.createStatement();
 			
-			ResultSet loansWithStatements = paymentStatements.executeQuery(psQuery);
-			HashMap<UUID, Loan> loanSet = new HashMap<UUID, Loan>();
-			
-			while(loansWithStatements.next()){
-				Loan theLoan = plugin.loanManager.getLoan(loansWithStatements.getInt("LoanID"));
+			if(loanSet != null){
 				
-				loanSet.put(theLoan.getBorrower().getUserID(), theLoan);
-			}
-			
-			boolean firstRun = true;
-			
-			for(UUID i : toCheck){
+				recipient.sendMessage(String.format("%s %s an outstanding payment statement!", prfx, firstRun? "You have" : ((FinancialInstitution)currentEntity).getName() + " has"));
+				recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, firstRun? "/loan": "/crunion"));
+				recipient.sendMessage(String.format("%s Details are given below:", prfx));
 				
-				if(loanSet.containsKey(i)){
-					Loan theLoan = loanSet.get(i);
+				
+				for(Loan theLoan : loanSet){
+
 					
-					boolean isPlayer = i.equals(theLoan.getBorrower().getUserID());
-					
-					Player recipient = plugin.playerManager.getPlayer(i);
-					
-					if(recipient != null){
-						
-					
-					
-					recipient.sendMessage(String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)theLoan.getBorrower()).getName() + " has"));
-					recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
-					recipient.sendMessage(String.format("%s Details are given below:", prfx));
+					if(recipient == null)
+						continue;
+
 					recipient.sendMessage(plugin.loanManager.getPaymentStatement(theLoan.getLoanID()).toString(plugin));
-					recipient.sendMessage(String.format("%s Use %s statement to view this statement again.", prfx, isPlayer? "/loan": "/crunion"));
-					}
+					recipient.sendMessage(String.format("%s Use %s statement to view this statement again.", prfx, firstRun? "/loan": "/crunion"));
+					
 				}
-				
-				offerQuery.setString(1, i.toString());
-				
-				ResultSet offerResults = offerQuery.executeQuery();
-				
-				while(offerResults.next()){
-					
-					UUID offerer = UUID.fromString(offerResults.getString("LenderID"));
-					
-					String sender = plugin.playerManager.entityNameLookup(plugin.playerManager.getFinancialEntity(offerer));
-					
-					
-					if(firstRun){
-						evt.getPlayer().sendMessage(prfx + " You have a loan offer from " + sender + "!");
-					} else {
-						String recipient = ((FinancialInstitution)plugin.playerManager.getFinancialEntity(i)).getName();
-						evt.getPlayer().sendMessage(prfx + " " + recipient + " has a loan offer from " + sender + "!");
-					}
-					
-					setUpdate.setString(1, i.toString());
-					setUpdate.setString(2, offerer.toString());
-					
-					setUpdate.executeUpdate();
-				}
-				
-//				if(i == 0)
-//					evt.getPlayer().sendMessage(prfx + " Type '/loan viewoffers' to view your offers.");
-				
-				firstRun = false;
 			}
 			
-			offerQuery.close();
-			setUpdate.close();
+			List<FinancialEntity> offerResults = plugin.offerManager.getOfferSendersTo(i, true);
 			
-		} catch(SQLException e){
+			for(FinancialEntity fe : offerResults){
+				
+				String sender = plugin.playerManager.entityNameLookup(fe);
+				
+				if(firstRun){
+					evt.getPlayer().sendMessage(prfx + " You have a loan offer from " + sender + "!");
+					evt.getPlayer().sendMessage(prfx + " Type '/loan viewoffers' to view your offers.");
+				} else {
+					String recipientS = ((FinancialInstitution)currentEntity).getName();
+					evt.getPlayer().sendMessage(prfx + " " + recipientS + " has a loan offer from " + sender + "!");
+					evt.getPlayer().sendMessage(prfx + " Type '/crunion viewoffers' to view your offers.");
+				}
+				
+				plugin.offerManager.registerOfferSend(fe.getUserID(), i);
+				
+				
+			}
 			
+			firstRun = false;
 		}
+			
+			
+		
 	}
 
 }

@@ -3,12 +3,12 @@
  *                               DESCRIPTION
  * ========================================================================
  * 
- * File: LoanState.java
+ * File: Terms.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This class contains the information that defines the state of a loan.
- * Objects of this class are immutable, so they will not change after 
- * initial creation. This class may be redundant with the Loan class.
+ * This enum provides identification for every field that describes the 
+ * terms of a loan. There is a 1:1 match with the terms in the mySQL 
+ * database and the fields in this enum.
  * 
  * 
  * ========================================================================
@@ -35,44 +35,17 @@
  * ========================================================================
  *    Date          Name                  Description              Defect #
  * ----------  --------------  ----------------------------------  --------
- * 2014-xx-xx  nmogk           Initial release for v0.1
+ * 2014-02-11  nmogk           Initial release for v0.1
  * 
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
-import java.util.Date;
+public enum Terms {
 
-import com.nwmogk.bukkit.loans.object.ImmutableOffer;
-import com.nwmogk.bukkit.loans.object.Loan;
-
-/*
- * May be redundant with the Loan class
- */
-
-public class LoanState{
-	
-	public final double balance;
-	public final double interestBalance;
-	public final double feeBalance;
-	public final LoanInfo terms;
-	public final long startDate;
-	public final long lastUpdate;
-
-	public LoanState(double balance, double interestBalance, double feeBalance, 
-			LoanInfo terms, Date startDate, Date lastUpdate) {
-		this.balance = balance;
-		this.interestBalance = interestBalance;
-		this.feeBalance = feeBalance;
-		this.terms = terms;
-		this.startDate = startDate.getTime();
-		this.lastUpdate = lastUpdate.getTime();
-	}
-	
-	public LoanState(Loan loan){
-		this(loan.getBalance(), loan.getInterestBalance(), loan.getFeesOutstanding(), 
-				new ImmutableOffer(loan), loan.getStartDate(), loan.getLastUpdate());
-	}
+	LENDER, BORROWER, VALUE, INTERESTRATE, LATEFEE, 
+	MINPAYMENT, SERVICEFEE, TERM, COMPOUNDINGPERIOD, GRACEPERIOD,
+	PAYMENTTIME, PAYMENTFREQUENCY, SERVICEFEEFREQUENCY, LOANTYPE;
 
 }

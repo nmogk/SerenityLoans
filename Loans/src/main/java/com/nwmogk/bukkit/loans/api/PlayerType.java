@@ -41,7 +41,7 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
 public enum PlayerType {
 	

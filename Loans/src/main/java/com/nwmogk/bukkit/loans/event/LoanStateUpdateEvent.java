@@ -1,7 +1,7 @@
 package com.nwmogk.bukkit.loans.event;
 
-import com.nwmogk.bukkit.loans.LoanState;
 import com.nwmogk.bukkit.loans.object.Loan;
+import com.nwmogk.bukkit.loans.obsolete.LoanState;
 
 public class LoanStateUpdateEvent {
 
