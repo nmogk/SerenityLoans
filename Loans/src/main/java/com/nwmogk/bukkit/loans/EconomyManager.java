@@ -46,8 +46,11 @@ package com.nwmogk.bukkit.loans;
 
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import net.milkbowl.vault.economy.Economy;
+import net.milkbowl.vault.economy.EconomyResponse;
 
 import org.bukkit.plugin.RegisteredServiceProvider;
 
@@ -72,9 +75,10 @@ public class EconomyManager {
 		if(plugin.getConfig().contains("options.economy"))
 			setting = plugin.getConfig().getString("options.economy");
 		
-		if(setting.equalsIgnoreCase("vault"))
+		if(setting.equalsIgnoreCase("vault")){
 			config = EconType.VAULT;
-		else if(setting.equalsIgnoreCase("hybrid"))
+			setupVaultEconomy();
+		} else if(setting.equalsIgnoreCase("hybrid"))
 			config = EconType.HYBRID;
 		else if(setting.equalsIgnoreCase("serenecon"))
 			config = EconType.SERENE;
@@ -86,51 +90,14 @@ public class EconomyManager {
 		setupVaultEconomy();
 	}
 	
-	public boolean isInitialized(){
-		if(config == null)
-			return false;
-		
-		switch(config){
-			
-		case VAULT:
-		case HYBRID:
-			return econ!= null;
-		case SERENE:
-			return false;
-		case INTERNAL:	
-			return true;
-			
-		default:
-				return false;
+	public EconomyResponse convertEconResult(EconResult result){
+		if(config != EconType.VAULT && config != EconType.HYBRID){
+			return null;
 		}
 		
+		return new EconomyResponse(result.amount, result.balance, result.callSuccess? EconomyResponse.ResponseType.SUCCESS : EconomyResponse.ResponseType.FAILURE, result.errMsg);
 	}
-	
-	private void setupVaultEconomy() {
-	       if (plugin.getServer().getPluginManager().getPlugin("Vault") == null) 
-	           return;
-	       
-	       RegisteredServiceProvider<Economy> rsp = plugin.getServer().getServicesManager().getRegistration(Economy.class);
-	      
-	       if (rsp == null) 
-	           return;
-	       
-	       econ = rsp.getProvider();
-	       
-	}
-	
 
-	public String currencyNameSingular(){
-		String result = "dollar";
-		
-		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
-			result = econ.currencyNameSingular();
-		else if(plugin.getConfig().contains("economy.currency.currency-name.singular"))
-			result = plugin.getConfig().getString("economy.currency.currency-name.singular");
-	
-		return result;
-	}
-	
 	public String currencyNamePlural(){
 		String result = "dollars";
 		
@@ -142,6 +109,17 @@ public class EconomyManager {
 		return result;
 	}
 	
+	public String currencyNameSingular(){
+		String result = "dollar";
+		
+		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
+			result = econ.currencyNameSingular();
+		else if(plugin.getConfig().contains("economy.currency.currency-name.singular"))
+			result = plugin.getConfig().getString("economy.currency.currency-name.singular");
+	
+		return result;
+	}
+
 	public String currencySymbol(){
 		String result = "$";
 		
@@ -149,108 +127,6 @@ public class EconomyManager {
 			result = plugin.getConfig().getString("economy.currency.currency-symbol");
 	
 		return result;
-	}
-	
-	@Deprecated
-	public EconResult has(String name, double amount){
-		boolean answer = true;
-		
-		if(amount < 0)
-			return new EconResult(0, 0, false, "Amount query is negative!");
-		
-		EconResult result = getBalance(name);
-		
-		double balance = result.balance;
-		
-		answer &= balance >= amount;
-		
-		
-		return new EconResult(0, balance, answer, result.errMsg);
-	}
-	
-	public EconResult has(FinancialEntity entity, double amount){
-		boolean answer = true;
-		
-		if(amount < 0)
-			return new EconResult(0, 0, false, "Amount query is negative!");
-		
-		EconResult result = getBalance(entity);
-		
-		double balance = result.balance;
-		
-		answer &= balance >= amount;
-		
-		
-		return new EconResult(0, balance, answer, result.errMsg);
-	}
-	
-	@Deprecated
-	public boolean hasBalance(String financialEntity, double amount){
-		return has(financialEntity, amount).callSuccess;
-	}
-	
-	@Deprecated
-	public EconResult getBalance(String name){
-		return getBalance(plugin.playerManager.getFinancialEntity(name));
-	}
-		
-	public EconResult getBalance(FinancialEntity entity){
-		
-		if(entity == null)
-			return new EconResult(0, 0, false, "Entity is not recognized.");
-		
-		
-		boolean answer = true;
-		String message = null;
-		double balance = 0;
-		
-		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION) && config.equals(EconType.VAULT))
-			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
-		
-		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION)){
-			
-			balance = entity.getCash();
-			
-		} else if(entity.getPlayerType().equals(PlayerType.PLAYER)){
-			
-			if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID)) 
-				balance = econ.getBalance(plugin.playerManager.getOfflinePlayer(entity.getUserID()));
-			else
-				balance = entity.getCash();
-		}
-		
-		
-		return new EconResult(0, balance, answer, message);
-	}
-	
-	public String format(double amount){
-		
-		boolean useSym = true;
-		
-		if(plugin.getConfig().contains("economy.currency.prefer-symbol"))
-			useSym = plugin.getConfig().getBoolean("economy.currency.prefer-symbol");
-		
-		String symbol = useSym? currencySymbol() : "";
-		String dollars = useSym? "" : " ";
-		
-		if(!useSym)
-			dollars += amount == 1? currencyNameSingular() : currencyNamePlural();
-			
-		int decimals = 2;
-		
-		if(plugin.getConfig().contains("economy.currency.fractional-digits"))
-			decimals = plugin.getConfig().getInt("economy.currency.fractional-digits");
-				
-		return String.format("%s%#(,." + decimals + "f%s", symbol, amount, dollars);
-	}
-	
-	public String formatPercent(double value){
-		return String.format("%#.3f%%", value * 100);
-	}
-
-	@Deprecated
-	public EconResult deposit(String name, double amount){
-		return deposit(plugin.playerManager.getFinancialEntity(name), amount);
 	}
 	
 	public EconResult deposit(FinancialEntity entity, double amount){
@@ -286,12 +162,155 @@ public class EconomyManager {
 		else
 			return new EconResult(0, entity.getCash(), false, "Upate not completed!");
 	}
-	
+
 	@Deprecated
-	public EconResult withdraw(String name, double amount){
-		return withdraw(plugin.playerManager.getFinancialEntity(name), amount);
+	public EconResult deposit(String name, double amount) throws InterruptedException, ExecutionException, TimeoutException{
+		return deposit(plugin.playerManager.getFinancialEntity(name), amount);
+	}
+
+	public String format(double amount){
+		
+		boolean useSym = true;
+		
+		if(plugin.getConfig().contains("economy.currency.prefer-symbol"))
+			useSym = plugin.getConfig().getBoolean("economy.currency.prefer-symbol");
+		
+		String symbol = useSym? currencySymbol() : "";
+		String dollars = useSym? "" : " ";
+		
+		if(!useSym)
+			dollars += amount == 1? currencyNameSingular() : currencyNamePlural();
+			
+		int decimals = 2;
+		
+		if(plugin.getConfig().contains("economy.currency.fractional-digits"))
+			decimals = plugin.getConfig().getInt("economy.currency.fractional-digits");
+				
+		return String.format("%s%#(,." + decimals + "f%s", symbol, amount, dollars);
+	}
+
+	public String formatPercent(double value){
+		return String.format("%#.3f%%", value * 100);
+	}
+
+	@Deprecated
+	public EconResult getBalance(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		return getBalance(plugin.playerManager.getFinancialEntity(name));
+	}
+		
+	public EconResult getBalance(FinancialEntity entity){
+		
+		if(entity == null)
+			return new EconResult(0, 0, false, "Entity is not recognized.");
+		
+		
+		boolean answer = true;
+		String message = null;
+		double balance = 0;
+		
+		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION) && config.equals(EconType.VAULT))
+			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
+		
+		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION)){
+			
+			balance = entity.getCash();
+			
+		} else if(entity.getPlayerType().equals(PlayerType.PLAYER)){
+			
+			if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID)) 
+				balance = econ.getBalance(plugin.playerManager.getOfflinePlayer(entity.getUserID()));
+			else
+				balance = entity.getCash();
+		}
+		
+		
+		return new EconResult(0, balance, answer, message);
 	}
 	
+	public String getName(){
+		switch(config){
+		case VAULT:
+		case HYBRID:
+			return econ.getName();
+		case SERENE:
+			return "Serenecon";
+		case INTERNAL:
+			return "SerenityLoans";
+		}
+		
+		return "";
+	}
+
+	public boolean getNetWorth(FinancialEntity entity){
+		// TODO
+		return false;
+	}
+
+	public EconResult has(FinancialEntity entity, double amount){
+		boolean answer = true;
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		EconResult result = getBalance(entity);
+		
+		double balance = result.balance;
+		
+		answer &= balance >= amount;
+		
+		
+		return new EconResult(0, balance, answer, result.errMsg);
+	}
+
+	@Deprecated
+	public EconResult has(String name, double amount) throws InterruptedException, ExecutionException, TimeoutException{
+		boolean answer = true;
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		EconResult result = getBalance(name);
+		
+		double balance = result.balance;
+		
+		answer &= balance >= amount;
+		
+		
+		return new EconResult(0, balance, answer, result.errMsg);
+	}
+
+	@Deprecated
+	public boolean hasBalance(String financialEntity, double amount) throws InterruptedException, ExecutionException, TimeoutException{
+		return has(financialEntity, amount).callSuccess;
+	}
+
+	public boolean isInitialized(){
+		if(config == null)
+			return false;
+		
+		switch(config){
+			
+		case VAULT:
+		case HYBRID:
+			return econ!= null;
+		case SERENE:
+			return false;
+		case INTERNAL:	
+			return true;
+			
+		default:
+				return false;
+		}
+		
+	}
+
+	public EconResult recycleFunds(FinancialEntity toZero){
+		double balance = getBalance(toZero).balance;
+		withdraw(toZero, balance);
+		deposit(plugin.playerManager.getFinancialInstitution("CentralBank"), balance);
+		return new EconResult(balance, 0.0, true, null);
+	}
+
 	public EconResult withdraw(FinancialEntity entity, double amount){
 		
 		if(entity == null)
@@ -328,18 +347,26 @@ public class EconomyManager {
 		else
 			return new EconResult(0, entity.getCash(), false, "Upate not completed!");
 	}
+
+	@Deprecated
+	public EconResult withdraw(String name, double amount) throws InterruptedException, ExecutionException, TimeoutException{
+		return withdraw(plugin.playerManager.getFinancialEntity(name), amount);
+	}
 	
-	public String getName(){
-		switch(config){
-		case VAULT:
-		case HYBRID:
-			return econ.getName();
-		case SERENE:
-			return "Serenecon";
-		case INTERNAL:
-			return "SerenityLoans";
-		}
-		
-		return "";
+	private void setupVaultEconomy() {
+	       if (plugin.getServer().getPluginManager().getPlugin("Vault") == null) {
+	    	   plugin.getServer().getPluginManager().disablePlugin(plugin);
+	           return;
+	       }
+	      
+	       
+	       RegisteredServiceProvider<Economy> rsp = plugin.getServer().getServicesManager().getRegistration(Economy.class);
+	      
+	       if (rsp == null) {
+	           plugin.getServer().getPluginManager().disablePlugin(plugin);
+	           return;
+	       }
+	       econ = rsp.getProvider();
+	       
 	}
 }
