@@ -60,6 +60,7 @@ import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.LoanType;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.PaymentStatement;
@@ -964,9 +965,9 @@ public class LoanManager {
 		if(recipient == null)
 			return;
 		
-		boolean isPlayer = recipient.getName().equalsIgnoreCase(plugin.playerManager.entityNameLookup(theLoan.getBorrower()));
+		boolean isPlayer = recipient.getUniqueId().equals(theLoan.getBorrower().getUserID());
 	
-		recipient.sendMessage(String.format("%s %s received a payment statement!", prfx, isPlayer? "You have" : plugin.playerManager.entityNameLookup(theLoan.getBorrower()) + " has"));
+		recipient.sendMessage(String.format("%s %s received a payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)theLoan.getBorrower()).getName() + " has"));
 		recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
 		recipient.sendMessage(String.format("%s Details are given below:", prfx));
 		recipient.sendMessage(getPaymentStatement(theLoan.getLoanID()).toString(plugin));
