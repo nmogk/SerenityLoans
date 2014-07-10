@@ -403,67 +403,183 @@ public class PlayerManager {
 			e.printStackTrace();
 		}
 		
+		// Populate the default offer tables.
 		plugin.offerManager.buildFinancialEntityInitialOffers(instituteId);
 		
 		return success;
 	}
 
+	/**
+	 * This method takes an name of a FinancialEntity and locates the appropriate uuid.
+	 * This method performs the call with a Callable object running in a separate 
+	 * thread. This method will block, and should be used with appropriate caution. 
+	 * A check is first performed to see if the given name represents a FinancialInstitution,
+	 * in which case, no unexpected behavior should result. This method will time out
+	 * according to the configuration settings.
+	 * 
+	 * @param entityName The name of the entity to search for.
+	 * @return A uuid corresponding to the given entity name.
+	 * @throws InterruptedException 
+	 * @throws ExecutionException When the Callable thread encounters an execution issue.
+	 * @throws TimeoutException When the timeout has been reached without a response.
+	 */
 	public UUID entityIdLookup(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
 		
+		// First perform the FinancialIstitution search
 		UUID result = getFinancialInstituteID(entityName);
 		
 		if(result != null)
 			return result;
 		
+		// Use evilmidget38's Fetcher class
 		Callable<Map<String,UUID>> fetcher = new UUIDFetcher(Arrays.asList(entityName));
 		Future<Map<String,UUID>> answer = plugin.threads.submit(fetcher);
 		
 		//TODO configure timeout settings
+		// Will either get the answer or throw an exception.
+		// No need to return a special value.
 		result = answer.get(10L, TimeUnit.SECONDS).get(entityName);
 		
 		return result;
 	}
 
+	/**
+	 * This method takes a UUID that represents a financial entity and attempts to find a name.
+	 * It first checks the list of FinancialInstitutions, and then it checks the online
+	 * Player list. If neither of these searches return a value, then a call to the Mojang
+	 * account service ensues. his method performs the call with a Callable object running in 
+	 * a separate thread. This method will block, and should be used with appropriate caution.
+	 * This method will time out according to the configuration settings.
+	 * 
+	 * @param entityID UUID of the entity to search for.
+	 * @return The name associated with this UUID.
+	 * @throws InterruptedException
+	 * @throws ExecutionException When the Callable thread encounters an execution issue.
+	 * @throws TimeoutException When the timeout has been reached without a response.
+	 */
 	public String entityNameLookup(UUID entityID) throws InterruptedException, ExecutionException, TimeoutException {
 		
+		// First search FinancialInstitutions
 		FinancialInstitution bank = getFinancialInstitution(entityID);
 		if(bank != null)
 			return bank.getName();
 		
+		// Then search for online players
 		Player player = plugin.getServer().getPlayer(entityID);
 		
 		if(player != null)
 			return player.getName();
 		
+		// Having exhausted the fast calls, use evilmidget38's Fetcher class
 		Callable<Map<UUID,String>> fetcher = new NameFetcher(Arrays.asList(entityID));
 		Future<Map<UUID,String>> answer = plugin.threads.submit(fetcher);
 		
+		// Will give answer or throw exception
 		String result = answer.get(10L, TimeUnit.SECONDS).get(entityID);
 		
 		return result;
 	}
 
+	/**
+	 * This is a convenience method that performs the same function as entityNameLookup(UUID),
+	 * but takes a FinancialEntity instead of a raw UUID. This method can be marginally
+	 * faster than the other in the event that the FinancialEntity is a FinancialInstitution,
+	 * since there is no SQL call to perform the first check.
+	 * 
+	 * @param entity FinancialEntity to search for.
+	 * @return The name associated with this FinancialEntity.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
 	public String entityNameLookup(FinancialEntity entity) throws InterruptedException, ExecutionException, TimeoutException{
 		if(entity instanceof FinancialInstitution)
 			return ((FinancialInstitution) entity).getName();
 		return entityNameLookup(entity.getUserID());
 	}
 
+	/**
+	 * This method returns a FinancialEntity object given the UUID of the entity. If no entity
+	 * with that UUID exists in the table, it returns null; Note that all FinancialEntities are
+	 * immutable.
+	 * 
+	 * @param userID UUID used in the search.
+	 * @return The FinancialEntity object represented by the UUID, or null.
+	 */
 	public FinancialEntity getFinancialEntity(UUID userID){
 		return buildEntity(queryFinancialEntitiesTable(userID));
 	}
 	
+	/**
+	 * This method returns a FinancialEntity object given the name of the entity. If no entity
+	 * with that name exists, it returns null; Note that all FinancialEntities are
+	 * immutable. This method relies on a name lookup which can be potentially blocking, and
+	 * so should be used with caution.
+	 * 
+	 * @param name FinancialEntity name.
+	 * @return FinancialEntity object represented by the name.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
 	@Deprecated
 	public FinancialEntity getFinancialEntity(String name) throws InterruptedException, ExecutionException, TimeoutException{
 		return getFinancialEntity(entityIdLookup(name));
 	}
 
 	/**
+	 * This method returns a FinancialEntity object given the UUID of the entity. If no entity
+	 * with that UUID exists in the table, it attempts to add the entity as a player. If that
+	 * still fails, it returns null; Note that all FinancialEntities are
+	 * immutable.
+	 * 
+	 * @param userID UUID used in the search.
+	 * @return The FinancialEntity object represented by the UUID, or null.
+	 */
+	public FinancialEntity getFinancialEntityAdd(UUID userID){
+		
+		FinancialEntity result = getFinancialEntity(userID);
+		
+		if(result == null){
+			if(!plugin.playerManager.addPlayer(userID)){
+						
+				return null;
+			}
+			
+			result = plugin.playerManager.getFinancialEntity(userID);
+		}
+		
+		return result;
+	}
+
+
+
+	/**
+	 * This method returns a FinancialEntity object given the name of the entity. If no entity
+	 * with that name exists, it attempts to add the entity as a player. If that
+	 * still fails, it returns null; Note that all FinancialEntities are
+	 * immutable. This method relies on a name lookup which can be potentially blocking, and
+	 * so should be used with caution.
+	 * 
+	 * @param name FinancialEntity name.
+	 * @return FinancialEntity object represented by the name.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	@Deprecated
+	public FinancialEntity getFinancialEntityAdd(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		return getFinancialEntityAdd(entityIdLookup(name));
+	}
+
+
+
+	/**
 	 * Reads the FinancialInstitutions table, and returns the UUID associated
 	 * with the given name or null, if the name is not present. 
 	 * 
 	 * @param entityName
-	 * @return
+	 * @return UUID of the FinancialInstitution with the given name or null.
 	 */
 	public UUID getFinancialInstituteID(String entityName) {
 		
@@ -508,10 +624,26 @@ public class PlayerManager {
 		return result;
 	}
 	
+	/**
+	 * Reads the FinancialInstitutions table and returns a FinancialInstitution object
+	 * representing the given ID or null if no entry exists. Note that FinancialInstitution
+	 * objects are immutable.
+	 * 
+	 * @param bankId UUID of the relevant FinancialInstitution
+	 * @return FinancialInstitution object representing the entry or null.
+	 */
 	public FinancialInstitution getFinancialInstitution(UUID bankId){
 		return (FinancialInstitution) buildEntity(queryFinancialInstitutionsTable(bankId));
 	}
 
+	/**
+	 * This method takes a UUID of a player and returns a Vector of UUIDs representing
+	 * the Entities that this user manages. If the user does not manage any entities, then
+	 * it returns null. Note that a manager must be a player. 
+	 * 
+	 * @param playerID UUID of player to check.
+	 * @return A vector of UUIDs of managed entities or null.
+	 */
 	public Vector<UUID> getManagedEntities(UUID playerID){
 		Vector<UUID> results = new Vector<UUID>();
 		
@@ -532,12 +664,30 @@ public class PlayerManager {
 			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-		
+			e.printStackTrace();
 		}
+		
+		if(results.size() == 0)
+			return null;
 		
 		return results;
 	}
 
+	/**
+	 * This method returns an OfflinePlayer object given a FinancialEntity
+	 * UUID. This method ensures that a real player is given. If the
+	 * input UUID is a FinancialInstitution, then the manager will be
+	 * returned. If the given UUID is not in the FinancialEntities table,
+	 * or cannot be found in the server's player cache, then it returns
+	 * null. Note this will return null for valid UUIDs that represent
+	 * players that have never played on the server. This method will not
+	 * handle large numbers of calls well, as it fetches the offline player
+	 * list from the server and searches it by brute-force each time it is
+	 * called.
+	 * 
+	 * @param financialEntityID
+	 * @return OfflinePlayer object corresponding to the input ID or manager thereof, or null.
+	 */
 	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
 		FinancialEntity entity = getFinancialEntity(financialEntityID);
 		
@@ -546,15 +696,20 @@ public class PlayerManager {
 		
 		UUID playerID = entity.getUserID();
 		
+		// This only checks for management one level deep.
+		// Cannot have institutions that manage other institutions
 		if(entity instanceof FinancialInstitution)
 			playerID = ((FinancialInstitution)entity).getResponsibleParty();
 		
 		// TODO look for ways to improve
 		
+		// Only finds OfflinePlayers who have played on the server
 		OfflinePlayer[] allPlayers = plugin.getServer().getOfflinePlayers();
 		
 		OfflinePlayer result = null;
 		
+		// Currently does a brute-force linear approach. Not appropriate
+		// for large number of calls.
 		for(OfflinePlayer op : allPlayers){
 			if(op.getUniqueId().equals(playerID)){
 				result = op;
@@ -562,8 +717,7 @@ public class PlayerManager {
 			}
 		}
 		
-		// Bukkit claims this is inefficient, but it would be
-		// convenient.
+		// Bukkit claims this is inefficient, but it would be convenient.
 		//return plugin.getServer().getOfflinePlayer(playerID);
 		
 		return result;
@@ -579,7 +733,7 @@ public class PlayerManager {
 	 * is offline, this method returns null.
 	 * 
 	 * @param financialEntityID
-	 * @return
+	 * @return Player corresponding to the input ID or manager thereof, or null.
 	 */
 	public Player getPlayer(UUID financialEntityID) {
 		
@@ -597,27 +751,12 @@ public class PlayerManager {
 		
 	}
 	
-	public FinancialEntity getFinancialEntityAdd(UUID userID){
-		
-		FinancialEntity result = getFinancialEntity(userID);
-		
-		if(result == null){
-			if(!plugin.playerManager.addPlayer(userID)){
-						
-				return null;
-			}
-			
-			result = plugin.playerManager.getFinancialEntity(userID);
-		}
-		
-		return result;
-	}
-	
-	@Deprecated
-	public FinancialEntity getFinancialEntityAdd(String name) throws InterruptedException, ExecutionException, TimeoutException{
-		return getFinancialEntityAdd(entityIdLookup(name));
-	}
-
+	/**
+	 * Checks if the given UUID represents an entry in the FinancialEntities table.
+	 * 
+	 * @param entityID UUID to check
+	 * @return true if the entry was found, false otherwise.
+	 */
 	public boolean inFinancialEntitiesTable(UUID entityID){
 		
 		ResultSet result = queryFinancialEntitiesTable(entityID);
@@ -632,7 +771,30 @@ public class PlayerManager {
 		
 		return answer;
 	}
-	
+
+	/**
+	 * Checks if the given name represents an entry in the FinancialEntities table.
+	 * This method depends on a blocking name lookup, and should be used with
+	 * caution.
+	 * 
+	 * @param entityName
+	 * @return true if the entry was found, false otherwise.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	@Deprecated
+	public boolean inFinancialEntitiesTable(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		return inFinancialEntitiesTable(entityIdLookup(entityName));
+	}
+
+	/**
+	 * Checks if the given UUID represents an entry in the FinancialInstitutions
+	 * table.
+	 * 
+	 * @param entityID UUID to check.
+	 * @return true if the entry was found, false otherwise.
+	 */
 	public boolean inFinancialInstitutionsTable(UUID entityID){
 		
 		ResultSet result = queryFinancialInstitutionsTable(entityID);
@@ -648,11 +810,14 @@ public class PlayerManager {
 		return answer;
 	}
 
-	@Deprecated
-	public boolean inFinancialEntitiesTable(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
-		return inFinancialEntitiesTable(entityIdLookup(entityName));
-	}
-	
+	/**
+	 * This method checks is the first user is ignoring the second input user.
+	 * If there is no entry for this user pair, then it returns false.
+	 * 
+	 * @param userId User to check ignore status.
+	 * @param targetId Potentially ignored target.
+	 * @return true if user is ignoring target, false otherwise.
+	 */
 	public boolean isIgnoring(UUID userId, UUID targetId){
 		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
 		
@@ -681,9 +846,20 @@ public class PlayerManager {
 		return false;
 	}
 
+	/**
+	 * Toggles the state of the first user ignoring offers from the target user.
+	 * If an entry does not already exist in the Trust table, one is created.
+	 * The method returns the new state ignore state, as if the isIgnoring(...)
+	 * method was called after the change.
+	 * 
+	 * @param playerId User to set ignore status.
+	 * @param targetId Target of ignore status.
+	 * @return true if user is now ignoring target, false otherwise.
+	 */
 	public boolean toggleIgnore(UUID playerId, UUID targetId){
 		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
 		
+		// Default if there isn't an entry already
 		boolean setToIgnore = true;
 		
 		try {
@@ -699,12 +875,16 @@ public class PlayerManager {
 				String updateSQL;
 				
 				if(currentTrust.next()){
+					// Already an entry
+					
+					// Switches current state
 					setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
 					
 					String ignoreString = setToIgnore? "'true'" : "'false'";
 					updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
 					
 				} else {
+					// Need to create an entry
 					updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
 				}
 				
@@ -727,6 +907,13 @@ public class PlayerManager {
 		
 	}
 
+	/*
+	 * Performs entity construction, given a ResultSet of the desired entry
+	 * in the FinancialEntities table. If the result is not a player, it attempts 
+	 * to find the corresponding entry in the FinancialInstitutions table. If one is found, then a 
+	 * FinancialInstitution object is created, if not, then it returns null.
+	 * A Player type will produce a FinancialPlayer object.
+	 */
 	private FinancialEntity buildEntity(ResultSet successfulQuery){
 		if(successfulQuery == null)
 			return null;
@@ -735,6 +922,7 @@ public class PlayerManager {
 			if(!successfulQuery.next())
 				return null;
 			
+			// Collect FinancialEntity information.
 			String userString = successfulQuery.getString("UserID");
 			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
 			double cash = successfulQuery.getDouble("Cash");
@@ -742,10 +930,11 @@ public class PlayerManager {
 			
 			UUID userID = UUID.fromString(userString);
 			
+			// Make FinancialPlayer object if that's what it is.
 			if(pt.equals(PlayerType.PLAYER))
 				return new FinancialPlayer(userID, pt, cash, crScore);
 			
-				
+			// Get FinancialInstitution info if it exists.
 			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
 				
 			if(instituteQuery == null || !instituteQuery.next())
@@ -756,6 +945,7 @@ public class PlayerManager {
 			
 			UUID managerID = UUID.fromString(managerString);
 			
+			// Make FinancialInstitution object.
 			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
 			
 		} catch (SQLException e) {
@@ -766,8 +956,11 @@ public class PlayerManager {
 		return null;
 	}
 
-	
-
+	/*
+	 * Performs a SQL query on the FinancialEntities table for the given UUID
+	 * are returns a result set containing every column of that entry. The
+	 * ResultSet may be empty if it was not found.
+	 */
 	private ResultSet queryFinancialEntitiesTable(UUID userID){
 		
 		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
@@ -787,6 +980,11 @@ public class PlayerManager {
 		return result;
 	}
 
+	/*
+	 * Performs a SQL query on the FinancialInstitutions table for the given UUID
+	 * are returns a result set containing every column of that entry. The
+	 * ResultSet may be empty if it was not found.
+	 */
 	private ResultSet queryFinancialInstitutionsTable(UUID userID){
 		
 		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
