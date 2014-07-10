@@ -633,7 +633,19 @@ public class PlayerManager {
 	 * @return FinancialInstitution object representing the entry or null.
 	 */
 	public FinancialInstitution getFinancialInstitution(UUID bankId){
-		return (FinancialInstitution) buildEntity(queryFinancialInstitutionsTable(bankId));
+		return (FinancialInstitution) buildEntity(queryFinancialEntitiesTable(bankId));
+	}
+	
+	/**
+	 * Reads the FinancialInstitutions table and returns a FinancialInstitution object
+	 * representing the given name or null if no entry exists. Note that FinancialInstitution
+	 * objects are immutable.
+	 * 
+	 * @param bankName Name of the relevant FinancialInstitution
+	 * @return FinancialInstitution object representing the entry or null.
+	 */
+	public FinancialInstitution getFinancialInstitution(String bankName){
+		return getFinancialInstitution(getFinancialInstituteID(bankName));
 	}
 
 	/**
@@ -962,6 +974,8 @@ public class PlayerManager {
 	 * ResultSet may be empty if it was not found.
 	 */
 	private ResultSet queryFinancialEntitiesTable(UUID userID){
+		if(userID==null)
+			return null;
 		
 		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
 		ResultSet result = null;
@@ -986,6 +1000,8 @@ public class PlayerManager {
 	 * ResultSet may be empty if it was not found.
 	 */
 	private ResultSet queryFinancialInstitutionsTable(UUID userID){
+		if(userID==null)
+			return null;
 		
 		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
 		ResultSet result = null;
