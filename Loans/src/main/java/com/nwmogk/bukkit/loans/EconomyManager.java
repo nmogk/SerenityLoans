@@ -151,6 +151,7 @@ public class EconomyManager {
 		return result;
 	}
 	
+	@Deprecated
 	public EconResult has(String name, double amount){
 		boolean answer = true;
 		
@@ -183,11 +184,12 @@ public class EconomyManager {
 		return new EconResult(0, balance, answer, result.errMsg);
 	}
 	
+	@Deprecated
 	public boolean hasBalance(String financialEntity, double amount){
 		return has(financialEntity, amount).callSuccess;
 	}
 	
-	
+	@Deprecated
 	public EconResult getBalance(String name){
 		return getBalance(plugin.playerManager.getFinancialEntity(name));
 	}
@@ -246,6 +248,7 @@ public class EconomyManager {
 		return String.format("%#.3f%%", value * 100);
 	}
 
+	@Deprecated
 	public EconResult deposit(String name, double amount){
 		return deposit(plugin.playerManager.getFinancialEntity(name), amount);
 	}
@@ -284,6 +287,7 @@ public class EconomyManager {
 			return new EconResult(0, entity.getCash(), false, "Upate not completed!");
 	}
 	
+	@Deprecated
 	public EconResult withdraw(String name, double amount){
 		return withdraw(plugin.playerManager.getFinancialEntity(name), amount);
 	}
