@@ -53,6 +53,8 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -582,7 +584,7 @@ public class LoanHandler implements CommandExecutor{
 	 * If player is online, send them a message,
 	 * otherwise terminate, message will be sent later.
 	 */
-	protected boolean sendOffer(CommandSender sender, FinancialEntity entity, String alias, String[] args, boolean isQuick){
+	private boolean sendOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args, final boolean isQuick){
 		
 		// -------------------- <Permissions> ------------------
 				
@@ -613,7 +615,7 @@ public class LoanHandler implements CommandExecutor{
 				
 		// Collect financialEntity target info
 		// This is potentially not safe input!!!
-		String entityTarget = args[1];
+		final String entityTarget = args[1];
 				
 		if(entityTarget.equalsIgnoreCase(sender.getName())){
 			sender.sendMessage(Conf.messageCenter("meta-offer-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
@@ -628,78 +630,104 @@ public class LoanHandler implements CommandExecutor{
 		// -------------------- </Parse Inputs> --------------------
 		
 		
-			
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
-		
-		// Check if other entity is in FinancialEntities table
-		if(borrower == null) {			
-			sender.sendMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		}
-		
-		// Parse expiration time
-		String timeString = "1w";
-				
-		// The expiration string is assumed to be the remainder of the line
-		// Spaces are removed, and the string is parsed into a length
-		if (args.length > 2) {
-			for(int i = 2; i < args.length; i++)
-				timeString += args[i];
-		} else if(plugin.getConfig().contains("loan.default-offer-time"))
-			timeString = plugin.getConfig().getString("loan.default-offer-time");
-				
-		// Parsing string
-		long expirationTime = Conf.parseTime(timeString);
-				
-		if(expirationTime == 0){
-			sender.sendMessage(Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		}
+		plugin.threads.execute(new Runnable(){
 
-		// Create expiration time
-		Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
+			@SuppressWarnings("deprecation")
+			public void run() {
 				
-		// Check if offer is in PreparedOffers table
-		String offerName = isQuick? "default" : "prepared";
-		
-		OfferExitStatus exit = plugin.offerManager.createOffer(entity.getUserID(), borrower.getUserID(), offerName, expDate);
+				// Check if other entity is in FinancialEntities table
+				FinancialEntity borrower = null;
 				
-		switch(exit){
-		case IGNORED:
-			sender.sendMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		case OVERWRITE_FAIL:
-			sender.sendMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		case SUCCESS:
-			break;
-		case UNKNOWN:
-			sender.sendMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
-			return true;
-		}
-		
-		Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
-		
-		if(recipient == null){
-			sender.sendMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		}
-		
-		if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
-			sender.sendMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		}
-		
-		// Send message
-		
-		String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
-		String commandName = recipient.getName().equals(entityTarget)? "/loan" : "/crunion";
-					
-		sender.sendMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-		sender.sendMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-					
-		if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
-			sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+				try {
+					borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					scheduleMessage(prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					return;
+				}
+				
+				if(borrower == null){	
+					scheduleMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+				
+				// Parse expiration time
+				String timeString = "1w";
+				
+				// The expiration string is assumed to be the remainder of the line
+				// Spaces are removed, and the string is parsed into a length
+				if (args.length > 2) {
+					for(int i = 2; i < args.length; i++)
+						timeString += args[i];
+				} else if(plugin.getConfig().contains("loan.default-offer-time"))
+					timeString = plugin.getConfig().getString("loan.default-offer-time");
+						
+				// Parsing string
+				long expirationTime = Conf.parseTime(timeString);
+						
+				if(expirationTime == 0){
+					scheduleMessage(Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+
+				// Create expiration time
+				Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
+						
+				// Check if offer is in PreparedOffers table
+				String offerName = isQuick? "default" : "prepared";
+				
+				OfferExitStatus exit = plugin.offerManager.createOffer(entity.getUserID(), borrower.getUserID(), offerName, expDate);
+				
+				switch(exit){
+				case IGNORED:
+					scheduleMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				case OVERWRITE_FAIL:
+					scheduleMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				case SUCCESS:
+					break;
+				case UNKNOWN:
+					scheduleMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
+					return;
+				}
+				
+				Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
+				
+				if(recipient == null){
+					scheduleMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+					return;
+				}
+				
+				if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
+					scheduleMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+					return;
+				}
+				
+				// Send message
+				
+				String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
+				String commandName = recipient.getName().equals(entityTarget)? "/loan " : "/crunion ";
+							
+				scheduleMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}), recipient);
+				scheduleMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}), recipient);
+							
+				if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
+					sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+				
+			}
+			
+			
+			private void scheduleMessage(String message){
+				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
+			}
+			
+			private void scheduleMessage(String message, CommandSender sender){
+				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
+			}
+			
+		});
+			
 				
 		return true;
 	}
