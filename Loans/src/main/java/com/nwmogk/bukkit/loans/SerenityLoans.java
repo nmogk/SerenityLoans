@@ -45,8 +45,10 @@
 
 package com.nwmogk.bukkit.loans;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.*;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.command.LoanHandler;
@@ -626,6 +628,22 @@ public final class SerenityLoans extends JavaPlugin {
 	 
 	 public EconomyManager getEcon(){
 		 return econ;
+	 }
+	 
+	 
+	 public class MessageSender extends BukkitRunnable {
+		 
+		 CommandSender sendTo;
+		 String message;
+		 
+		 public MessageSender(CommandSender sendTo, String message){
+			 this.sendTo = sendTo;
+		 }
+		 
+		 public void run(){
+			 sendTo.sendMessage(message);
+		 }
+		 
 	 }
 
 	 
