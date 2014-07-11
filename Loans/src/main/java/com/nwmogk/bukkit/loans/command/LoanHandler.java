@@ -135,20 +135,9 @@ public class LoanHandler implements CommandExecutor{
 			retractOffer(sender, entity, alias + " " + subCommand, args);
 
 		else if (subCommand.equalsIgnoreCase("forgive")) {			
-			// Check basic command syntax
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-									
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.lend")) {
-				sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
 			
-			return sub1.forgiveLoan(sender, cmd, alias, args);
+			
+			return forgiveLoan(sender, entity, alias + " " + subCommand, args);
 						
 		} else if (subCommand.equalsIgnoreCase("sell")) {
 			// Check basic command syntax
@@ -451,7 +440,7 @@ public class LoanHandler implements CommandExecutor{
 	 * args will be not null, and contain only the arguments following the last loan
 	 * specification argument.
 	 */
-	protected static LoanSpec parseLoanArguments(FinancialEntity sender, String senderName, String[] args, boolean isSenderLender){
+	protected static LoanSpec parseLoanArguments(FinancialEntity sender, FinancialEntity target, String senderName, String[] args, boolean isSenderLender){
 		
 		LoanSpec result = new LoanSpec();
 		result.result = null;
@@ -460,13 +449,6 @@ public class LoanHandler implements CommandExecutor{
 		result.errMessage = null;
 		
 		int remainingIndex = 2;
-		
-		if(args.length < 2){
-			result.errMessage = Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{senderName, "$$c"});
-			return result;
-		}
-			
-		FinancialEntity target = SerenityLoans.getPlugin().playerManager.getFinancialEntity(args[1]);
 		
 		if(target == null){
 			
@@ -507,12 +489,15 @@ public class LoanHandler implements CommandExecutor{
 			}
 			catch (NumberFormatException e){
 				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
-				
+				result.result = potentials[0];
+				result.multipleValues = true;
 				return result;
 			}
 			
-			if (loanIndex >= potentials.length){
+			if (loanIndex >= potentials.length || loanIndex < 1){
 				result.errMessage = Conf.messageCenter("unknown-loan-selection", new String[]{"$$p", "$$r", "$$c"}, new String[]{senderName, args[1], "$$c"});
+				result.result = potentials[0];
+				result.multipleValues = true;
 				return result;
 			}
 			
@@ -524,6 +509,7 @@ public class LoanHandler implements CommandExecutor{
 		
 		String[] remainingArgs = new String[args.length - remainingIndex];
 		
+		// Copy remaining args into new array
 		for(int i = remainingIndex; i < args.length; i++){
 			remainingArgs[i - remainingIndex] = args[i];
 		}
@@ -535,8 +521,8 @@ public class LoanHandler implements CommandExecutor{
 	}
 	
 	/*
-	 * Command: /sendoffer <borrower> [expiration time]
-	 * 			/quickoffer <borrower> [expiration time]
+	 * Command: /loan sendoffer <borrower> [expiration time]
+	 * 			/loan quickoffer <borrower> [expiration time]
 	 * 
 	 * Permissions: serenityloans.loan.lend
 	 * 
@@ -552,8 +538,8 @@ public class LoanHandler implements CommandExecutor{
 	 * can be offline. However, the borrower must have the proper
 	 * permissions to borrow for the command to work. 
 	 * 
-	 * /sendoffer sends the current prepared offer
-	 * /quickoffer sends the default prepared offer
+	 * /loan sendoffer sends the current prepared offer
+	 * /loan quickoffer sends the default prepared offer
 	 * 
 	 * ==========================================================
 	 * 
@@ -629,12 +615,12 @@ public class LoanHandler implements CommandExecutor{
 					borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
 					// TODO add message to configuration
-					scheduleMessage(prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
 					return;
 				}
 				
 				if(borrower == null){	
-					scheduleMessage(Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				}
 				
@@ -653,7 +639,7 @@ public class LoanHandler implements CommandExecutor{
 				long expirationTime = Conf.parseTime(timeString);
 						
 				if(expirationTime == 0){
-					scheduleMessage(Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				}
 
@@ -667,27 +653,27 @@ public class LoanHandler implements CommandExecutor{
 				
 				switch(exit){
 				case IGNORED:
-					scheduleMessage(Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				case OVERWRITE_FAIL:
-					scheduleMessage(Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				case SUCCESS:
 					break;
 				case UNKNOWN:
-					scheduleMessage(prfx + " No offer has been prepared. This is a bug. Please report.");
+					plugin.scheduleMessage(sender, prfx + " No offer has been prepared. This is a bug. Please report.");
 					return;
 				}
 				
 				Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
 				
 				if(recipient == null){
-					scheduleMessage(Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				}
 				
 				if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
-					scheduleMessage(Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
 					return;
 				}
 				
@@ -696,22 +682,15 @@ public class LoanHandler implements CommandExecutor{
 				String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
 				String commandName = recipient.getName().equals(entityTarget)? "/loan " : "/crunion ";
 							
-				scheduleMessage(Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}), recipient);
-				scheduleMessage(Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}), recipient);
+				plugin.scheduleMessage(recipient, Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+				plugin.scheduleMessage(recipient, Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
 							
 				if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
-					sender.sendMessage(Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
 				
 			}
 			
 			
-			private void scheduleMessage(String message){
-				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
-			}
-			
-			private void scheduleMessage(String message, CommandSender sender){
-				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
-			}
 			
 		});
 			
@@ -720,7 +699,7 @@ public class LoanHandler implements CommandExecutor{
 	}
 
 	/*
-	 * Command: /retractoffer <borrower>
+	 * Command: /loan retractoffer <borrower>
 	 * 
 	 * Permissions: serenityloans.loan.lend
 	 * 
@@ -763,20 +742,16 @@ public class LoanHandler implements CommandExecutor{
 					borrowerId = plugin.playerManager.entityIdLookup(args[1]);
 				} catch (InterruptedException | ExecutionException	| TimeoutException e) {
 					// TODO add message to configuration
-					scheduleMessage(prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
 					return;
 				}
 				
 				// TODO replace with message center message
 				if(plugin.offerManager.removeOffer(entity.getUserID(), borrowerId))
-					scheduleMessage(prfx + " Operation successful.");
+					plugin.scheduleMessage(sender, prfx + " Operation successful.");
 				else
-					scheduleMessage(Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, args[1]}));
+					plugin.scheduleMessage(sender, Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, args[1]}));
 				
-			}
-			
-			private void scheduleMessage(String message){
-				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
 			}
 			
 		});
@@ -787,8 +762,8 @@ public class LoanHandler implements CommandExecutor{
 	}
 	
 	/*
-	 * Command: /offering [param-list]
-	 * 			/defaultoffering [param-list]
+	 * Command: /loan offering [param-list]
+	 * 			/loan defaultoffering [param-list]
 	 * 
 	 * Permissions: serenityloans.loan.lend
 	 * 
@@ -799,8 +774,10 @@ public class LoanHandler implements CommandExecutor{
 	 * offer. If param-list is given, then the command sets the parameter to the 
 	 * given value and reports success or failure. It then displays the new values.
 	 * 
-	 * /offering updates the current prepared offer, /defaultoffering updates the
+	 * /loan offering updates the current prepared offer, /loan defaultoffering updates the
 	 * default prepared offer.
+	 * 
+	 * ======================================================================================
 	 * 
 	 * This command does not make any name queries, so currently runs on the main thread.
 	 */
@@ -847,57 +824,110 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 
-	protected boolean forgiveLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args){
-		String borrowerName = args[1];
-		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(borrowerName);
-		
-		if(lender == null){
-			sender.sendMessage(Conf.messageCenter("generic-problem", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " forgive"}));
-			
-			return true;
-		}
-		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, sender.getName(), args, true);
-		
-		
-		if(loanSelection.errMessage != null){
-			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
-			return true;
-		}
-		
-		if(loanSelection.multipleValues){
-			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
-			
-			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
-			for(int i = 0; i < allLoans.length ; i++){
-				sender.sendMessage(String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
-			}
-			
-			return true;
-		}
-		
-		double amount = 0;
-		Loan theLoan = loanSelection.result;
-		String[] toParse = loanSelection.remainingArgs;
-		
-		if(toParse.length >= 1){
-			try{
-				amount = Double.parseDouble(toParse[0]);
-			} catch (NumberFormatException e){
-				sender.sendMessage(Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
-				return true;
-			}
-		} else 
-			amount = theLoan.getCloseValue();
-		
-		
-		
-		plugin.loanManager.applyPayment(theLoan, amount);
-		
-		sender.sendMessage(Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName, plugin.econ.format(amount)}));
+	/*
+	 * Command: /loan forgive <borrower [account]> [amount]
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * borrower = name of borrower of loan
+	 * account = loan number if multiple loans with same borrower
+	 * amount = dollar value to forgive. Default: {total balance}
+	 * 
+	 * This command forgives the borrower loan by the amount given. If
+	 * no amount argument is given, will forgive entire loan. If the
+	 * borrower has multiple loans, a specific loan must be chosen from
+	 * an index list. /loan forgive <borrower> 0 is a safe way to view
+	 * the index list without accidentally forgiving anything.
+	 */
+	private boolean forgiveLoan(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
 
+		// -------------------- Permissions ------------------
+				
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+
+		
+		// -------------------- Syntax ------------------
+		
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+
+		
+		
+		// -------------------- <Logic> ------------------
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				String borrowerName = args[1];
+				
+				
+				FinancialEntity lender = entity;
+				FinancialEntity borrower = null;
+				try {
+					
+					// Parse borrower argument
+					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
+				
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
+					return;
+				}
+				
+				// Parse loan selection
+				LoanSpec loanSelection = parseLoanArguments(lender, borrower, sender.getName(), args, true);
+				
+				// Report error if found
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				// If multiple loans were found, list them to the caller
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
+					
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+					}
+					
+					return;
+				}
+				
+				double amount = 0;
+				Loan theLoan = loanSelection.result;
+				String[] toParse = loanSelection.remainingArgs;
+				
+				// Parse amount to forgive. Ignore arguments afterwards
+				if(toParse.length >= 1){
+					try{
+						amount = Double.parseDouble(toParse[0]);
+					} catch (NumberFormatException e){
+						plugin.scheduleMessage(sender, Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
+						return;
+					}
+				} else 
+					amount = theLoan.getCloseValue();
+				
+				// Apply the forgiveness
+				plugin.loanManager.applyPayment(theLoan, amount);
+				
+				plugin.scheduleMessage(sender, Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName, plugin.econ.format(amount)}));
+			}
+
+		});
+		
 		return true;
 	}
 	
