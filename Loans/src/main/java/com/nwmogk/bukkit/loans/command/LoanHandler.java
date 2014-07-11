@@ -141,14 +141,13 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("sell"))
 			return sellLoan(sender, entity, alias + " " + subCommand, args);
 			
-		else if (subCommand.equalsIgnoreCase("buy")) {
+		else if (subCommand.equalsIgnoreCase("buy"))
 			return buyLoan(sender, entity, alias, args);
 			
-		} else if (subCommand.equalsIgnoreCase("viewsaleoffer")) {
-			
+		else if (subCommand.equalsIgnoreCase("viewsaleoffer")) 
 			return viewSaleOffer(sender, entity, alias, args);			
 			
-		} else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 
+		else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 
 			/*
 			 * Behavior: 
 			 * 	/loan viewoffers
@@ -332,7 +331,7 @@ public class LoanHandler implements CommandExecutor{
 									"    /" + alias + " summary",
 									"    /" + alias + " setautopay",};
 		
-		if(args.length <= 1){
+		if(args.length == 0 || args.length <= 1 || !args[0].equalsIgnoreCase("help")){
 			sender.sendMessage(basicHelp);
 			
 			if(sender.hasPermission("serenityloans.loan.lend"))
@@ -343,9 +342,138 @@ public class LoanHandler implements CommandExecutor{
 			return true;
 		}
 		
+		String subCommand = args[1];
+		
+		if (subCommand.equalsIgnoreCase("help") || subCommand.equalsIgnoreCase("?")) {
+			sender.sendMessage(prfx + "Whoah, how meta. I think you have it figured out.");
+		} else if (subCommand.equalsIgnoreCase("offering") || subCommand.equalsIgnoreCase("defaultoffering")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan offering [param-list]",
+					"         /loan defaultoffering [param-list]",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"param-list = space delimited list of the form <termName>=<value>. Term names",
+					"are not case sensitive. Note there must be no spaces next to the `='.",
+					"",
+					"If no arguments are given, then the command displays the current state of the",
+					"offer. If param-list is given, then the command sets the parameter to the",
+					"given value and reports success or failure. It then displays the new values.",
+					"",
+					"/loan offering updates the current prepared offer, /loan defaultoffering updates the",
+					"default prepared offer."
+			});
+		} else if (subCommand.equalsIgnoreCase("sendoffer") || subCommand.equalsIgnoreCase("quickoffer")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan sendoffer <borrower> [expiration time]",
+					"         /loan quickoffer <borrower> [expiration time]",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"borrower = name of a player or financial institution (bank)",
+					"",
+					"expiration time = length of time for loan to be active formatted",
+					"as a list of integers followed by units. Available units are",
+					"y (year), d (day), h (hour), m (minutes), s (seconds). Spaces",
+					"are optional. ex - \"3d 4h 1 s\" represents 3 days 4 hours and 1 second.",
+					"",
+					"This command sends a loan offer to the given potential borrower.",
+					"The borrower may be either a player or a financial institution and",
+					"can be offline. However, the borrower must have the proper",
+					"permissions to borrow for the command to work. ",
+					"",
+					"/loan sendoffer sends the current prepared offer",
+					"/loan quickoffer sends the default prepared offer"
+			});
+		} else if (subCommand.equalsIgnoreCase("retractoffer")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan retractoffer <borrower>",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"borrower = name of a player or financial institution (bank)",
+					"",
+					"This command removes an offer from the given financial entity name.",
+					"If there was no offer sent in the first place, this command will not",
+					"give an error."
+			});
+		} else if (subCommand.equalsIgnoreCase("forgive")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan forgive <borrower [account]> [amount]",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"borrower = name of borrower of loan",
+					"account = loan number if multiple loans with same borrower",
+					"amount = dollar value to forgive. Default: {total balance}",
+					"",
+					"This command forgives the borrower loan by the amount given. If",
+					"no amount argument is given, will forgive entire loan. If the",
+					"borrower has multiple loans, a specific loan must be chosen from",
+					"an index list. /loan forgive <borrower> 0 is a safe way to view",
+					"the index list without accidentally forgiving anything." 
+			});
+		} else if (subCommand.equalsIgnoreCase("sell")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan sell <borrower [account]> <new lender> <amount>",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"borrower = name of borrower of loan",
+					"account = loan number if multiple loans with same borrower",
+					"new lender = entity to attempt to sell loan to",
+					"amount = dollar value of sale",
+					"",
+					"This command sets up a loan to be sold to new lender for the",
+					"given amount. If the borrower has multiple loans, a specific",
+					"loan must be chosen from an index list. Sale offers will not",
+					"persist across plugin resets, and the new lender must be ",
+					"online. "
+			});
+		} else if (subCommand.equalsIgnoreCase("buy")) {
+			sender.sendMessage(new String[]{
+					"Command /loan buy",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"This command executes the pending sale offer for the sender.",
+					"It will fail if the sender does not have enough money. If",
+					"the sale is successful, the old lender and the borrower are",
+					"notified if they are online."
+			});
+		} else if (subCommand.equalsIgnoreCase("viewsaleoffer")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan viewsaleoffer",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"This command displays a received loan sale offer including",
+					"the price and the loan in question."
+			});
+		} else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 			
+			
+		} else if (subCommand.equalsIgnoreCase("accept")) {
+	
+		} else if (subCommand.equalsIgnoreCase("reject")) {
+				
+		} else if (subCommand.equalsIgnoreCase("ignore")) {
+
+		} else if (subCommand.equalsIgnoreCase("pay")) {
+			
+		} else if (subCommand.equalsIgnoreCase("payoff")) {
+
+		} else if (subCommand.equalsIgnoreCase("summary")) {
+			
+		} else if (subCommand.equalsIgnoreCase("setautopay")) {
+			
+		} else if (subCommand.equalsIgnoreCase("statement")) {
+	
+		} else {
+			return false;
+		}
+		
 		//TODO implement command documentation
 
-		return false;
+		return true;
 	}
 	
 	
