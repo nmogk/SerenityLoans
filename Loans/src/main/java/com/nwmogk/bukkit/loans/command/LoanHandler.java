@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: LoanHandler.java
  * Contributing Authors: Nathan W Mogk
@@ -51,9 +52,9 @@ package com.nwmogk.bukkit.loans.command;
 import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -81,12 +82,17 @@ public class LoanHandler implements CommandExecutor{
 	}
 	
 	private class LoanSale{
-		public Loan theLoan = null;
-		public double amount = 0;
+		public final Loan theLoan;
+		public final double amount;
+		
+		public LoanSale(Loan theLoan, double amount){
+			this.theLoan = theLoan;
+			this.amount = amount;
+		}
 	}
 	
 	private SerenityLoans plugin;
-	private HashMap<FinancialEntity, LoanSale> pendingSales;
+	private ConcurrentHashMap<FinancialEntity, LoanSale> pendingSales;
 	private LoanLenderHandler sub1;
 	private LoanBorrowerHandler sub2;
 	private static String prfx;
@@ -134,28 +140,13 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("retractoffer")) 
 			retractOffer(sender, entity, alias + " " + subCommand, args);
 
-		else if (subCommand.equalsIgnoreCase("forgive")) {			
-			
-			
+		else if (subCommand.equalsIgnoreCase("forgive"))
 			return forgiveLoan(sender, entity, alias + " " + subCommand, args);
 						
-		} else if (subCommand.equalsIgnoreCase("sell")) {
-			// Check basic command syntax
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-									
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.lend")) {
-				sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
+		else if (subCommand.equalsIgnoreCase("sell"))
+			return sellLoan(sender, entity, alias + " " + subCommand, args);
 			
-			return sub1.sellLoan(sender, cmd, alias, args);
-			
-		} else if (subCommand.equalsIgnoreCase("buy")) {
+		else if (subCommand.equalsIgnoreCase("buy")) {
 			
 			if(!sender.hasPermission("serenityloans.loan.lend")){
 				sender.sendMessage(Conf.messageCenter("perm-buy-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
@@ -931,89 +922,157 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 	
-	protected boolean sellLoan (CommandSender sender, FinancialEntity entity, String alias, String[] args){
-		String borrowerName = args[1];
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(borrowerName);
-					
-		if(lender == null){
-			sender.sendMessage(Conf.messageCenter("generic-problem", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + " sell"}));
-			return true;
-		}		
+	/*
+	 * Command: /loan sell <borrower [account]> <new lender> <amount>
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * borrower = name of borrower of loan
+	 * account = loan number if multiple loans with same borrower
+	 * new lender = entity to attempt to sell loan to
+	 * amount = dollar value of sale
+	 * 
+	 * This command sets up a loan to be sold to new lender for the
+	 * given amount. If the borrower has multiple loans, a specific
+	 * loan must be chosen from an index list. Sale offers will not
+	 * persist across plugin resets, and the new lender must be 
+	 * online. 
+	 * 
+	 */
+	private boolean sellLoan (final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
+
+		//-------------------- Permissions --------------------
 		
-		LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, sender.getName(), args, true);
-		
-		
-		if(loanSelection.errMessage != null){
-			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
 		
-		if(loanSelection.multipleValues){
-			sender.sendMessage(Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " sell", borrowerName}));
-			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
-			for(int i = 0; i < allLoans.length ; i++){
-				sender.sendMessage(String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+		//-------------------- Syntax --------------------
+		
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+
+		//-------------------- Logic --------------------
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				String borrowerName = args[1];
+				FinancialEntity lender = entity;
+				FinancialEntity borrower = null;
+				FinancialEntity recipient = null;
+				
+				try{
+					
+					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
+					
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
+					return;
+				}
+			
+				// Parse loan selection
+				LoanSpec loanSelection = LoanHandler.parseLoanArguments(lender, borrower, sender.getName(), args, true);
+				
+				
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				// List available loans to sender
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, borrowerName}));
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+					}
+					
+					return;
+				}
+				
+				// New syntax checking now that loan selection has been taken care of
+				// (variable argument length before this)
+				String[] toParse = loanSelection.remainingArgs;
+				
+				if(toParse.length < 2){
+					plugin.scheduleMessage(sender, prfx + " Syntax incorrect. Must specify new lender and amount of sale.");
+					return;
+				}
+				
+				String recipientName = toParse[0];
+				
+				// Get the new lender financial entity
+				try{
+					
+					recipient = plugin.playerManager.getFinancialEntityAdd(recipientName);
+					
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + recipientName + ". Try again later.");
+					return;
+				}
+				
+				if(recipient == null){
+					plugin.scheduleMessage(sender, String.format(prfx + " You cannot sell a loan to %s.", toParse[0]));
+					return;
+				}
+				
+				Player newLender = plugin.playerManager.getPlayer(recipient.getUserID());
+				
+				// New lender must be online
+				if(newLender == null){
+					plugin.scheduleMessage(sender, prfx + " New lender must be online to complete transaction.");
+					return;
+				}
+				
+				// Check permissions of new lender
+				if(!newLender.hasPermission("serenityloans.loan.lend") && !newLender.hasPermission("serenityloans.crunion.lend")){
+					plugin.scheduleMessage(sender, String.format(prfx + " %s does not have permission to buy loan.", toParse[0]));
+					return;
+				}
+				
+				double amount = 0;
+				
+				// Parse sale amount input
+				try{
+					amount = Double.parseDouble(toParse[1]);
+				} catch (NumberFormatException e){
+					plugin.scheduleMessage(sender, prfx + " Amount specified incorrectly.");
+					return;
+				}
+				
+				// Create sale record object
+				LoanSale sale = new LoanSale(loanSelection.result, amount);
+				// Each entity can only have a single loan offer at a time.
+				pendingSales.put(recipient, sale);
+				
+				// Send message to new lender
+				
+				String recipientString = recipient.getUserID().equals(newLender.getUniqueId())? "You" : ((FinancialInstitution)recipient).getName();
+				String commandName = recipient.getUserID().equals(newLender.getUniqueId())? "/loan" : "/crunion";
+				
+				plugin.scheduleMessage(newLender, String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientString, sender.getName(), plugin.econ.format(amount)));
+				plugin.scheduleMessage(newLender, String.format(prfx + "Type '%s viewsaleoffer' to view details.", commandName));
+				plugin.scheduleMessage(newLender, String.format(prfx + "Type '%s buy' to purchase loan.", commandName));
+			
+				
+				// TODO upgrade message
+				plugin.scheduleMessage(sender, prfx + " Sale offer sent successfully.");
+				
 			}
 			
-			return true;
-		}
-		
-		LoanSale sale = new LoanSale();
-		
-		double amount = 0;
-		sale.theLoan = loanSelection.result;
-		String[] toParse = loanSelection.remainingArgs;
-		
-		if(toParse.length < 2){
-			sender.sendMessage(prfx + " Syntax incorrect. Must specify new lender and amount of sale.");
-			return true;
-		}
-		
-		FinancialEntity recipient = plugin.playerManager.getFinancialEntityAdd(toParse[0]);
-		
-		
-		if(recipient == null){
-			sender.sendMessage(String.format(prfx + " You cannot sell a loan to %s.", toParse[0]));
-			return true;
-		}
-		
-		Player newLender = plugin.playerManager.getPlayer(recipient.getUserID());
-		
-		
-		if(newLender == null){
-			sender.sendMessage(prfx + " New lender must be online to complete transaction.");
-			return true;
-		}
-		
-		if(!newLender.hasPermission("serenityloans.loan.lend") && !newLender.hasPermission("serenityloans.crunion.lend")){
-			sender.sendMessage(String.format(prfx + " %s does not have permission to buy loan.", toParse[0]));
-			return true;
-		}
-		
-		try{
-			amount = Double.parseDouble(toParse[1]);
-		} catch (NumberFormatException e){
-			sender.sendMessage(prfx + " Amount specified incorrectly.");
-			return true;
-		}
-		
-		
-		sale.amount = amount;
-		
-		// Send message
-		
-		String recipientName = recipient.getUserID().equals(newLender.getUniqueId())? "You" : ((FinancialInstitution)recipient).getName();
-		String commandName = recipient.getUserID().equals(newLender.getUniqueId())? "/loan" : "/crunion";
-		
-		newLender.sendMessage(String.format(prfx + " %s received a loan sale offer from %s for %s.", recipientName, sender.getName(), plugin.econ.format(amount)));
-		newLender.sendMessage(String.format(prfx + "Type '%s viewsaleoffer' to view details.", commandName));
-		newLender.sendMessage(String.format(prfx + "Type '%s buy' to purchase loan.", commandName));
-	
-		pendingSales.put(borrower, sale);
-		
-		sender.sendMessage(prfx + " Sale offer sent successfully.");
-		
+		});
+
 		return true;
 	}
 	
@@ -1036,6 +1095,8 @@ public class LoanHandler implements CommandExecutor{
 		
 		plugin.econ.withdraw(buyer, ls.amount);
 		plugin.econ.deposit(ls.theLoan.getLender(), ls.amount);
+		
+		// TODO notify old lender and borrower if possible
 		
 		if(plugin.loanManager.setLender(ls.theLoan.getLoanID(), buyer.getUserID()))
 			sender.sendMessage(prfx + " Purchase processed successfully!");
