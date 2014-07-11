@@ -142,40 +142,15 @@ public class LoanHandler implements CommandExecutor{
 			return sellLoan(sender, entity, alias + " " + subCommand, args);
 			
 		else if (subCommand.equalsIgnoreCase("buy"))
-			return buyLoan(sender, entity, alias, args);
+			return buyLoan(sender, entity, alias + " " + subCommand, args);
 			
 		else if (subCommand.equalsIgnoreCase("viewsaleoffer")) 
-			return viewSaleOffer(sender, entity, alias, args);			
+			return viewSaleOffer(sender, entity, alias + " " + subCommand, args);			
 			
-		else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 
-			/*
-			 * Behavior: 
-			 * 	/loan viewoffers
-			 * 		Shows all offers given to the calling player
-			 * 	/loan viewoffers <otherentity>
-			 * 		Shows offer detail from given entity
-			 * 	/loan viewoffers <self>
-			 * 		Shows all offers outstanding
-			 */
-			
-			// Check basic command syntax
-			if(args.length > 2){
-				sender.sendMessage(Conf.messageCenter("too-many-arguments", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-			
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			// Send to specific handler method
-			return loanViewoffersCommand(sender, args, subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"));
-						
-			
-		} else if (subCommand.equalsIgnoreCase("accept")) {
+		else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"))  
+			return loanViewoffersCommand(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"));
+		
+		else if (subCommand.equalsIgnoreCase("accept")) {
 			
 			if(args.length == 1){
 				sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
@@ -475,60 +450,118 @@ public class LoanHandler implements CommandExecutor{
 
 		return true;
 	}
-	
-	
 
-
-	private boolean loanViewoffersCommand(CommandSender sender, String[] args, boolean sentOffers) {
+	/*
+	 * Command: /loan viewoffer[s] [lender]
+	 *          /loan viewsentoffer[s] [borrower]
+	 *          
+	 * Permissions: serenityloans.loan.borrow
+	 *           OR serenityloans.loan.lend
+	 *           
+	 * lender = name of entity which sent the offer
+	 * borrower = name of entity to which the offer was sent
+	 * 
+	 * *The plural form of both of these commands are built-in
+	 * aliases.
+	 *           
+	 * This command shows outstanding offers. Giving a particular
+	 * other entity to the command shows the detailed terms of an offer
+	 * while leaving the argument blank will show the list of all
+	 * relevant offers. Putting your own name as the optional argument
+	 * has the same effect as /loan viewsentoffer with no arguments.
+	 * 
+	 * /loan viewoffer shows offers which you have received
+	 * /loan viewsentoffer shows offers which you have sent
+	 */
+	private boolean loanViewoffersCommand(final CommandSender sender, final FinancialEntity player, final String alias, final String[] args, final boolean sentOffers) {
 		
-		// Attempt to add sender to FinancialEntities table
-		
-		FinancialEntity player = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
-		
-		if(player == null){
-			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"}));
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow") || !sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-generic-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
 		
-		List<FinancialEntity> othersList = null;
+		// Check basic command syntax
+		if(args.length > 2){
+			sender.sendMessage(Conf.messageCenter("too-many-arguments", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
 		
-		// Three cases
-		if((sentOffers && args.length == 1) || (args.length == 2 && args[1].equalsIgnoreCase(sender.getName()))){
-			othersList = plugin.offerManager.getOfferRecipientsFrom(player.getUserID());
-		} else if(args.length == 2){
-			FinancialEntity other = plugin.playerManager.getFinancialEntityAdd(args[1]);
-			ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
-		
-			sender.sendMessage(String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
-			sender.sendMessage(offer.toString(plugin));
+		plugin.threads.execute(new Runnable(){
 			
-			return true;
-		} else {
-			othersList = plugin.offerManager.getOfferSendersTo(player.getUserID());
-		}
-		
-		if(othersList.size() == 0){
-			sender.sendMessage(Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/loan viewoffers", args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
-			return true;
-		}
-		
-		String lenderLabel = args.length == 1? "Lender" : "Recipient";
+			@SuppressWarnings("deprecation")
+			public void run(){
 				
-		String output = Conf.messageCenter(args.length == 1 && !sentOffers ? "received-offers" : "sent-offers", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/loan viewoffers"});
-		output += "\n    " + lenderLabel + " --- Expires";
-		
-		for(FinancialEntity fe : othersList){
-			String name = plugin.playerManager.entityNameLookup(fe);
-			
-			ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), fe.getUserID()) : plugin.offerManager.getOffer(fe.getUserID(), player.getUserID());
-		
-			Timestamp exp = offer.getExpirationDate();
-			
-			output += String.format("\n    %s - %s", name, DateFormat.getDateInstance().format(exp));
-			
-		}
+				List<FinancialEntity> othersList = null;
 				
-		sender.sendMessage(output.split("\n"));
+				// Three cases
+				if((sentOffers && (args.length == 1 || args[1].equalsIgnoreCase(sender.getName()))) || (args.length == 2 && args[1].equalsIgnoreCase(sender.getName()))){
+					othersList = plugin.offerManager.getOfferRecipientsFrom(player.getUserID());
+				
+				} else if(args.length == 2){
+					FinancialEntity other = null;
+					String entityTarget = args[1];
+					
+					try {
+						other = plugin.playerManager.getFinancialEntity(args[1]);
+					} catch (InterruptedException | ExecutionException | TimeoutException e) {
+						// TODO add message to configuration
+						plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+						return;
+					}
+					
+					// Has to be generic because it could be a lender or borrower
+					// Maybe add configuration message for this case.
+					if(other == null){
+						plugin.scheduleMessage(sender, Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+						return;
+					}
+					
+					ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
+				
+					plugin.scheduleMessage(sender, String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
+					plugin.scheduleMessage(sender, offer.toString(plugin));
+					
+					return;
+				} else {
+					othersList = plugin.offerManager.getOfferSendersTo(player.getUserID());
+				}
+				
+				if(othersList.size() == 0){
+					plugin.scheduleMessage(sender, Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), alias, args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
+					return;
+				}
+				
+				String lenderLabel = args.length == 1? "Lender" : "Recipient";
+					
+				// Table formatting
+				String output = Conf.messageCenter(args.length == 1 && !sentOffers ? "received-offers" : "sent-offers", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), alias});
+				output += "\n    " + lenderLabel + " --- Expires";
+				
+				// Collect information for each offer in the list.
+				for(FinancialEntity fe : othersList){
+					String name = null;
+					try {
+						name = plugin.playerManager.entityNameLookup(fe);
+					} catch (InterruptedException | ExecutionException | TimeoutException e) {
+						plugin.scheduleMessage(sender, String.format("%s Problem during name lookup for %s. Try again later.", prfx, fe.getUserID().toString()));
+						continue;
+					}
+					
+					ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), fe.getUserID()) : plugin.offerManager.getOffer(fe.getUserID(), player.getUserID());
+				
+					Timestamp exp = offer.getExpirationDate();
+					
+					output += String.format("\n    %s - %s", name, DateFormat.getDateInstance().format(exp));
+					
+				}
+						
+				plugin.scheduleMessage(sender, output.split("\n"));
+				
+			}
+			
+		});
 				
 		return true;
 				
