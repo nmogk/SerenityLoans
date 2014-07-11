@@ -159,26 +159,10 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("ignore") || subCommand.equalsIgnoreCase("ignoreOffers"))
 			return ignoreOffers(sender, entity, alias + " " + subCommand, args);			
 			
-		else if (subCommand.equalsIgnoreCase("pay")) 
-			return payLoan(sender, entity, alias + " " + subCommand, args, false);
+		else if (subCommand.equalsIgnoreCase("pay") || subCommand.equalsIgnoreCase("payoff")) 
+			return payLoan(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("payoff"));
 			
-		else if (subCommand.equalsIgnoreCase("payoff")) {
-
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			return payLoan(sender, entity, alias + " " + subCommand, args, true);
-			
-		} else if (subCommand.equalsIgnoreCase("summary")) {
+		else if (subCommand.equalsIgnoreCase("summary")) {
 			//TODO
 		} else if (subCommand.equalsIgnoreCase("setautopay")) {
 			
@@ -425,10 +409,26 @@ public class LoanHandler implements CommandExecutor{
 					"offers from the given lender. This does not affect your",
 					"ability to pay/be paid or to use other loan features."
 			});
-		} else if (subCommand.equalsIgnoreCase("pay")) {
-			
-		} else if (subCommand.equalsIgnoreCase("payoff")) {
-
+		} else if (subCommand.equalsIgnoreCase("pay") || subCommand.equalsIgnoreCase("payoff")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan pay <lender [account]> [amount]",
+					"         /loan payoff <lender [account]> [amount]",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"",
+					"lender = name of lender",
+					"account = loan number if multiple loans with same lender",
+					"amount = amount to pay off",
+					"",
+					"This command will apply a payment to the specified loan.",
+					"If no amount is given, then the default is to specify the",
+					"total due. ",
+					"",
+					"/loan pay applies payments only for outstanding payment statements.",
+					"/loan payoff will pay down the principal balance of the loan. Be ",
+					"careful with payoff, as it will pay the entire principal balance",
+					"if used without arguments."
+			});
 		} else if (subCommand.equalsIgnoreCase("summary")) {
 			
 		} else if (subCommand.equalsIgnoreCase("setautopay")) {
@@ -1544,7 +1544,7 @@ public class LoanHandler implements CommandExecutor{
 	 * 
 	 * This command rejects the offer from the given lender.
 	 */
-	protected boolean rejectOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
+	private boolean rejectOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
 		
 		// Check perms			
 		if(!sender.hasPermission("serenityloans.loan.borrow")) {
@@ -1587,58 +1587,102 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 
-	protected boolean payLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args, boolean payOff) {
+	/*
+	 * Command: /loan pay <lender [account]> [amount]
+	 *          /loan payoff <lender [account]> [amount]
+	 * 
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of lender
+	 * account = loan number if multiple loans with same lender
+	 * amount = amount to pay off
+	 * 
+	 * This command will apply a payment to the specified loan.
+	 * If no amount is given, then the default is to specify the
+	 * total due. 
+	 * 
+	 * /loan pay applies payments only for outstanding payment statements.
+	 * /loan payoff will pay down the principal balance of the loan. Be 
+	 * careful with payoff, as it will pay the entire principal balance
+	 * if used without arguments.
+	 */
+	private boolean payLoan(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args, final boolean payOff) {
 
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
-		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
-		
-		
-		if(borrower == null){
-			sender.sendMessage(prfx + " You are not able to use this command.");
-			return true;
-		}		
-		
-		LoanSpec loanSelection = parseLoanArguments(borrower, lender, sender.getName(), args, false);
-		
-		if(loanSelection.errMessage != null){
-			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
-		
-		if(loanSelection.multipleValues){
-			sender.sendMessage(prfx + " You have multiple loans with this entity. Select one of the following.");
-			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
-			for(int i = 0; i < allLoans.length ; i++){
-				sender.sendMessage(String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
-			}
-			
-			return true;
-		}
-		
-		double payAmount = 0;
-		
-		try{
-
-			payAmount = loanSelection.remainingArgs.length != 0? Double.parseDouble(loanSelection.remainingArgs[0]) : (payOff? loanSelection.result.getCloseValue() : plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).getPaymentRemaining());
 				
-		} catch(NumberFormatException e){
-			sender.sendMessage(String.format("%s Value specified incorrectly.", prfx));
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
 			return true;
 		}
 		
-		if(!plugin.econ.has(borrower, payAmount).callSuccess){
-			sender.sendMessage(String.format("%s You do not have enough money!", prfx));
-			return true;
-		}
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				String lenderName = args[1];
+				
+				FinancialEntity lender = null;
+				try {
+					lender = plugin.playerManager.getFinancialEntity(args[1]);
+				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					return;
+				}
+				
+				LoanSpec loanSelection = parseLoanArguments(borrower, lender, sender.getName(), args, false);
+				
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+					}
+					
+					return;
+				}
+				
+				double payAmount = 0;
+				
+				try{
+
+					payAmount = loanSelection.remainingArgs.length != 0? Double.parseDouble(loanSelection.remainingArgs[0]) : (payOff? loanSelection.result.getCloseValue() : plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).getPaymentRemaining());
+						
+				} catch(NumberFormatException e){
+					plugin.scheduleMessage(sender, String.format("%s Value specified incorrectly.", prfx));
+					return;
+				}
+				
+				if(!plugin.econ.has(borrower, payAmount).callSuccess){
+					plugin.scheduleMessage(sender, String.format("%s You do not have enough money!", prfx));
+					return;
+				}
+				
+				plugin.econ.withdraw(borrower, payAmount);
+				plugin.econ.deposit(lender, payAmount);
+				
+				plugin.loanManager.applyPayment(loanSelection.result, payAmount);
+				
+				plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
+				
+			}
+		});
+					
 		
-		plugin.econ.withdraw(borrower, payAmount);
-		plugin.econ.deposit(lender, payAmount);
 		
-		plugin.loanManager.applyPayment(loanSelection.result, payAmount);
-		
-		sender.sendMessage(String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
-		
-		return false;
+		return true;
 	}
 
 	protected boolean viewStatement(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
