@@ -630,19 +630,25 @@ public final class SerenityLoans extends JavaPlugin {
 		 return econ;
 	 }
 	 
+	 public void scheduleMessage(CommandSender sender, String message){
+			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
+	 }
 	 
-	 public class MessageSender extends BukkitRunnable {
+	 
+	 private class MessageSender extends BukkitRunnable {
 		 
 		 CommandSender sendTo;
 		 String message;
 		 
-		 public MessageSender(CommandSender sendTo, String message){
+		 private MessageSender(CommandSender sendTo, String message){
 			 this.sendTo = sendTo;
 		 }
 		 
 		 public void run(){
 			 sendTo.sendMessage(message);
 		 }
+		 
+		 
 		 
 	 }
 
