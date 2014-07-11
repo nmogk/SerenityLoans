@@ -146,11 +146,6 @@ public class LoanHandler implements CommandExecutor{
 			
 		} else if (subCommand.equalsIgnoreCase("viewsaleoffer")) {
 			
-			if(!sender.hasPermission("serenityloans.loan.lend")){
-				sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
 			return viewSaleOffer(sender, entity, alias, args);			
 			
 		} else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 
@@ -1130,17 +1125,34 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 	
-	protected boolean viewSaleOffer(CommandSender sender, FinancialEntity entity, String alias,
+	/*
+	 * Command: /loan viewsaleoffer
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * This command displays a received loan sale offer including
+	 * the price and the loan in question.
+	 * 
+	 * =================================================================
+	 * 
+	 * This command does not use a name lookup, and so is on the main thread for now.
+	 */
+	private boolean viewSaleOffer(CommandSender sender, FinancialEntity entity, String alias,
 			String[] args) {
 	
-		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
+		// TODO Message center
 		
-		if(!pendingSales.containsKey(buyer)){
+		if(!sender.hasPermission("serenityloans.loan.lend")){
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+
+		if(!pendingSales.containsKey(entity)){
 			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan");
 			return true;
 		}
 		
-		LoanSale ls = pendingSales.get(buyer);
+		LoanSale ls = pendingSales.get(entity);
 		
 		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
 		sender.sendMessage(ls.theLoan.toString(plugin));
@@ -1150,6 +1162,11 @@ public class LoanHandler implements CommandExecutor{
 	}
 
 
+	/*
+	 * Displays a prepared offer of the given player provides all of the formatting
+	 * in a String array, which it displays. Will automatically display or hide 
+	 * information relating to service fees and late fees as necessary.
+	 */
 	private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, boolean isDefault) {
 
 		ImmutableOffer results = plugin.offerManager.getPreparedOffer(player.getUserID(), isDefault? "default" : "prepared");
@@ -1197,10 +1214,13 @@ public class LoanHandler implements CommandExecutor{
 			sender.sendMessage(serviceFeeRelated);
 			
 		return true;
-		
-		
+
 	}
 	
+	/*
+	 * Takes a command+subcommand and inserts the word 'help' between
+	 * the two portions, forming the help function name.
+	 */
 	private String getHelpCommand(String commandSubcommand){
 		String[] intermediate = commandSubcommand.split("\\s+");
 		String result = intermediate[0];
