@@ -631,6 +631,10 @@ public final class SerenityLoans extends JavaPlugin {
 	 }
 	 
 	 public void scheduleMessage(CommandSender sender, String message){
+			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, new String[]{message}));
+	 }
+	 
+	 public void scheduleMessage(CommandSender sender, String[] message){
 			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
 	 }
 	 
@@ -640,7 +644,7 @@ public final class SerenityLoans extends JavaPlugin {
 		 CommandSender sendTo;
 		 String message;
 		 
-		 private MessageSender(CommandSender sendTo, String message){
+		 private MessageSender(CommandSender sendTo, String[] message){
 			 this.sendTo = sendTo;
 		 }
 		 
