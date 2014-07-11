@@ -55,6 +55,8 @@ public class Conf {
 	
 	public static final String[] allMacros = {"$$c", "$$k", "$$p", "$$m", "$$r", "$$l", "$$b", "$$s", "$$h", "$$t"};
 	
+	// TODO make thread safe
+	
 	/**
 	 * This method parses a string that contains time values in the form
 	 * of numbers followed by units. Spaces and capitalization are removed

@@ -60,6 +60,7 @@ import com.nwmogk.bukkit.loans.api.PlayerType;
 
 public class EconomyManager {
 
+	// TODO make thread safe + comments + handle different economies
 	private enum EconType {VAULT, HYBRID, SERENE, INTERNAL};
 	
 	private SerenityLoans plugin;

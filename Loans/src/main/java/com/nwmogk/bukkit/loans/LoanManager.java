@@ -65,7 +65,7 @@ import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.PaymentStatement;
 
-
+// TODO make thread safe + comments
 public class LoanManager {
 	
 	/*

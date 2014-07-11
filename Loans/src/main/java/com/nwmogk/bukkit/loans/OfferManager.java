@@ -64,7 +64,7 @@ import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 public class OfferManager {
 	
 	private SerenityLoans plugin;
-	
+	// TODO make thread-safe, + comments
 	public enum OfferExitStatus{SUCCESS, IGNORED, UNKNOWN, OVERWRITE_FAIL};
 	
 	
