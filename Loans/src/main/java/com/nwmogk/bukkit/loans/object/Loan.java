@@ -82,44 +82,6 @@ public class Loan implements Loanable {
 	}
 	
 
-	/**
-	 * This method instructs the payment of the remainder of the loan. It returns whether the action
-	 * was successful or not. If successful, this will close the loan.
-	 * @throws InsufficientCashException 
-	 */
-//	public boolean payoff() throws InsufficientCashException {
-//		// do something about this method - remove it?
-////		previousState = new LoanState(this);
-//		
-//		double interestAddition =  getInterestRate() * balance;
-//		
-//		double amount = balance + interestAddition + interestBalance + feeBalance;
-//		
-//		if(getBorrower() == null || getLender() == null)
-//			throw new LoanException(this);
-//		if(!SerenityLoans.econ.has(getBorrower(), amount).callSuccess){
-//			throw new InsufficientCashException(getBorrower(), "Borrower has insufficient cash to payoff.");
-//		}
-//		
-//		interestBalance += interestAddition;
-//		
-//		SerenityLoans.econ.withdraw(getBorrower(), amount);
-//		SerenityLoans.econ.deposit(getLender(), amount);
-//		
-//		balance = 0;
-//		interestBalance = 0;
-//		feeBalance = 0;
-//		
-//
-//		
-////		borrower.closeLoan(this);
-////		lender.closeLoan(this);
-//		
-////		newState = new LoanState(this);
-//		
-//		return true;
-//		
-//	}
 
 	public FinancialEntity getLender() {return terms.getLender();}
 
