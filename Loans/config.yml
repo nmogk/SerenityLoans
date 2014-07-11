@@ -43,6 +43,10 @@ options:
   # not implemented.
   economy: hybrid
   
+  # Maximum time to wait for a name query.
+  # No name queries are performed on the main thread.
+  name-fetch-timeout: 10s
+  
   message-prefix: $loans$>
   
   # Messages will be prepended with the message-prefix
