@@ -8,12 +8,9 @@
  * Contributing Authors: Nathan W Mogk
  * 
  * This class performs command handling for the /loan command of the
- * SerenityLoans plugin. For length purposes, this class splits lender and
- * borrower sub-commands into two other classes. This class handles the
- * help, viewoffers, and summary sub-commands directly. This class depends
- * on static fields provided in the com.nwmogk.bukkit.loans.SerenityLoans
- * class and configuration information from com.nwmogk.bukkit.loans.Conf
- * class. It interacts directly with a mySQL database.
+ * SerenityLoans plugin. Most subcommands run in their own thread.  This 
+ * class depends on configuration information from the 
+ * com.nwmogk.bukkit.loans.Conf class.
  * 
  * 
  * ========================================================================
@@ -93,13 +90,11 @@ public class LoanHandler implements CommandExecutor{
 	
 	private SerenityLoans plugin;
 	private ConcurrentHashMap<FinancialEntity, LoanSale> pendingSales;
-	private LoanLenderHandler sub1;
 	private LoanBorrowerHandler sub2;
 	private static String prfx;
 	
 	public LoanHandler(SerenityLoans plugin){
 		this.plugin = plugin;
-		sub1 = new LoanLenderHandler(plugin);
 		sub2 = new LoanBorrowerHandler(plugin);
 		prfx = Conf.getMessageString();
 	}
@@ -147,13 +142,8 @@ public class LoanHandler implements CommandExecutor{
 			return sellLoan(sender, entity, alias + " " + subCommand, args);
 			
 		else if (subCommand.equalsIgnoreCase("buy")) {
+			return buyLoan(sender, entity, alias, args);
 			
-			if(!sender.hasPermission("serenityloans.loan.lend")){
-				sender.sendMessage(Conf.messageCenter("perm-buy-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			return sub1.buyLoan(sender, cmd, alias, args);
 		} else if (subCommand.equalsIgnoreCase("viewsaleoffer")) {
 			
 			if(!sender.hasPermission("serenityloans.loan.lend")){
@@ -161,7 +151,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			return sub1.viewSaleOffer(sender, cmd, alias, args);			
+			return viewSaleOffer(sender, entity, alias, args);			
 			
 		} else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 
 			/*
@@ -1076,8 +1066,31 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 	
-	protected boolean buyLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args){
-		FinancialEntity buyer = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());			
+	/*
+	 * Command /loan buy
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * This command executes the pending sale offer for the sender.
+	 * It will fail if the sender does not have enough money. If
+	 * the sale is successful, the old lender and the borrower are
+	 * notified if they are online.
+	 * 
+	 * =============================================================
+	 * 
+	 * This command does not use a name lookup, and so is on the main thread for now.
+	 */
+	private boolean buyLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args){
+		// TODO add configuration messages this whole method
+		
+		//------------------ Permissions --------------------
+		
+		if(!sender.hasPermission("serenityloans.loan.lend")){
+			sender.sendMessage(Conf.messageCenter("perm-buy-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+			
+		FinancialEntity buyer = entity;
 		
 		
 		// Pending Sales are not persistent across restarts.
@@ -1093,15 +1106,26 @@ public class LoanHandler implements CommandExecutor{
 			return true;
 		}
 		
-		plugin.econ.withdraw(buyer, ls.amount);
-		plugin.econ.deposit(ls.theLoan.getLender(), ls.amount);
+		FinancialEntity oldLender = ls.theLoan.getLender();
 		
-		// TODO notify old lender and borrower if possible
+		
+		plugin.econ.withdraw(buyer, ls.amount);
+		plugin.econ.deposit(oldLender, ls.amount);
 		
 		if(plugin.loanManager.setLender(ls.theLoan.getLoanID(), buyer.getUserID()))
 			sender.sendMessage(prfx + " Purchase processed successfully!");
-		else
+		else {
 			sender.sendMessage(prfx + " Error processing purchase.");
+			return true;
+		}
+		
+		Player oldLend = plugin.playerManager.getPlayer(oldLender.getUserID());
+		Player borrower = plugin.playerManager.getPlayer(ls.theLoan.getBorrower().getUserID());
+		
+		if(oldLend != null)
+			oldLend.sendMessage(prfx + " Loan sale succeeded!");
+		if(borrower != null)
+			borrower.sendMessage(prfx + " Your loan has been sold to another lender!");
 		
 		return true;
 	}
