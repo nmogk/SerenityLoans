@@ -55,6 +55,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.bukkit.entity.Player;
 
@@ -233,6 +235,10 @@ public class LoanManager {
 	private SerenityLoans plugin;
 	private String prfx;
 	
+	private Object loanTableLock = new Object();
+	private Object loanEventTableLock = new Object();
+	private Object paymentStatementTableLock = new Object();
+	
 	public LoanManager(SerenityLoans plugin){
 		this.plugin = plugin;
 		prfx = Conf.getMessageString();
@@ -281,14 +287,17 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			stmt.executeUpdate(updateSQL);
-			
+			synchronized(loanTableLock){
+				stmt.executeUpdate(updateSQL);
+			}
 			PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
 			
 			if(ps != null){
 			
 				String updateBill = String.format("UPDATE PaymentStatements SET BillAmountPaid=%f WHERE StatementID=%d;", ps.getActualPaid() + amount - runningTotal, ps.getStatementID());
-				stmt.executeUpdate(updateBill);
+				synchronized(paymentStatementTableLock){
+					stmt.executeUpdate(updateBill);
+				}
 			}
 			stmt.close();
 		} catch (SQLException e) {
@@ -606,8 +615,10 @@ public class LoanManager {
 		} catch (SQLException e){
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
-		}
-		
+		} catch (InterruptedException | ExecutionException | TimeoutException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		} 
 	}
 
 	private void accrueInterest(int loanID) {
@@ -923,7 +934,7 @@ public class LoanManager {
 		
 	}
 
-	private void sendOutStatement(LoanEvent le) {
+	private void sendOutStatement(LoanEvent le) throws InterruptedException, ExecutionException, TimeoutException {
 		
 		Loan theLoan = getLoan(le.loan);
 		PaymentStatement ps = getPaymentStatement(le.loan);
