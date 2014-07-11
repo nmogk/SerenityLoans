@@ -90,12 +90,10 @@ public class LoanHandler implements CommandExecutor{
 	
 	private SerenityLoans plugin;
 	private ConcurrentHashMap<FinancialEntity, LoanSale> pendingSales;
-	private LoanBorrowerHandler sub2;
 	private static String prfx;
 	
 	public LoanHandler(SerenityLoans plugin){
 		this.plugin = plugin;
-		sub2 = new LoanBorrowerHandler(plugin);
 		prfx = Conf.getMessageString();
 	}
 	
@@ -123,6 +121,8 @@ public class LoanHandler implements CommandExecutor{
 		
 		String subCommand = args[0];
 		
+		
+		// Send to handler method
 		if (subCommand.equalsIgnoreCase("help") || subCommand.equalsIgnoreCase("?"))
 			return helpCommand(sender, alias, args);
 		
@@ -150,23 +150,10 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"))  
 			return loanViewoffersCommand(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"));
 		
-		else if (subCommand.equalsIgnoreCase("accept")) {
+		else if (subCommand.equalsIgnoreCase("accept") || subCommand.equalsIgnoreCase("acceptoffer")) {
+			acceptOffer(sender, entity, alias + " " + subCommand, args);
 			
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			return sub2.acceptOffer(sender, cmd, alias, args);
-			
-		} else if (subCommand.equalsIgnoreCase("reject")) {
+		} else if (subCommand.equalsIgnoreCase("reject") || subCommand.equalsIgnoreCase("rejectoffer")) {
 			
 			if(args.length == 1){
 				sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
@@ -181,7 +168,7 @@ public class LoanHandler implements CommandExecutor{
 			}
 			
 			// Send to specific handler method
-			sub2.rejectOffer(sender, cmd, alias, args);
+			rejectOffer(sender, entity, alias + " " + subCommand, args);
 			
 		} else if (subCommand.equalsIgnoreCase("ignore")) {
 			// Behavior: toggle ignore status
@@ -202,7 +189,7 @@ public class LoanHandler implements CommandExecutor{
 			
 			// Send to specific handler method
 
-			return sub2.ignoreOffers(sender, cmd, alias, args);			
+			ignoreOffers(sender, entity, alias + " " + subCommand, args);			
 			
 		} else if (subCommand.equalsIgnoreCase("pay")) {
 			
@@ -218,7 +205,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			return sub2.payLoan(sender, cmd, alias, args, false);
+			payLoan(sender, entity, alias + " " + subCommand, args, false);
 			
 		} else if (subCommand.equalsIgnoreCase("payoff")) {
 
@@ -234,7 +221,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			return sub2.payLoan(sender, cmd, alias, args, true);
+			payLoan(sender, entity, alias + " " + subCommand, args, true);
 			
 		} else if (subCommand.equalsIgnoreCase("summary")) {
 			//TODO
@@ -252,7 +239,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			return sub2.setAutoPay(sender, cmd, alias, args);
+			setAutoPay(sender, entity, alias + " " + subCommand, args);
 			
 		} else if (subCommand.equalsIgnoreCase("statement")) {
 			
@@ -268,7 +255,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			return sub2.viewStatement(sender, cmd, alias, args);
+			viewStatement(sender, entity, alias + " " + subCommand, args);
 			
 		} else {
 			return false;
@@ -448,7 +435,18 @@ public class LoanHandler implements CommandExecutor{
 					"/loan viewsentoffer shows offers which you have sent"
 			});
 		} else if (subCommand.equalsIgnoreCase("accept")) {
-	
+			sender.sendMessage(new String[]{
+					"Command: /loan accept <lender>",
+					"         /loan acceptoffer <lender>",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"",
+					"lender = name of the entity which sent the offer",
+					"",
+					"This command will accept a loan offer from the given",
+					"lender and create a new loan with the terms of the",
+					"offer."
+			});
 		} else if (subCommand.equalsIgnoreCase("reject")) {
 				
 		} else if (subCommand.equalsIgnoreCase("ignore")) {
@@ -598,7 +596,7 @@ public class LoanHandler implements CommandExecutor{
 	 * args will be not null, and contain only the arguments following the last loan
 	 * specification argument.
 	 */
-	protected static LoanSpec parseLoanArguments(FinancialEntity sender, FinancialEntity target, String senderName, String[] args, boolean isSenderLender){
+	private LoanSpec parseLoanArguments(FinancialEntity sender, FinancialEntity target, String senderName, String[] args, boolean isSenderLender){
 		
 		LoanSpec result = new LoanSpec();
 		result.result = null;
@@ -1414,65 +1412,104 @@ public class LoanHandler implements CommandExecutor{
 		return result;
 	}
 
-
-protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, String[] args){
+	/*
+	 * Command: /loan accept <lender>
+	 *          /loan acceptoffer <lender>
+	 *          
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of the entity which sent the offer
+	 * 
+	 * This command will accept a loan offer from the given
+	 * lender and create a new loan with the terms of the
+	 * offer.
+	 */
+	private boolean acceptOffer(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args){
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
+		// Check permissions
 		
-		if(borrower == null){
-			sender.sendMessage(prfx + " You are not able to use this commmand.");
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
 		
-		String lenderName = args[1];
+		// Basic syntax
 		
-		FinancialEntity lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
-		
-		if(lender == null) {
-			sender.sendMessage(prfx + " Lender entity not found.");
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
 			return true;
 		}
 		
-		
-		ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
-		
-		if(theOffer == null){
-			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
-			return true;
-		}
-		
-		Timestamp expires = theOffer.getExpirationDate();
-		
-		if(expires.before(new Date())){
-			sender.sendMessage(String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
-			return true;
-		}
-		
-		int termsID = theOffer.getPreparedTermsId();
-		
-		double value = plugin.offerManager.getTermsValue(termsID);
-		
-		if(!plugin.econ.has(lender, value).callSuccess){
+		plugin.threads.execute(new Runnable(){
 			
-			sender.sendMessage(String.format(prfx + " %s does not have enough money to loan!", lenderName));
-			return true;
-		}
-		
-		plugin.econ.withdraw(lender, value);
-		plugin.econ.deposit(borrower, value);
-		
-		boolean returnSuccess = plugin.loanManager.createLoan(lender.getUserID(), borrower.getUserID(), termsID, value);
-		
-		if(returnSuccess){
-			sender.sendMessage(prfx + " Successfully processed loan!");
-		} else {
-			sender.sendMessage(prfx + " Loan not processed!");
-		}
-		
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				String lenderName = args[1];
+				
+				FinancialEntity lender = null;
+				try {
+					lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					return;
+				}
+				
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
+					return;
+				}
+				
+				ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
+				
+				if(theOffer == null){
+					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
+					return;
+				}
+				
+				Timestamp expires = theOffer.getExpirationDate();
+				
+				if(expires.before(new Date())){
+					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
+					return;
+				}
+				
+				int termsID = theOffer.getPreparedTermsId();
+				
+				double value = plugin.offerManager.getTermsValue(termsID);
+				
+				if(!plugin.econ.has(lender, value).callSuccess){
+					
+					plugin.scheduleMessage(sender, String.format(prfx + " %s does not have enough money to loan!", lenderName));
+					return;
+				}
+				
+				plugin.econ.withdraw(lender, value);
+				plugin.econ.deposit(borrower, value);
+				
+				boolean returnSuccess = plugin.loanManager.createLoan(lender.getUserID(), borrower.getUserID(), termsID, value);
+				
+				// TODO message center
+				if(returnSuccess){
+					plugin.scheduleMessage(sender, prfx + " Successfully processed loan!");
+					
+					Player newLender = plugin.playerManager.getPlayer(lender.getUserID());
+					
+					if(newLender != null)
+						plugin.scheduleMessage(newLender, prfx + " Successfully processed loan!");
+				} else {
+					plugin.scheduleMessage(sender, prfx + " Loan not processed!");
+				}
+				
+			}
+		});
+
 		return true;
 	}
 	
-	protected boolean ignoreOffers(CommandSender sender, Command cmd,  String alias, String[] args){
+	protected boolean ignoreOffers(CommandSender sender, FinancialEntity entity,  String alias, String[] args){
 		
 		FinancialEntity requester = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		FinancialEntity target = plugin.playerManager.getFinancialEntityAdd(args[1]);
@@ -1494,7 +1531,7 @@ protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, 
 		return true;
 	}
 
-	protected boolean rejectOffer(CommandSender sender, Command cmd, String alias, String[] args){
+	protected boolean rejectOffer(CommandSender sender, FinancialEntity entity, String alias, String[] args){
 		boolean success = plugin.offerManager.removeOffer(((Player)sender).getUniqueId(), plugin.playerManager.entityIdLookup(args[1]));
 		
 		if(success)
@@ -1505,7 +1542,7 @@ protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, 
 		return true;
 	}
 
-	protected boolean payLoan(CommandSender sender, Command cmd, String alias, String[] args, boolean payOff) {
+	protected boolean payLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args, boolean payOff) {
 
 		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
@@ -1559,7 +1596,7 @@ protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, 
 		return false;
 	}
 
-	protected boolean viewStatement(CommandSender sender, Command cmd, String alias, String[] args) {
+	protected boolean viewStatement(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
 		
 		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
 		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
@@ -1603,8 +1640,7 @@ protected boolean acceptOffer(CommandSender sender, Command cmd,  String alias, 
 		return false;
 	}
 
-	protected boolean setAutoPay(CommandSender sender, Command cmd, String alias,
-			String[] args) {
+	protected boolean setAutoPay(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
 		// TODO Auto-generated method stub
 		return false;
 	}
