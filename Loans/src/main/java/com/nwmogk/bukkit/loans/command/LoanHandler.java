@@ -162,38 +162,13 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("pay") || subCommand.equalsIgnoreCase("payoff")) 
 			return payLoan(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("payoff"));
 			
-		else if (subCommand.equalsIgnoreCase("summary")) {
-			//TODO
-		} else if (subCommand.equalsIgnoreCase("setautopay")) {
+		else if (subCommand.equalsIgnoreCase("summary")) 
+			return relationshipSummary(sender, entity, alias + " " + subCommand, args);
 			
-			if(args.length < 3){
-				sender.sendMessage(Conf.messageCenter("too-few-arguments", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
+		else if (subCommand.equalsIgnoreCase("setautopay"))
 			return setAutoPay(sender, entity, alias + " " + subCommand, args);
 			
-		} else if (subCommand.equalsIgnoreCase("statement")) {
-			
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
+		else if (subCommand.equalsIgnoreCase("statement")) {
 			return viewStatement(sender, entity, alias + " " + subCommand, args);
 			
 		} 
@@ -202,9 +177,297 @@ public class LoanHandler implements CommandExecutor{
 	}
 	
 	
+	/*
+	 * Command: /loan accept <lender>
+	 *          /loan acceptoffer <lender>
+	 *          
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of the entity which sent the offer
+	 * 
+	 * This command will accept a loan offer from the given
+	 * lender and create a new loan with the terms of the
+	 * offer.
+	 */
+	private boolean acceptOffer(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args){
+		
+		// Check permissions
+		
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+		
+		// Basic syntax
+		
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				String lenderName = args[1];
+				
+				FinancialEntity lender = null;
+				try {
+					lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					return;
+				}
+				
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
+					return;
+				}
+				
+				ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
+				
+				if(theOffer == null){
+					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
+					return;
+				}
+				
+				Timestamp expires = theOffer.getExpirationDate();
+				
+				if(expires.before(new Date())){
+					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
+					return;
+				}
+				
+				int termsID = theOffer.getPreparedTermsId();
+				
+				double value = plugin.offerManager.getTermsValue(termsID);
+				
+				if(!plugin.econ.has(lender, value).callSuccess){
+					
+					plugin.scheduleMessage(sender, String.format(prfx + " %s does not have enough money to loan!", lenderName));
+					return;
+				}
+				
+				plugin.econ.withdraw(lender, value);
+				plugin.econ.deposit(borrower, value);
+				
+				boolean returnSuccess = plugin.loanManager.createLoan(lender.getUserID(), borrower.getUserID(), termsID, value);
+				
+				// TODO message center
+				if(returnSuccess){
+					plugin.scheduleMessage(sender, prfx + " Successfully processed loan!");
+					
+					Player newLender = plugin.playerManager.getPlayer(lender.getUserID());
+					
+					if(newLender != null)
+						plugin.scheduleMessage(newLender, prfx + " Successfully processed loan!");
+				} else {
+					plugin.scheduleMessage(sender, prfx + " Loan not processed!");
+				}
+				
+			}
+		});
 
+		return true;
+	}
+	
+	/*
+	 * Command /loan buy
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * This command executes the pending sale offer for the sender.
+	 * It will fail if the sender does not have enough money. If
+	 * the sale is successful, the old lender and the borrower are
+	 * notified if they are online.
+	 * 
+	 * =============================================================
+	 * 
+	 * This command does not use a name lookup, and so is on the main thread for now.
+	 */
+	private boolean buyLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args){
+		// TODO add configuration messages this whole method
+		
+		//------------------ Permissions --------------------
+		
+		if(!sender.hasPermission("serenityloans.loan.lend")){
+			sender.sendMessage(Conf.messageCenter("perm-buy-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+			
+		FinancialEntity buyer = entity;
+		
+		
+		// Pending Sales are not persistent across restarts.
+		if(!pendingSales.containsKey(buyer)){
+			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan.");
+			return true;
+		}
+		
+		LoanSale ls = pendingSales.get(buyer);
+		
+		if(!plugin.econ.has(buyer, ls.amount).callSuccess){
+			sender.sendMessage(String.format(prfx + " You do not have enough money to buy this loan. Cost is %s.", plugin.econ.format(ls.amount)));
+			return true;
+		}
+		
+		FinancialEntity oldLender = ls.theLoan.getLender();
+		
+		
+		plugin.econ.withdraw(buyer, ls.amount);
+		plugin.econ.deposit(oldLender, ls.amount);
+		
+		if(plugin.loanManager.setLender(ls.theLoan.getLoanID(), buyer.getUserID()))
+			sender.sendMessage(prfx + " Purchase processed successfully!");
+		else {
+			sender.sendMessage(prfx + " Error processing purchase.");
+			return true;
+		}
+		
+		Player oldLend = plugin.playerManager.getPlayer(oldLender.getUserID());
+		Player borrower = plugin.playerManager.getPlayer(ls.theLoan.getBorrower().getUserID());
+		
+		if(oldLend != null)
+			oldLend.sendMessage(prfx + " Loan sale succeeded!");
+		if(borrower != null)
+			borrower.sendMessage(prfx + " Your loan has been sold to another lender!");
+		
+		return true;
+	}
+
+	/*
+	 * Command: /loan forgive <borrower [account]> [amount]
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * borrower = name of borrower of loan
+	 * account = loan number if multiple loans with same borrower
+	 * amount = dollar value to forgive. Default: {total balance}
+	 * 
+	 * This command forgives the borrower loan by the amount given. If
+	 * no amount argument is given, will forgive entire loan. If the
+	 * borrower has multiple loans, a specific loan must be chosen from
+	 * an index list. /loan forgive <borrower> 0 is a safe way to view
+	 * the index list without accidentally forgiving anything.
+	 */
+	private boolean forgiveLoan(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
+	
+		// -------------------- Permissions ------------------
+				
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+	
+		
+		// -------------------- Syntax ------------------
+		
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+	
+		
+		
+		// -------------------- <Logic> ------------------
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				String borrowerName = args[1];
+				
+				
+				FinancialEntity lender = entity;
+				FinancialEntity borrower = null;
+				try {
+					
+					// Parse borrower argument
+					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
+				
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
+					return;
+				}
+				
+				// Parse loan selection
+				LoanSpec loanSelection = parseLoanArguments(lender, borrower, sender.getName(), args, true);
+				
+				// Report error if found
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				// If multiple loans were found, list them to the caller
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
+					
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+					}
+					
+					return;
+				}
+				
+				double amount = 0;
+				Loan theLoan = loanSelection.result;
+				String[] toParse = loanSelection.remainingArgs;
+				
+				// Parse amount to forgive. Ignore arguments afterwards
+				if(toParse.length >= 1){
+					try{
+						amount = Double.parseDouble(toParse[0]);
+					} catch (NumberFormatException e){
+						plugin.scheduleMessage(sender, Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
+						return;
+					}
+				} else 
+					amount = theLoan.getCloseValue();
+				
+				// Apply the forgiveness
+				plugin.loanManager.applyPayment(theLoan, amount);
+				
+				plugin.scheduleMessage(sender, Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName, plugin.econ.format(amount)}));
+			}
+	
+		});
+		
+		return true;
+	}
+
+	/*
+	 * Takes a command+subcommand and inserts the word 'help' between
+	 * the two portions, forming the help function name.
+	 */
+	private String getHelpCommand(String commandSubcommand){
+		String[] intermediate = commandSubcommand.split("\\s+");
+		String result = intermediate[0];
+		
+		// Kindof an easter egg. Should never give more than one help.
+		for(int i=1; i<intermediate.length; i++)
+			result += " help " + intermediate[i];
+		
+		return result;
+	}
+
+	/*
+	 * Builds help strings when the sender gives improper input or specifically
+	 * requests help. Can display all commands that are available to a given
+	 * player based on permissions or can give detailed help on a particular 
+	 * command.
+	 */
 	private boolean helpCommand(CommandSender sender, String alias, String[] args) {
-
+	
 		String[] basicHelp = {prfx + " The '/" + alias + "' command allows players to offer and accept loans.",
 								prfx + " The specific commands are listed below.",
 								prfx + " Use '/" + alias + " help <commandname>' for more info on a command."};
@@ -430,17 +693,167 @@ public class LoanHandler implements CommandExecutor{
 					"if used without arguments."
 			});
 		} else if (subCommand.equalsIgnoreCase("summary")) {
-			
+			sender.sendMessage(new String[]{
+					"Command: /loan summary [to|from] <entity>",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"          OR serenityloans.loan.lend",
+					"",
+					"entity = entity for which you want the relationship summary with",
+					"to|from = restrict information direction",
+					"",
+					"This command gives a summary of the relationship with the",
+					"given entity. This includes offers outstanding, loans outstanding,",
+					"debts between the two entities, and trust information."
+			});
 		} else if (subCommand.equalsIgnoreCase("setautopay")) {
-			
+			sender.sendMessage(new String[]{
+					"Command: /loan setautopay <lender [account]> <on|off>",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"",
+					"lender = name of lender",
+					"account = loan number if multiple loans with same lender",
+					"on|off = whether to turn autopay on or off for the loan",
+					"",
+					"This command sets the autopay feature for the given loan.",
+					"Autopay will attempt to pay payment statements from the",
+					"loan when they are due, with no interraction from the",
+					"borrower. If the whole bill cannot be paid, then it will",
+					"pay the minimum payment."
+			});
 		} else if (subCommand.equalsIgnoreCase("statement")) {
-	
+			sender.sendMessage(new String[]{
+					"Command: /loan statement <lender [account]>",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"",
+					"lender = name of lender",
+					"account = loan number if multiple loans with same lender",
+					"",
+					"This command checks for an outstanding payment statement",
+					"on the given loan and displays the result to the caller."
+			});
 		} else {
 			return false;
 		}
 		
 		//TODO implement command documentation
+	
+		return true;
+	}
 
+	/*
+	 * Command: /loan ignore <lender>
+	 *          /loan ignoreoffers <lender>
+	 * 
+	 * Permissions: serenityloans.loan
+	 * 
+	 * lender = name of the entity to ignore
+	 * 
+	 * This command toggles your ignore status with the given
+	 * lender. When being ignored, you will not receive loan
+	 * offers from the given lender. This does not affect your
+	 * ability to pay/be paid or to use other loan features.
+	 */
+	private boolean ignoreOffers(final CommandSender sender, final FinancialEntity requester, final String alias, final String[] args){
+		
+
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+					
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				FinancialEntity target = null;
+				try {
+					target = plugin.playerManager.getFinancialEntityAdd(args[1]);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
+					return;
+				}
+				
+				if(target == null){
+					plugin.scheduleMessage(sender, prfx + " Cannot ignore this entity.");
+					return;
+				}
+				
+				boolean setToIgnore = plugin.playerManager.toggleIgnore(requester.getUserID(), target.getUserID());
+				
+				plugin.scheduleMessage(sender, String.format(prfx + " %s ignoring %s.", setToIgnore? "Now" : "No longer", args[1]));
+
+			}
+		});
+			
+		return true;
+	}
+
+	/*
+	 * Command: /loan offering [param-list]
+	 * 			/loan defaultoffering [param-list]
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * param-list = space delimited list of the form <termName>=<value>. Term names
+	 * are not case sensitive. Note there must be no spaces next to the `='.
+	 * 
+	 * If no arguments are given, then the command displays the current state of the
+	 * offer. If param-list is given, then the command sets the parameter to the 
+	 * given value and reports success or failure. It then displays the new values.
+	 * 
+	 * /loan offering updates the current prepared offer, /loan defaultoffering updates the
+	 * default prepared offer.
+	 * 
+	 * ======================================================================================
+	 * 
+	 * This command does not make any name queries, so currently runs on the main thread.
+	 */
+	private boolean loanOfferingCommand(CommandSender sender, FinancialEntity entity, String alias, String[] args, boolean isDefault) {
+		
+		// -------------------- <Permissions> ------------------
+		
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+		
+		// -------------------- </Permissions> ------------------
+	
+		// If there are no arguments, then display the current values.
+		if(args.length == 1)
+			return viewPreparedOffer(sender, entity, isDefault);
+		
+		boolean success = true;
+		for(int i = 1; i < args.length; i++){
+			try {
+				success &= plugin.offerManager.setTerms(entity.getUserID(), isDefault, args[i]);
+			} catch (InvalidLoanTermsException e) {
+				sender.sendMessage(Conf.messageCenter("terms-constraint-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+				sender.sendMessage(e.getMessage());
+			}
+		}
+		
+		if(success){
+			sender.sendMessage(Conf.messageCenter("change-success", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			
+		} else {
+			sender.sendMessage(Conf.messageCenter("change-fail1", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("change-fail2", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			
+		}
+		
+		sender.sendMessage(Conf.messageCenter("new-values", new String[]{"$$s", "$$p", "$$c"}, new String[]{isDefault? "default ":"" ,sender.getName(), "/" + alias + " " + (isDefault? "default ": "") +  "offering"}));
+		
+		// View the new state of the offer.
+		viewPreparedOffer(sender, entity, isDefault);
+	
 		return true;
 	}
 
@@ -559,8 +972,7 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 				
 	}
-	
-	
+
 	/*
 	 * Parses a loan specification from arguments given a FinancialEntity.
 	 * errMessage should be null unless there is an error. As long as errMessage is 
@@ -649,182 +1061,165 @@ public class LoanHandler implements CommandExecutor{
 		return result;
 		
 	}
-	
+
 	/*
-	 * Command: /loan sendoffer <borrower> [expiration time]
-	 * 			/loan quickoffer <borrower> [expiration time]
+	 * Command: /loan pay <lender [account]> [amount]
+	 *          /loan payoff <lender [account]> [amount]
 	 * 
-	 * Permissions: serenityloans.loan.lend
+	 * Permissions: serenityloans.loan.borrow
 	 * 
-	 * borrower = name of a player or financial institution (bank)
+	 * lender = name of lender
+	 * account = loan number if multiple loans with same lender
+	 * amount = amount to pay off
 	 * 
-	 * expiration time = length of time for loan to be active formatted
-	 * as a list of integers followed by units. Available units are
-	 * y (year), d (day), h (hour), m (minutes), s (seconds). Spaces
-	 * are optional. ex - "3d 4h 1 s" represents 3 days 4 hours and 1 second.
+	 * This command will apply a payment to the specified loan.
+	 * If no amount is given, then the default is to specify the
+	 * total due. 
 	 * 
-	 * This command sends a loan offer to the given potential borrower.
-	 * The borrower may be either a player or a financial institution and
-	 * can be offline. However, the borrower must have the proper
-	 * permissions to borrow for the command to work. 
-	 * 
-	 * /loan sendoffer sends the current prepared offer
-	 * /loan quickoffer sends the default prepared offer
-	 * 
-	 * ==========================================================
-	 * 
-	 * Provides functionality for the /loan sendoffer command. The calling function ensures
-	 * that the argument list is at least 2 long, and contains "sendoffer" in the first position.
-	 * Permissions are also checked by the calling function. The behavior outline of this command 
-	 * is as follows:
-	 * 
-	 * Check the sender's status in the loan system.
-	 * Check the target's status in the loan system.
-	 * Determine inputs for offer expiration time.
-	 * Select terms from PreparedOffers table.
-	 * Create unnamed entry in PreparedOffers table.
-	 * Create Offer table entry with required info.
-	 * If player is online, send them a message,
-	 * otherwise terminate, message will be sent later.
+	 * /loan pay applies payments only for outstanding payment statements.
+	 * /loan payoff will pay down the principal balance of the loan. Be 
+	 * careful with payoff, as it will pay the entire principal balance
+	 * if used without arguments.
 	 */
-	private boolean sendOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args, final boolean isQuick){
-		
-		// -------------------- <Permissions> ------------------
+	private boolean payLoan(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args, final boolean payOff) {
+
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
 				
-		if(!sender.hasPermission("serenityloans.loan.lend")) {
-			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
 			return true;
 		}
 		
-		// -------------------- </Permissions> ------------------
+		plugin.threads.execute(new Runnable(){
 			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				String lenderName = args[1];
+				
+				FinancialEntity lender = null;
+				try {
+					lender = plugin.playerManager.getFinancialEntity(args[1]);
+				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					return;
+				}
+				
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
+					return;
+				}
+				
+				LoanSpec loanSelection = parseLoanArguments(borrower, lender, sender.getName(), args, false);
+				
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+					}
+					
+					return;
+				}
+				
+				double payAmount = 0;
+				
+				try{
+
+					payAmount = loanSelection.remainingArgs.length != 0? Double.parseDouble(loanSelection.remainingArgs[0]) : (payOff? loanSelection.result.getCloseValue() : plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).getPaymentRemaining());
+						
+				} catch(NumberFormatException e){
+					plugin.scheduleMessage(sender, String.format("%s Value specified incorrectly.", prfx));
+					return;
+				}
+				
+				if(!plugin.econ.has(borrower, payAmount).callSuccess){
+					plugin.scheduleMessage(sender, String.format("%s You do not have enough money!", prfx));
+					return;
+				}
+				
+				plugin.econ.withdraw(borrower, payAmount);
+				plugin.econ.deposit(lender, payAmount);
+				
+				plugin.loanManager.applyPayment(loanSelection.result, payAmount);
+				
+				plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
+				
+			}
+		});
+					
 		
 		
-		// -------------------- <Syntax> ------------------
+		return true;
+	}
+
+	/*
+	 * Command: /loan reject <lender>
+	 *          /loan rejectoffer <lender>
+	 * 
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of the lender who sent the offer
+	 * 
+	 * This command rejects the offer from the given lender.
+	 */
+	private boolean rejectOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
 		
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+				
 		if(args.length == 1){
 			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
-					
 			return true;
 		}
-		
-		// -------------------- </Syntax> ------------------
-		
-					
-		
-		// -------------------- <Parse Inputs> --------------------
-
-				
-		// Collect financialEntity target info
-		// This is potentially not safe input!!!
-		final String entityTarget = args[1];
-				
-		if(entityTarget.equalsIgnoreCase(sender.getName())){
-			sender.sendMessage(Conf.messageCenter("meta-offer-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
-			return true;
-		}
-				
-		if(entityTarget.equalsIgnoreCase("CentralBank")){
-			sender.sendMessage(Conf.messageCenter("offer-government", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
-			return true;
-		}
-		
-		// -------------------- </Parse Inputs> --------------------
-		
 		
 		plugin.threads.execute(new Runnable(){
-
+			
 			@SuppressWarnings("deprecation")
-			public void run() {
-				
-				// Check if other entity is in FinancialEntities table
-				FinancialEntity borrower = null;
+			public void run(){
+				String entityTarget = args[1];
+				FinancialEntity lender = null;
 				
 				try {
-					borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
+					lender = plugin.playerManager.getFinancialEntity(entityTarget);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
 					// TODO add message to configuration
 					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
 					return;
 				}
 				
-				if(borrower == null){	
-					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
 					return;
 				}
 				
-				// Parse expiration time
-				String timeString = "1w";
+				boolean success = plugin.offerManager.removeOffer(entity.getUserID(), lender.getUserID());
 				
-				// The expiration string is assumed to be the remainder of the line
-				// Spaces are removed, and the string is parsed into a length
-				if (args.length > 2) {
-					for(int i = 2; i < args.length; i++)
-						timeString += args[i];
-				} else if(plugin.getConfig().contains("loan.default-offer-time"))
-					timeString = plugin.getConfig().getString("loan.default-offer-time");
-						
-				// Parsing string
-				long expirationTime = Conf.parseTime(timeString);
-						
-				if(expirationTime == 0){
-					plugin.scheduleMessage(sender, Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
-					return;
-				}
-
-				// Create expiration time
-				Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
-						
-				// Check if offer is in PreparedOffers table
-				String offerName = isQuick? "default" : "prepared";
-				
-				OfferExitStatus exit = plugin.offerManager.createOffer(entity.getUserID(), borrower.getUserID(), offerName, expDate);
-				
-				switch(exit){
-				case IGNORED:
-					plugin.scheduleMessage(sender, Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
-					return;
-				case OVERWRITE_FAIL:
-					plugin.scheduleMessage(sender, Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
-					return;
-				case SUCCESS:
-					break;
-				case UNKNOWN:
-					plugin.scheduleMessage(sender, prfx + " No offer has been prepared. This is a bug. Please report.");
-					return;
-				}
-				
-				Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
-				
-				if(recipient == null){
-					plugin.scheduleMessage(sender, Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
-					return;
-				}
-				
-				if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
-					plugin.scheduleMessage(sender, Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
-					return;
-				}
-				
-				// Send message
-				
-				String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
-				String commandName = recipient.getName().equals(entityTarget)? "/loan " : "/crunion ";
-							
-				plugin.scheduleMessage(recipient, Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-				plugin.scheduleMessage(recipient, Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-							
-				if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
-					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+				if(success)
+					plugin.scheduleMessage(sender, prfx + " Offer removed successfully.");
+				else
+					plugin.scheduleMessage(sender, prfx + " Unable to complete request.");
 				
 			}
-			
-			
-			
 		});
-			
-				
+					
+		
 		return true;
 	}
 
@@ -864,7 +1259,7 @@ public class LoanHandler implements CommandExecutor{
 		
 		
 		plugin.threads.execute(new Runnable(){
-
+	
 			public void run() {
 				UUID borrowerId = null;
 				
@@ -890,177 +1285,25 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 		
 	}
-	
-	/*
-	 * Command: /loan offering [param-list]
-	 * 			/loan defaultoffering [param-list]
-	 * 
-	 * Permissions: serenityloans.loan.lend
-	 * 
-	 * param-list = space delimited list of the form <termName>=<value>. Term names
-	 * are not case sensitive. Note there must be no spaces next to the `='.
-	 * 
-	 * If no arguments are given, then the command displays the current state of the
-	 * offer. If param-list is given, then the command sets the parameter to the 
-	 * given value and reports success or failure. It then displays the new values.
-	 * 
-	 * /loan offering updates the current prepared offer, /loan defaultoffering updates the
-	 * default prepared offer.
-	 * 
-	 * ======================================================================================
-	 * 
-	 * This command does not make any name queries, so currently runs on the main thread.
-	 */
-	private boolean loanOfferingCommand(CommandSender sender, FinancialEntity entity, String alias, String[] args, boolean isDefault) {
-		
-		// -------------------- <Permissions> ------------------
-		
-		// Check perms			
-		if(!sender.hasPermission("serenityloans.loan.lend")) {
-			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			return true;
-		}
-		
-		// -------------------- </Permissions> ------------------
-
-		// If there are no arguments, then display the current values.
-		if(args.length == 1)
-			return viewPreparedOffer(sender, entity, isDefault);
-		
-		boolean success = true;
-		for(int i = 1; i < args.length; i++){
-			try {
-				success &= plugin.offerManager.setTerms(entity.getUserID(), isDefault, args[i]);
-			} catch (InvalidLoanTermsException e) {
-				sender.sendMessage(Conf.messageCenter("terms-constraint-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-				sender.sendMessage(e.getMessage());
-			}
-		}
-		
-		if(success){
-			sender.sendMessage(Conf.messageCenter("change-success", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			
-		} else {
-			sender.sendMessage(Conf.messageCenter("change-fail1", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			sender.sendMessage(Conf.messageCenter("change-fail2", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			
-		}
-		
-		sender.sendMessage(Conf.messageCenter("new-values", new String[]{"$$s", "$$p", "$$c"}, new String[]{isDefault? "default ":"" ,sender.getName(), "/" + alias + " " + (isDefault? "default ": "") +  "offering"}));
-		
-		// View the new state of the offer.
-		viewPreparedOffer(sender, entity, isDefault);
-	
-		return true;
-	}
 
 	/*
-	 * Command: /loan forgive <borrower [account]> [amount]
+	 * Command: /loan summary [to|from] <entity>
 	 * 
-	 * Permissions: serenityloans.loan.lend
+	 * Permissions: serenityloans.loan.borrow
+	 *           OR serenityloans.loan.lend
 	 * 
-	 * borrower = name of borrower of loan
-	 * account = loan number if multiple loans with same borrower
-	 * amount = dollar value to forgive. Default: {total balance}
+	 * entity = entity for which you want the relationship summary with
+	 * to|from = restrict information direction
 	 * 
-	 * This command forgives the borrower loan by the amount given. If
-	 * no amount argument is given, will forgive entire loan. If the
-	 * borrower has multiple loans, a specific loan must be chosen from
-	 * an index list. /loan forgive <borrower> 0 is a safe way to view
-	 * the index list without accidentally forgiving anything.
+	 * This command gives a summary of the relationship with the
+	 * given entity. This includes offers outstanding, loans outstanding,
+	 * debts between the two entities, and trust information.
 	 */
-	private boolean forgiveLoan(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
-
-		// -------------------- Permissions ------------------
-				
-		if(!sender.hasPermission("serenityloans.loan.lend")) {
-			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			return true;
-		}
-
-		
-		// -------------------- Syntax ------------------
-		
-		if(args.length == 1){
-			sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
-			return true;
-		}
-
-		
-		
-		// -------------------- <Logic> ------------------
-		
-		plugin.threads.execute(new Runnable(){
-			
-			@SuppressWarnings("deprecation")
-			public void run(){
-				
-				String borrowerName = args[1];
-				
-				
-				FinancialEntity lender = entity;
-				FinancialEntity borrower = null;
-				try {
-					
-					// Parse borrower argument
-					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
-				
-				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
-					return;
-				}
-				
-				// Parse loan selection
-				LoanSpec loanSelection = parseLoanArguments(lender, borrower, sender.getName(), args, true);
-				
-				// Report error if found
-				if(loanSelection.errMessage != null){
-					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
-					
-					if(!loanSelection.multipleValues)
-						return;
-				}
-				
-				// If multiple loans were found, list them to the caller
-				if(loanSelection.multipleValues){
-					plugin.scheduleMessage(sender, Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
-					
-					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
-					for(int i = 0; i < allLoans.length ; i++){
-						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
-					}
-					
-					return;
-				}
-				
-				double amount = 0;
-				Loan theLoan = loanSelection.result;
-				String[] toParse = loanSelection.remainingArgs;
-				
-				// Parse amount to forgive. Ignore arguments afterwards
-				if(toParse.length >= 1){
-					try{
-						amount = Double.parseDouble(toParse[0]);
-					} catch (NumberFormatException e){
-						plugin.scheduleMessage(sender, Conf.messageCenter("number-parse-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName}));
-						return;
-					}
-				} else 
-					amount = theLoan.getCloseValue();
-				
-				// Apply the forgiveness
-				plugin.loanManager.applyPayment(theLoan, amount);
-				
-				plugin.scheduleMessage(sender, Conf.messageCenter("loan-forgive", new String[]{"$$p", "$$c", "$$r", "$$b"}, new String[]{sender.getName(), "/" + alias + " forgive", borrowerName, plugin.econ.format(amount)}));
-			}
-
-		});
-		
-		return true;
+	private boolean relationshipSummary(CommandSender sender, FinancialEntity entity, String string, String[] args) {
+		// TODO Implement
+		return false;
 	}
-	
+
 	/*
 	 * Command: /loan sell <borrower [account]> <new lender> <amount>
 	 * 
@@ -1079,7 +1322,7 @@ public class LoanHandler implements CommandExecutor{
 	 * 
 	 */
 	private boolean sellLoan (final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
-
+	
 		//-------------------- Permissions --------------------
 		
 		if(!sender.hasPermission("serenityloans.loan.lend")) {
@@ -1094,7 +1337,7 @@ public class LoanHandler implements CommandExecutor{
 			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
 			return true;
 		}
-
+	
 		//-------------------- Logic --------------------
 		
 		plugin.threads.execute(new Runnable(){
@@ -1211,110 +1454,220 @@ public class LoanHandler implements CommandExecutor{
 			}
 			
 		});
+	
+		return true;
+	}
 
-		return true;
-	}
-	
 	/*
-	 * Command /loan buy
+	 * Command: /loan sendoffer <borrower> [expiration time]
+	 * 			/loan quickoffer <borrower> [expiration time]
 	 * 
 	 * Permissions: serenityloans.loan.lend
 	 * 
-	 * This command executes the pending sale offer for the sender.
-	 * It will fail if the sender does not have enough money. If
-	 * the sale is successful, the old lender and the borrower are
-	 * notified if they are online.
+	 * borrower = name of a player or financial institution (bank)
 	 * 
-	 * =============================================================
+	 * expiration time = length of time for loan to be active formatted
+	 * as a list of integers followed by units. Available units are
+	 * y (year), d (day), h (hour), m (minutes), s (seconds). Spaces
+	 * are optional. ex - "3d 4h 1 s" represents 3 days 4 hours and 1 second.
 	 * 
-	 * This command does not use a name lookup, and so is on the main thread for now.
+	 * This command sends a loan offer to the given potential borrower.
+	 * The borrower may be either a player or a financial institution and
+	 * can be offline. However, the borrower must have the proper
+	 * permissions to borrow for the command to work. 
+	 * 
+	 * /loan sendoffer sends the current prepared offer
+	 * /loan quickoffer sends the default prepared offer
+	 * 
+	 * ==========================================================
+	 * 
+	 * Provides functionality for the /loan sendoffer command. The calling function ensures
+	 * that the argument list is at least 2 long, and contains "sendoffer" in the first position.
+	 * Permissions are also checked by the calling function. The behavior outline of this command 
+	 * is as follows:
+	 * 
+	 * Check the sender's status in the loan system.
+	 * Check the target's status in the loan system.
+	 * Determine inputs for offer expiration time.
+	 * Select terms from PreparedOffers table.
+	 * Create unnamed entry in PreparedOffers table.
+	 * Create Offer table entry with required info.
+	 * If player is online, send them a message,
+	 * otherwise terminate, message will be sent later.
 	 */
-	private boolean buyLoan(CommandSender sender, FinancialEntity entity, String alias, String[] args){
-		// TODO add configuration messages this whole method
+	private boolean sendOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args, final boolean isQuick){
 		
-		//------------------ Permissions --------------------
-		
-		if(!sender.hasPermission("serenityloans.loan.lend")){
-			sender.sendMessage(Conf.messageCenter("perm-buy-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			return true;
-		}
-			
-		FinancialEntity buyer = entity;
-		
-		
-		// Pending Sales are not persistent across restarts.
-		if(!pendingSales.containsKey(buyer)){
-			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan.");
-			return true;
-		}
-		
-		LoanSale ls = pendingSales.get(buyer);
-		
-		if(!plugin.econ.has(buyer, ls.amount).callSuccess){
-			sender.sendMessage(String.format(prfx + " You do not have enough money to buy this loan. Cost is %s.", plugin.econ.format(ls.amount)));
-			return true;
-		}
-		
-		FinancialEntity oldLender = ls.theLoan.getLender();
-		
-		
-		plugin.econ.withdraw(buyer, ls.amount);
-		plugin.econ.deposit(oldLender, ls.amount);
-		
-		if(plugin.loanManager.setLender(ls.theLoan.getLoanID(), buyer.getUserID()))
-			sender.sendMessage(prfx + " Purchase processed successfully!");
-		else {
-			sender.sendMessage(prfx + " Error processing purchase.");
-			return true;
-		}
-		
-		Player oldLend = plugin.playerManager.getPlayer(oldLender.getUserID());
-		Player borrower = plugin.playerManager.getPlayer(ls.theLoan.getBorrower().getUserID());
-		
-		if(oldLend != null)
-			oldLend.sendMessage(prfx + " Loan sale succeeded!");
-		if(borrower != null)
-			borrower.sendMessage(prfx + " Your loan has been sold to another lender!");
-		
-		return true;
-	}
-	
-	/*
-	 * Command: /loan viewsaleoffer
-	 * 
-	 * Permissions: serenityloans.loan.lend
-	 * 
-	 * This command displays a received loan sale offer including
-	 * the price and the loan in question.
-	 * 
-	 * =================================================================
-	 * 
-	 * This command does not use a name lookup, and so is on the main thread for now.
-	 */
-	private boolean viewSaleOffer(CommandSender sender, FinancialEntity entity, String alias,
-			String[] args) {
-	
-		// TODO Message center
-		
-		if(!sender.hasPermission("serenityloans.loan.lend")){
+		// -------------------- <Permissions> ------------------
+				
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
 			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
-
-		if(!pendingSales.containsKey(entity)){
-			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan");
+		
+		// -------------------- </Permissions> ------------------
+			
+		
+		
+		// -------------------- <Syntax> ------------------
+		
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+					
 			return true;
 		}
 		
-		LoanSale ls = pendingSales.get(entity);
+		// -------------------- </Syntax> ------------------
 		
-		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
-		sender.sendMessage(ls.theLoan.toString(plugin));
+					
+		
+		// -------------------- <Parse Inputs> --------------------
+	
+				
+		// Collect financialEntity target info
+		// This is potentially not safe input!!!
+		final String entityTarget = args[1];
+				
+		if(entityTarget.equalsIgnoreCase(sender.getName())){
+			sender.sendMessage(Conf.messageCenter("meta-offer-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias + args[0]}));
+			return true;
+		}
+				
+		if(entityTarget.equalsIgnoreCase("CentralBank")){
+			sender.sendMessage(Conf.messageCenter("offer-government", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + args[0], entityTarget}));
+			return true;
+		}
+		
+		// -------------------- </Parse Inputs> --------------------
 		
 		
-		return false;
+		plugin.threads.execute(new Runnable(){
+	
+			@SuppressWarnings("deprecation")
+			public void run() {
+				
+				// Check if other entity is in FinancialEntities table
+				FinancialEntity borrower = null;
+				
+				try {
+					borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					return;
+				}
+				
+				if(borrower == null){	
+					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+				
+				// Parse expiration time
+				String timeString = "1w";
+				
+				// The expiration string is assumed to be the remainder of the line
+				// Spaces are removed, and the string is parsed into a length
+				if (args.length > 2) {
+					for(int i = 2; i < args.length; i++)
+						timeString += args[i];
+				} else if(plugin.getConfig().contains("loan.default-offer-time"))
+					timeString = plugin.getConfig().getString("loan.default-offer-time");
+						
+				// Parsing string
+				long expirationTime = Conf.parseTime(timeString);
+						
+				if(expirationTime == 0){
+					plugin.scheduleMessage(sender, Conf.messageCenter("bad-expiration", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+	
+				// Create expiration time
+				Timestamp expDate = new Timestamp(new Date().getTime() + expirationTime);
+						
+				// Check if offer is in PreparedOffers table
+				String offerName = isQuick? "default" : "prepared";
+				
+				OfferExitStatus exit = plugin.offerManager.createOffer(entity.getUserID(), borrower.getUserID(), offerName, expDate);
+				
+				switch(exit){
+				case IGNORED:
+					plugin.scheduleMessage(sender, Conf.messageCenter("talk-to-the-hand", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				case OVERWRITE_FAIL:
+					plugin.scheduleMessage(sender, Conf.messageCenter("overwrite-fail", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				case SUCCESS:
+					break;
+				case UNKNOWN:
+					plugin.scheduleMessage(sender, prfx + " No offer has been prepared. This is a bug. Please report.");
+					return;
+				}
+				
+				Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
+				
+				if(recipient == null){
+					plugin.scheduleMessage(sender, Conf.messageCenter("offline-send", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+				
+				if(!recipient.hasPermission("serenityloans.loan.borrow") && !recipient.hasPermission("serenityloans.crunion.borrow")){
+					plugin.scheduleMessage(sender, Conf.messageCenter("no-can-borrow", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, entityTarget}));
+					return;
+				}
+				
+				// Send message
+				
+				String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
+				String commandName = recipient.getName().equals(entityTarget)? "/loan " : "/crunion ";
+							
+				plugin.scheduleMessage(recipient, Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+				plugin.scheduleMessage(recipient, Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+							
+				if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
+					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
+				
+			}
+			
+			
+			
+		});
+			
+				
+		return true;
 	}
 
+	/*
+	 * Command: /loan setautopay <lender [account]> <on|off>
+	 * 
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of lender
+	 * account = loan number if multiple loans with same lender
+	 * on|off = whether to turn autopay on or off for the loan
+	 * 
+	 * This command sets the autopay feature for the given loan.
+	 * Autopay will attempt to pay payment statements from the
+	 * loan when they are due, with no interraction from the
+	 * borrower. If the whole bill cannot be paid, then it will
+	 * pay the minimum payment.
+	 */
+	private boolean setAutoPay(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
+		
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}		
+				
+		if(args.length < 3){
+			sender.sendMessage(Conf.messageCenter("too-few-arguments", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+		
+		// TODO Implement
+		return false;
+	}
 
 	/*
 	 * Displays a prepared offer of the given player provides all of the formatting
@@ -1322,7 +1675,7 @@ public class LoanHandler implements CommandExecutor{
 	 * information relating to service fees and late fees as necessary.
 	 */
 	private boolean viewPreparedOffer(CommandSender sender, FinancialEntity player, boolean isDefault) {
-
+	
 		ImmutableOffer results = plugin.offerManager.getPreparedOffer(player.getUserID(), isDefault? "default" : "prepared");
 	
 		if(results == null)
@@ -1350,7 +1703,7 @@ public class LoanHandler implements CommandExecutor{
 			 String.format("    Payment time: %s", Conf.buildTimeString(paymentTime)),
 			 String.format("    Payment frequency: %s", Conf.buildTimeString(paymentFrequency)),
 			 String.format("    Loan type: %s", loanType)};
-
+	
 		String[] lateFeeRelated = 
 			{String.format("    Late fee: %s", plugin.econ.format(lateFee)),
 			 String.format("    Grace period: %s", Conf.buildTimeString(gracePeriod))};
@@ -1368,270 +1721,86 @@ public class LoanHandler implements CommandExecutor{
 			sender.sendMessage(serviceFeeRelated);
 			
 		return true;
-
-	}
 	
-	/*
-	 * Takes a command+subcommand and inserts the word 'help' between
-	 * the two portions, forming the help function name.
-	 */
-	private String getHelpCommand(String commandSubcommand){
-		String[] intermediate = commandSubcommand.split("\\s+");
-		String result = intermediate[0];
-		
-		// Kindof an easter egg. Should never give more than one help.
-		for(int i=1; i<intermediate.length; i++)
-			result += " help " + intermediate[i];
-		
-		return result;
 	}
 
 	/*
-	 * Command: /loan accept <lender>
-	 *          /loan acceptoffer <lender>
-	 *          
-	 * Permissions: serenityloans.loan.borrow
+	 * Command: /loan viewsaleoffer
 	 * 
-	 * lender = name of the entity which sent the offer
+	 * Permissions: serenityloans.loan.lend
 	 * 
-	 * This command will accept a loan offer from the given
-	 * lender and create a new loan with the terms of the
-	 * offer.
+	 * This command displays a received loan sale offer including
+	 * the price and the loan in question.
+	 * 
+	 * =================================================================
+	 * 
+	 * This command does not use a name lookup, and so is on the main thread for now.
 	 */
-	private boolean acceptOffer(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args){
-		
-		// Check permissions
-		
-		if(!sender.hasPermission("serenityloans.loan.borrow")) {
-			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			return true;
-		}
-		
-		// Basic syntax
-		
-		if(args.length == 1){
-			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
-			return true;
-		}
-		
-		plugin.threads.execute(new Runnable(){
-			
-			@SuppressWarnings("deprecation")
-			public void run(){
-				
-				String lenderName = args[1];
-				
-				FinancialEntity lender = null;
-				try {
-					lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
-				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
-					return;
-				}
-				
-				if(lender == null) {
-					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
-					return;
-				}
-				
-				ImmutableOffer theOffer = plugin.offerManager.getOffer(lender.getUserID(), borrower.getUserID());
-				
-				if(theOffer == null){
-					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
-					return;
-				}
-				
-				Timestamp expires = theOffer.getExpirationDate();
-				
-				if(expires.before(new Date())){
-					plugin.scheduleMessage(sender, String.format(prfx + " You do not have any outstanding offers from %s.", lenderName));
-					return;
-				}
-				
-				int termsID = theOffer.getPreparedTermsId();
-				
-				double value = plugin.offerManager.getTermsValue(termsID);
-				
-				if(!plugin.econ.has(lender, value).callSuccess){
-					
-					plugin.scheduleMessage(sender, String.format(prfx + " %s does not have enough money to loan!", lenderName));
-					return;
-				}
-				
-				plugin.econ.withdraw(lender, value);
-				plugin.econ.deposit(borrower, value);
-				
-				boolean returnSuccess = plugin.loanManager.createLoan(lender.getUserID(), borrower.getUserID(), termsID, value);
-				
-				// TODO message center
-				if(returnSuccess){
-					plugin.scheduleMessage(sender, prfx + " Successfully processed loan!");
-					
-					Player newLender = plugin.playerManager.getPlayer(lender.getUserID());
-					
-					if(newLender != null)
-						plugin.scheduleMessage(newLender, prfx + " Successfully processed loan!");
-				} else {
-					plugin.scheduleMessage(sender, prfx + " Loan not processed!");
-				}
-				
-			}
-		});
-
-		return true;
-	}
+	private boolean viewSaleOffer(CommandSender sender, FinancialEntity entity, String alias,
+			String[] args) {
 	
-	/*
-	 * Command: /loan ignore <lender>
-	 *          /loan ignoreoffers <lender>
-	 * 
-	 * Permissions: serenityloans.loan
-	 * 
-	 * lender = name of the entity to ignore
-	 * 
-	 * This command toggles your ignore status with the given
-	 * lender. When being ignored, you will not receive loan
-	 * offers from the given lender. This does not affect your
-	 * ability to pay/be paid or to use other loan features.
-	 */
-	private boolean ignoreOffers(final CommandSender sender, final FinancialEntity requester, final String alias, final String[] args){
+		// TODO Message center
 		
-
-		if(args.length == 1){
-			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+		if(!sender.hasPermission("serenityloans.loan.lend")){
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
-					
-		plugin.threads.execute(new Runnable(){
-			
-			@SuppressWarnings("deprecation")
-			public void run(){
-				
-				FinancialEntity target = null;
-				try {
-					target = plugin.playerManager.getFinancialEntityAdd(args[1]);
-				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
-					return;
-				}
-				
-				if(target == null){
-					plugin.scheduleMessage(sender, prfx + " Cannot ignore this entity.");
-					return;
-				}
-				
-				boolean setToIgnore = plugin.playerManager.toggleIgnore(requester.getUserID(), target.getUserID());
-				
-				plugin.scheduleMessage(sender, String.format(prfx + " %s ignoring %s.", setToIgnore? "Now" : "No longer", args[1]));
-
-			}
-		});
-			
-		return true;
+	
+		if(!pendingSales.containsKey(entity)){
+			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan");
+			return true;
+		}
+		
+		LoanSale ls = pendingSales.get(entity);
+		
+		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
+		sender.sendMessage(ls.theLoan.toString(plugin));
+		
+		
+		return false;
 	}
 
 	/*
-	 * Command: /loan reject <lender>
-	 *          /loan rejectoffer <lender>
-	 * 
-	 * Permissions: serenityloans.loan.borrow
-	 * 
-	 * lender = name of the lender who sent the offer
-	 * 
-	 * This command rejects the offer from the given lender.
-	 */
-	private boolean rejectOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
-		
-		// Check perms			
-		if(!sender.hasPermission("serenityloans.loan.borrow")) {
-			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			return true;
-		}
-				
-		if(args.length == 1){
-			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
-			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
-			return true;
-		}
-		
-		plugin.threads.execute(new Runnable(){
-			
-			@SuppressWarnings("deprecation")
-			public void run(){
-				String entityTarget = args[1];
-				FinancialEntity lender = null;
-				
-				try {
-					lender = plugin.playerManager.getFinancialEntity(entityTarget);
-				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
-					return;
-				}
-				
-				boolean success = plugin.offerManager.removeOffer(entity.getUserID(), lender.getUserID());
-				
-				if(success)
-					plugin.scheduleMessage(sender, prfx + " Offer removed successfully.");
-				else
-					plugin.scheduleMessage(sender, prfx + " Unable to complete request.");
-				
-			}
-		});
-					
-		
-		return true;
-	}
-
-	/*
-	 * Command: /loan pay <lender [account]> [amount]
-	 *          /loan payoff <lender [account]> [amount]
+	 * Command: /loan statement <lender [account]>
 	 * 
 	 * Permissions: serenityloans.loan.borrow
 	 * 
 	 * lender = name of lender
 	 * account = loan number if multiple loans with same lender
-	 * amount = amount to pay off
 	 * 
-	 * This command will apply a payment to the specified loan.
-	 * If no amount is given, then the default is to specify the
-	 * total due. 
-	 * 
-	 * /loan pay applies payments only for outstanding payment statements.
-	 * /loan payoff will pay down the principal balance of the loan. Be 
-	 * careful with payoff, as it will pay the entire principal balance
-	 * if used without arguments.
+	 * This command checks for an outstanding payment statement
+	 * on the given loan and displays the result to the caller.
 	 */
-	private boolean payLoan(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args, final boolean payOff) {
-
+	private boolean viewStatement(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args) {
+		
 		// Check perms			
 		if(!sender.hasPermission("serenityloans.loan.borrow")) {
 			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
 		}
-				
+	
 		if(args.length == 1){
 			sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
 			return true;
 		}
-		
+					
 		plugin.threads.execute(new Runnable(){
 			
 			@SuppressWarnings("deprecation")
 			public void run(){
 				String lenderName = args[1];
-				
 				FinancialEntity lender = null;
+				
 				try {
 					lender = plugin.playerManager.getFinancialEntity(args[1]);
-				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
 					return;
 				}
 				
@@ -1654,83 +1823,23 @@ public class LoanHandler implements CommandExecutor{
 					return;
 				}
 				
-				double payAmount = 0;
+				Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
 				
-				try{
-
-					payAmount = loanSelection.remainingArgs.length != 0? Double.parseDouble(loanSelection.remainingArgs[0]) : (payOff? loanSelection.result.getCloseValue() : plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).getPaymentRemaining());
-						
-				} catch(NumberFormatException e){
-					plugin.scheduleMessage(sender, String.format("%s Value specified incorrectly.", prfx));
+				if(recipient == null)
 					return;
-				}
 				
-				if(!plugin.econ.has(borrower, payAmount).callSuccess){
-					plugin.scheduleMessage(sender, String.format("%s You do not have enough money!", prfx));
-					return;
-				}
-				
-				plugin.econ.withdraw(borrower, payAmount);
-				plugin.econ.deposit(lender, payAmount);
-				
-				plugin.loanManager.applyPayment(loanSelection.result, payAmount);
-				
-				plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
-				
-			}
-		});
-					
-		
-		
-		return true;
-	}
-
-	protected boolean viewStatement(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
-		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntityAdd(((Player)sender).getUniqueId());
-		FinancialEntity lender = plugin.playerManager.getFinancialEntity(args[1]);
-		
-		
-		if(borrower == null){
-			sender.sendMessage(prfx + " You are not able to use this command.");
-			return true;
-		}		
-		
-		LoanSpec loanSelection = parseLoanArguments(borrower, lender, sender.getName(), args, false);
-		
-		if(loanSelection.errMessage != null){
-			sender.sendMessage(Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
-			return true;
-		}
-		
-		if(loanSelection.multipleValues){
-			sender.sendMessage(prfx + " You have multiple loans with this entity. Select one of the following.");
-			Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
-			for(int i = 0; i < allLoans.length ; i++){
-				sender.sendMessage(String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+				boolean isPlayer = recipient.getUniqueId().equals(loanSelection.result.getBorrower().getUserID());
+			
+				plugin.scheduleMessage(recipient, String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)loanSelection.result.getBorrower()).getName() + " has"));
+				plugin.scheduleMessage(recipient, String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
+				plugin.scheduleMessage(recipient, String.format("%s Details are given below:", prfx));
+				plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
+				plugin.scheduleMessage(recipient, String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", lenderName));
+			
 			}
 			
-			return true;
-		}
+		});	
 		
-		Player recipient = plugin.playerManager.getPlayer(borrower.getUserID());
-		
-		if(recipient == null)
-			return true;
-		
-		boolean isPlayer = recipient.getUniqueId().equals(loanSelection.result.getBorrower().getUserID());
-	
-		recipient.sendMessage(String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)loanSelection.result.getBorrower()).getName() + " has"));
-		recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
-		recipient.sendMessage(String.format("%s Details are given below:", prfx));
-		recipient.sendMessage(plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
-		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", plugin.playerManager.entityNameLookup(loanSelection.result.getLender())));
-	
-		return false;
-	}
-
-	protected boolean setAutoPay(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
-		// TODO Auto-generated method stub
-		return false;
+		return true;
 	}
 }
