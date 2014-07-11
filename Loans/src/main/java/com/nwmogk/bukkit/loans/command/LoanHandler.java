@@ -53,6 +53,7 @@ import java.text.DateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -130,24 +131,10 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("sendoffer") || subCommand.equalsIgnoreCase("quickoffer")) 
 			return sendOffer(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("quickoffer"));
 			
-		else if (subCommand.equalsIgnoreCase("retractoffer")) {
-			// Check basic command syntax
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.lend")) {
-				sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			// Send to specific handler method
-			sub1.retractOffer(sender, cmd, alias, args);
+		else if (subCommand.equalsIgnoreCase("retractoffer")) 
+			retractOffer(sender, entity, alias + " " + subCommand, args);
 
-		} else if (subCommand.equalsIgnoreCase("forgive")) {			
+		else if (subCommand.equalsIgnoreCase("forgive")) {			
 			// Check basic command syntax
 			if(args.length == 1){
 				sender.sendMessage(Conf.messageCenter("missing-borrower-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
@@ -732,14 +719,68 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 
-	protected boolean retractOffer(CommandSender sender, FinancialEntity entity, String alias, String[] args){
+	/*
+	 * Command: /retractoffer <borrower>
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * borrower = name of a player or financial institution (bank)
+	 * 
+	 * This command removes an offer from the given financial entity name.
+	 * If there was no offer sent in the first place, this command will not
+	 * give an error.
+	 */
+	private boolean retractOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
 		
-		FinancialEntity borrower = plugin.playerManager.getFinancialEntity(args[1]);
+		// -------------------- <Permissions> ------------------
 		
-		if(borrower != null && plugin.offerManager.removeOffer(((Player)sender).getUniqueId(), borrower.getUserID()))
-			sender.sendMessage(prfx + " Operation successful.");
-		else
-			sender.sendMessage(Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias + " retractoffer", args[1]}));
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+				
+		// -------------------- <Syntax> ------------------
+		
+		
+		// Check basic command syntax
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+								
+		
+		// -------------------- <Logic> ------------------
+		
+		
+		plugin.threads.execute(new Runnable(){
+
+			public void run() {
+				UUID borrowerId = null;
+				
+				try {
+					borrowerId = plugin.playerManager.entityIdLookup(args[1]);
+				} catch (InterruptedException | ExecutionException	| TimeoutException e) {
+					// TODO add message to configuration
+					scheduleMessage(prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
+					return;
+				}
+				
+				// TODO replace with message center message
+				if(plugin.offerManager.removeOffer(entity.getUserID(), borrowerId))
+					scheduleMessage(prfx + " Operation successful.");
+				else
+					scheduleMessage(Conf.messageCenter("generic-refuse", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, args[1]}));
+				
+			}
+			
+			private void scheduleMessage(String message){
+				plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
+			}
+			
+		});
+		
 		
 		return true;
 		
