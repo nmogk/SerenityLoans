@@ -150,50 +150,19 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"))  
 			return loanViewoffersCommand(sender, entity, alias + " " + subCommand, args, subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers"));
 		
-		else if (subCommand.equalsIgnoreCase("accept") || subCommand.equalsIgnoreCase("acceptoffer")) {
-			acceptOffer(sender, entity, alias + " " + subCommand, args);
+		else if (subCommand.equalsIgnoreCase("accept") || subCommand.equalsIgnoreCase("acceptoffer"))
+			return acceptOffer(sender, entity, alias + " " + subCommand, args);
 			
-		} else if (subCommand.equalsIgnoreCase("reject") || subCommand.equalsIgnoreCase("rejectoffer")) {
-			rejectOffer(sender, entity, alias + " " + subCommand, args);
+		else if (subCommand.equalsIgnoreCase("reject") || subCommand.equalsIgnoreCase("rejectoffer"))
+			return rejectOffer(sender, entity, alias + " " + subCommand, args);
 			
-		} else if (subCommand.equalsIgnoreCase("ignore") || subCommand.equalsIgnoreCase("ignoreOffers")) {
-			// Behavior: toggle ignore status
-			// Check current status
-			// Change
+		else if (subCommand.equalsIgnoreCase("ignore") || subCommand.equalsIgnoreCase("ignoreOffers"))
+			return ignoreOffers(sender, entity, alias + " " + subCommand, args);			
 			
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
+		else if (subCommand.equalsIgnoreCase("pay")) 
+			return payLoan(sender, entity, alias + " " + subCommand, args, false);
 			
-			// Send to specific handler method
-
-			ignoreOffers(sender, entity, alias + " " + subCommand, args);			
-			
-		} else if (subCommand.equalsIgnoreCase("pay")) {
-			
-			if(args.length == 1){
-				sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias +" " + subCommand, "/" + alias +" help " + subCommand}));
-				return true;
-			}
-						
-			// Check perms			
-			if(!sender.hasPermission("serenityloans.loan.borrow")) {
-				sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
-				return true;
-			}
-			
-			payLoan(sender, entity, alias + " " + subCommand, args, false);
-			
-		} else if (subCommand.equalsIgnoreCase("payoff")) {
+		else if (subCommand.equalsIgnoreCase("payoff")) {
 
 			if(args.length == 1){
 				sender.sendMessage(Conf.messageCenter("missing-lender-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias +" " + subCommand}));
@@ -207,7 +176,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			payLoan(sender, entity, alias + " " + subCommand, args, true);
+			return payLoan(sender, entity, alias + " " + subCommand, args, true);
 			
 		} else if (subCommand.equalsIgnoreCase("summary")) {
 			//TODO
@@ -225,7 +194,7 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			setAutoPay(sender, entity, alias + " " + subCommand, args);
+			return setAutoPay(sender, entity, alias + " " + subCommand, args);
 			
 		} else if (subCommand.equalsIgnoreCase("statement")) {
 			
@@ -241,11 +210,9 @@ public class LoanHandler implements CommandExecutor{
 				return true;
 			}
 			
-			viewStatement(sender, entity, alias + " " + subCommand, args);
+			return viewStatement(sender, entity, alias + " " + subCommand, args);
 			
-		} else {
-			return false;
-		}
+		} 
 		
 		return false;
 	}
@@ -434,13 +401,24 @@ public class LoanHandler implements CommandExecutor{
 					"offer."
 			});
 		} else if (subCommand.equalsIgnoreCase("reject") || subCommand.equalsIgnoreCase("rejectoffer")) {
-				
+			sender.sendMessage(new String[]{
+					"Command: /loan reject <lender>",
+					"         /loan rejectoffer <lender>",
+					"",
+					"Permissions: serenityloans.loan.borrow",
+					"",
+					"lender = name of the lender who sent the offer",
+					"",
+					"This command rejects the offer from the given lender.",
+			});
 		} else if (subCommand.equalsIgnoreCase("ignore") || subCommand.equalsIgnoreCase("ignoreoffers")) {
 			sender.sendMessage(new String[]{
 					"Command: /loan ignore <lender>",
 					"         /loan ignoreoffers <lender>",
 					"",
 					"Permissions: serenityloans.loan",
+					"",
+					"lender = name of the entity to ignore",
 					"",
 					"This command toggles your ignore status with the given",
 					"lender. When being ignored, you will not receive loan",
@@ -1511,6 +1489,8 @@ public class LoanHandler implements CommandExecutor{
 	 * 
 	 * Permissions: serenityloans.loan
 	 * 
+	 * lender = name of the entity to ignore
+	 * 
 	 * This command toggles your ignore status with the given
 	 * lender. When being ignored, you will not receive loan
 	 * offers from the given lender. This does not affect your
@@ -1554,13 +1534,55 @@ public class LoanHandler implements CommandExecutor{
 		return true;
 	}
 
-	protected boolean rejectOffer(CommandSender sender, FinancialEntity entity, String alias, String[] args){
-		boolean success = plugin.offerManager.removeOffer(((Player)sender).getUniqueId(), plugin.playerManager.entityIdLookup(args[1]));
+	/*
+	 * Command: /loan reject <lender>
+	 *          /loan rejectoffer <lender>
+	 * 
+	 * Permissions: serenityloans.loan.borrow
+	 * 
+	 * lender = name of the lender who sent the offer
+	 * 
+	 * This command rejects the offer from the given lender.
+	 */
+	protected boolean rejectOffer(final CommandSender sender, final FinancialEntity entity, final String alias, final String[] args){
 		
-		if(success)
-			sender.sendMessage(prfx + " Offer removed successfully.");
-		else
-			sender.sendMessage(prfx + " Unable to complete request.");
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.borrow")) {
+			sender.sendMessage(Conf.messageCenter("perm-borrow-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+				
+		if(args.length == 1){
+			sender.sendMessage(Conf.messageCenter("missing-entity-argument", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			sender.sendMessage(Conf.messageCenter("command-help", new String[]{"$$p", "$$c", "$$h"}, new String[]{sender.getName(), "/" + alias, "/" + getHelpCommand(alias)}));
+			return true;
+		}
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				String entityTarget = args[1];
+				FinancialEntity lender = null;
+				
+				try {
+					lender = plugin.playerManager.getFinancialEntity(entityTarget);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					return;
+				}
+				
+				boolean success = plugin.offerManager.removeOffer(entity.getUserID(), lender.getUserID());
+				
+				if(success)
+					plugin.scheduleMessage(sender, prfx + " Offer removed successfully.");
+				else
+					plugin.scheduleMessage(sender, prfx + " Unable to complete request.");
+				
+			}
+		});
+					
 		
 		return true;
 	}
