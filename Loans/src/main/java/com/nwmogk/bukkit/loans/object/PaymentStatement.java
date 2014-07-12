@@ -46,6 +46,8 @@ package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import com.nwmogk.bukkit.loans.SerenityLoans;
 
@@ -102,7 +104,7 @@ public final class PaymentStatement {
 		return minPayment;
 	}
 	
-	public String[] toString(SerenityLoans plugin){
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException{
 		
 		String[] result = 
 			{

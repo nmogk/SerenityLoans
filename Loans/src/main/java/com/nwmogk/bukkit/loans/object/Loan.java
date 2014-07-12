@@ -45,6 +45,8 @@ package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang.ArrayUtils;
 
@@ -53,7 +55,6 @@ import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.LoanType;
 import com.nwmogk.bukkit.loans.api.Loanable;
-import com.nwmogk.bukkit.loans.exception.InsufficientCashException;
 
 
 public class Loan implements Loanable {
@@ -219,7 +220,7 @@ public class Loan implements Loanable {
 		return balance + feeBalance + interestBalance;
 	}
 
-	public String getShortDescription(SerenityLoans plugin, boolean nameByLender) {
+	public String getShortDescription(SerenityLoans plugin, boolean nameByLender) throws InterruptedException, ExecutionException, TimeoutException {
 		return String.format("%s: %s %F", nameByLender? plugin.playerManager.entityNameLookup(getLender()) : plugin.playerManager.entityNameLookup(getBorrower()), plugin.econ.format(getValue()), new Date(startDate.getTime()));
 	}
 
@@ -227,7 +228,7 @@ public class Loan implements Loanable {
 		return loanID;
 	}
 
-	public String[] toString(SerenityLoans plugin) {
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException {
 		String[] result =  
 			{String.format("    Balance: %s", plugin.econ.format(balance)),
 			 String.format("    Interest balance: %s", plugin.econ.format(interestBalance)),

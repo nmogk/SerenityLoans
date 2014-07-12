@@ -42,6 +42,9 @@
 
 package com.nwmogk.bukkit.loans.api;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+
 import com.nwmogk.bukkit.loans.SerenityLoans;
 
 
@@ -139,6 +142,6 @@ public interface LoanInfo {
 	 */
 	public LoanType getLoanType();
 	
-	public String[] toString(SerenityLoans plugin);
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException;
 
 }

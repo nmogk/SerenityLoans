@@ -42,6 +42,8 @@
 package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang.ArrayUtils;
 
@@ -116,7 +118,7 @@ public final class ImmutableOffer implements LoanInfo {
 	}
 	
 	
-	public String[] toString(SerenityLoans plugin){
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException{
 		
 		EconomyManager econ = plugin.getEcon();
 		
