@@ -18,14 +18,6 @@ mysql:
 
 # This section represents global options
 options:
-  # When set to true, only players whose names are listed in whitelist.txt
-  # are able to use the loan system.
-  use-whitelist: false
-  
-  # When set to true, players whose names are listed in blacklist.txt are
-  # prevented from using the system.
-  use-blacklist: false
-  
   # Sets how often the plugin will check for loan updates, such as interest
   # being accrued or statements due. Can accept time units y w d h m s. Numbers
   # without units are assumed to be minutes.

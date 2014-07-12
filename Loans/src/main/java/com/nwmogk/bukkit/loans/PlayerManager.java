@@ -52,18 +52,11 @@
 
 package com.nwmogk.bukkit.loans;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.Charset;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.Callable;
@@ -75,7 +68,6 @@ import java.util.concurrent.TimeoutException;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
-import com.google.common.io.Files;
 import com.nwmogk.bukkit.evilmidget38.UUIDFetcher;
 import com.nwmogk.bukkit.evilmidget38.NameFetcher;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
@@ -113,10 +105,7 @@ public class PlayerManager {
 	 * FinancialEntities table. Will fail if given a UUID that does not
 	 * represent an online Player unless the UUID is already present
 	 * in the table. In this case, the method reports that the entity
-	 * exists. This method will check for the existence of a white or
-	 * black list if the settings specify, and will filter potential
-	 * users appropriately. These lists are plugin specific, not the
-	 * ones for the server as a whole.
+	 * exists. 
 	 * 
 	 * @param playerID UUID of the player to be added.
 	 * @return true if the entity is in the FinancialEntities table
@@ -150,10 +139,7 @@ public class PlayerManager {
 	/**
 	 * 
 	 * Attempts to add all Players given to the 
-	 * FinancialEntities table. This method will check for the existence of a white or
-	 * black list if the settings specify, and will filter potential
-	 * users appropriately. These lists are plugin specific, not the
-	 * ones for the server as a whole.
+	 * FinancialEntities table. 
 	 * 
 	 * @param players Array of the players to be added.
 	 * @return true if all players were added successfully, false otherwise.
@@ -161,73 +147,7 @@ public class PlayerManager {
 	public boolean addPlayers(Player[] players){
 		boolean result = true;
 		
-		
-		
-		// Flags for controlling the use of white or black list
-		// Actual values set later
-		boolean white = false;
-		boolean black = false;
-		Set<String> names = null;
 				
-		
-		// Sets the white/black list flags.
-		// If both are set, this method behaves as if using a whitelist.
-		if(plugin.getConfig().contains("options.use-whitelist"))
-			white = plugin.getConfig().getBoolean("options.use-whitelist");
-		else if(plugin.getConfig().contains("options.use-blacklist"))
-			black = plugin.getConfig().getBoolean("options.use-blacklist");
-		
-		// Check to see if player is allowed to use system.
-		// FIXME Implement a UUID based white/black list system 
-		if(white || black) {
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Using a white/black list.", plugin.getDescription().getName()));
-			
-			// Currently only supports ASCII encoding
-			Charset charset = Charset.forName("US-ASCII");
-			
-			String fname = white? "whitelist":"blacklist";
-			File list = new File(plugin.getDataFolder().getAbsolutePath() + fname + ".txt");
-			
-			names = new HashSet<String>();
-				
-			try {
-				
-				// Creates the list file if it doesn't exist.
-				if(!list.exists()){
-					
-					list.createNewFile();
-					return false;
-					
-				} else {
-				
-					BufferedReader reader = Files.newReader(list, charset);
-			
-					// This expects each name to be a separate line
-					while(true){
-						String name = reader.readLine();
-						
-						if(name == null)
-							break;
-						
-						// Building a list of names in the file
-						names.add(name);
-					}
-				
-				}
-		
-			} catch (FileNotFoundException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			} catch (IOException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			}
-			
-			
-			
-		}
-		
 		// Loop through all of the players given
 		for(Player aPlayer : players){
 			
@@ -240,19 +160,7 @@ public class PlayerManager {
 				continue;
 			
 			}
-			
-			// Check player name against the white/black list
-			if(white || black){
-				boolean nameFound = names.contains(aPlayer.getName());
-				
-				if(!(nameFound && white) && !(!nameFound && black)){
-					result = false;
-					continue;
-				}
-					
-			}
-			
-			
+						
 			String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
 			int rowsUpdated = 0;
 			
