@@ -44,8 +44,6 @@
 
 package com.nwmogk.bukkit.loans;
 
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -60,7 +58,7 @@ import com.nwmogk.bukkit.loans.api.PlayerType;
 
 public class EconomyManager {
 
-	// TODO make thread safe + comments + handle different economies
+	// TODO make thread safe + comments + handle different economies + update configuration fetches
 	private enum EconType {VAULT, HYBRID, SERENE, INTERNAL};
 	
 	private SerenityLoans plugin;
@@ -138,30 +136,14 @@ public class EconomyManager {
 		if(amount < 0)
 			return new EconResult(0, 0, false, "Amount query is negative!");
 		
-		
 		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION) && config.equals(EconType.VAULT))
 			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
 		
-		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
+		if(config.equals(EconType.VAULT) || (config.equals(EconType.HYBRID) && entity.getPlayerType().equals(PlayerType.PLAYER)))
 			return new EconResult(econ.depositPlayer(plugin.playerManager.getOfflinePlayer(entity.getUserID()), amount));
 		
-		String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%d", Math.max(entity.getCash(), 0.0) + amount, entity.getUserID());
+		return plugin.playerManager.depositCash(entity.getUserID(), amount);
 		
-		int result = 0;
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			result = stmt.executeUpdate(updateSQL);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		if(result == 1)
-			return new EconResult(amount, Math.max(entity.getCash(),  0.0) + amount, true, null);
-		else
-			return new EconResult(0, entity.getCash(), false, "Upate not completed!");
 	}
 
 	@Deprecated
@@ -247,6 +229,16 @@ public class EconomyManager {
 		return false;
 	}
 
+	/**
+	 * Returns an EconResult which contains the balance
+	 * of the entity and the success of the amount query.
+	 * Depends on the implementation of getBalance(FinancialEntity)
+	 * to get the balance.
+	 * 
+	 * @param entity
+	 * @param amount
+	 * @return
+	 */
 	public EconResult has(FinancialEntity entity, double amount){
 		boolean answer = true;
 		
@@ -254,6 +246,9 @@ public class EconomyManager {
 			return new EconResult(0, 0, false, "Amount query is negative!");
 		
 		EconResult result = getBalance(entity);
+		
+		if(! result.callSuccess)
+			return result;
 		
 		double balance = result.balance;
 		
@@ -265,19 +260,7 @@ public class EconomyManager {
 
 	@Deprecated
 	public EconResult has(String name, double amount) throws InterruptedException, ExecutionException, TimeoutException{
-		boolean answer = true;
-		
-		if(amount < 0)
-			return new EconResult(0, 0, false, "Amount query is negative!");
-		
-		EconResult result = getBalance(name);
-		
-		double balance = result.balance;
-		
-		answer &= balance >= amount;
-		
-		
-		return new EconResult(0, balance, answer, result.errMsg);
+		return has(plugin.playerManager.getFinancialEntity(name), amount);
 	}
 
 	@Deprecated
@@ -312,6 +295,16 @@ public class EconomyManager {
 		return new EconResult(balance, 0.0, true, null);
 	}
 
+	/**
+	 * This method attempts to withdraw cash from a financial entity's 
+	 * account. It will handle all of the various economy options available.
+	 * Returns a EconResult, which has similar functionality to the Vault
+	 * EconomyResponse.
+	 * 
+	 * @param entity
+	 * @param amount
+	 * @return
+	 */
 	public EconResult withdraw(FinancialEntity entity, double amount){
 		
 		if(entity == null)
@@ -320,33 +313,13 @@ public class EconomyManager {
 		if(amount < 0)
 			return new EconResult(0, 0, false, "Amount query is negative!");
 		
-		
 		if(entity.getPlayerType().equals(PlayerType.CREDIT_UNION) && config.equals(EconType.VAULT))
 			return new EconResult(0, 0, false, "CreditUnions are not supported by the economy.");
 		
-		if(config.equals(EconType.VAULT) || config.equals(EconType.HYBRID))
+		if(config.equals(EconType.VAULT) || (config.equals(EconType.HYBRID) && entity.getPlayerType().equals(PlayerType.PLAYER)))
 			return new EconResult(econ.withdrawPlayer(plugin.playerManager.getOfflinePlayer(entity.getUserID()), amount));
 		
-		if(amount > entity.getCash())
-			return new EconResult(0, entity.getCash(), false, "Entity does not have sufficient funds.");
-		
-		String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%d", Math.max(entity.getCash() - amount, 0.0), entity.getUserID());
-		
-		int result = 0;
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			result = stmt.executeUpdate(updateSQL);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		if(result == 1)
-			return new EconResult(amount, Math.max(entity.getCash() - amount,  0.0), true, null);
-		else
-			return new EconResult(0, entity.getCash(), false, "Upate not completed!");
+		return plugin.playerManager.withdrawCash(entity.getUserID(), amount);
 	}
 
 	@Deprecated
