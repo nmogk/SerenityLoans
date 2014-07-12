@@ -87,7 +87,7 @@ public final class SerenityLoans extends JavaPlugin {
     
 	public void onEnable(){
 		
-		log = Logger.getLogger("Minecraft" + getDescription().getName());
+		log = Logger.getLogger("Minecraft." + getDescription().getName());
 		
 		this.threads = Executors.newCachedThreadPool();
 		
