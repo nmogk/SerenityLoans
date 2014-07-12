@@ -176,7 +176,8 @@ public final class SerenityLoans extends JavaPlugin {
 		/*
 		 * TODO next:
 		 * Setup listeners/handlers
-		 * Setup recurring events
+		 * 
+		 * Remove references to the regular configuration pathway in other classes. Use only the Conf object
 		 * 
 		 * Work out economy stuff
 		 */

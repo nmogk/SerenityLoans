@@ -70,6 +70,7 @@ public class OfferManager {
 	public enum OfferExitStatus{SUCCESS, IGNORED, UNKNOWN, OVERWRITE_FAIL};
 	
 	private Object offerTableLock = new Object();
+	private Object preparedLock = new Object();
 	
 	public OfferManager(SerenityLoans plugin){
 		this.plugin = plugin;
@@ -158,32 +159,35 @@ public class OfferManager {
 			// build two PreparedOffers
 			
 			PreparedStatement stmt1 = plugin.conn.prepareStatement(query1);
-			
-			stmt1.setString(1, playerID.toString());
-			
-			ResultSet existingOffers = stmt1.executeQuery();
-			
-			Set<String> searchSet = new HashSet<String>();
-			
-			while(existingOffers.next()){
-				searchSet.add(existingOffers.getString("OfferName"));
-			}
-			
 			PreparedStatement stmt2 = plugin.conn.prepareStatement(query2);
 			
-			stmt2.setString(1, playerID.toString());
+			synchronized(preparedLock){
+				stmt1.setString(1, playerID.toString());
+				
+				ResultSet existingOffers = stmt1.executeQuery();
+				
+				Set<String> searchSet = new HashSet<String>();
+				
+				while(existingOffers.next()){
+					searchSet.add(existingOffers.getString("OfferName"));
+				}
+				
+				
+				stmt2.setString(1, playerID.toString());
+				
+				
+				if(searchSet.size() == 0 || !searchSet.contains("default")){
+				
+				stmt2.setString(2, "default");
+				stmt2.executeUpdate();
+				}
+				
+				if(searchSet.size() == 0 || !searchSet.contains("prepared")){
+				stmt2.setString(2, "prepared");
+				
+				stmt2.executeUpdate();
+				}
 			
-			
-			if(searchSet.size() == 0 || !searchSet.contains("default")){
-			
-			stmt2.setString(2, "default");
-			stmt2.executeUpdate();
-			}
-			
-			if(searchSet.size() == 0 || !searchSet.contains("prepared")){
-			stmt2.setString(2, "prepared");
-			
-			stmt2.executeUpdate();
 			}
 			
 			stmt1.close();
@@ -220,16 +224,25 @@ public class OfferManager {
 			offerTermsCopier.setString(2, lenderID.toString());
 			offerTermsCopier.setString(3, preparedOfferName);
 			
-			int output = offerTermsCopier.executeUpdate();
 			
-			if(output != 1)
-				return OfferExitStatus.UNKNOWN;
+			synchronized(preparedLock){
+				int output = offerTermsCopier.executeUpdate();
+				
+				if(output != 1)
+					return OfferExitStatus.UNKNOWN;
+				
+			}
+			
 			
 			PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
 			
 			offerIdFinder.setString(1, lenderID.toString());
 			
-			ResultSet newOfferId = offerIdFinder.executeQuery();
+			ResultSet newOfferId = null;
+			
+			synchronized(preparedLock){
+				newOfferId = offerIdFinder.executeQuery();
+			}
 			
 			if(!newOfferId.next()){
 				return OfferExitStatus.UNKNOWN;
@@ -241,10 +254,12 @@ public class OfferManager {
 			
 			renameOffer.setString(1, lenderID.toString());
 			
-			output = renameOffer.executeUpdate();
+			synchronized(preparedLock){
+				int output = renameOffer.executeUpdate();
 			
-			if(output != 1)
-				return OfferExitStatus.UNKNOWN;
+				if(output != 1)
+					return OfferExitStatus.UNKNOWN;
+			}
 			
 			PreparedStatement deleteOldOfferSQL = plugin.conn.prepareStatement(deleteOldOffer);
 			PreparedStatement checkDeletedSQL = plugin.conn.prepareStatement(checkDeleted);
@@ -254,11 +269,13 @@ public class OfferManager {
 			checkDeletedSQL.setString(1, lenderID.toString());
 			checkDeletedSQL.setString(2, borrowerID.toString());
 			
-			output = deleteOldOfferSQL.executeUpdate();
-			ResultSet shouldBeEmpty = checkDeletedSQL.executeQuery();
+			synchronized(offerTableLock){
+				int output = deleteOldOfferSQL.executeUpdate();
+				ResultSet shouldBeEmpty = checkDeletedSQL.executeQuery();
 			
-			if(output != 1 || output != 0 || shouldBeEmpty.next())
-				return OfferExitStatus.OVERWRITE_FAIL;
+				if(output != 1 || output != 0 || shouldBeEmpty.next())
+					return OfferExitStatus.OVERWRITE_FAIL;
+			}
 			
 			String sentOfferString = String.format("INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (?, ?, ?, %d);", offerId);
 			
@@ -268,10 +285,12 @@ public class OfferManager {
 			buildOffer.setString(2, borrowerID.toString());
 			buildOffer.setTimestamp(3, offerExpiry);
 			
-			output = buildOffer.executeUpdate();
+			synchronized(offerTableLock){
+				int output = buildOffer.executeUpdate();
 			
-			if(output != 1)
-				return OfferExitStatus.UNKNOWN;
+				if(output != 1)
+					return OfferExitStatus.UNKNOWN;
+			}
 			
 			offerTermsCopier.close();
 			offerIdFinder.close();
@@ -325,7 +344,10 @@ public class OfferManager {
 			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
 			Timestamp expDate = results.getTimestamp("ExpirationDate");
 			
-			results = stmt2.executeQuery();
+			
+			synchronized(offerTableLock){
+				results = stmt2.executeQuery();
+			}
 			
 			int termsID = results.getInt(1);
 			
@@ -350,7 +372,11 @@ public class OfferManager {
 			
 			stmt.setString(1, lenderID.toString());
 			
-			ResultSet results = stmt.executeQuery();
+			ResultSet results = null;
+			
+			synchronized(offerTableLock){
+				results = stmt.executeQuery();
+			}
 			
 			while(results.next())
 				list.add(plugin.playerManager.getFinancialEntity(UUID.fromString(results.getString("BorrowerID"))));
@@ -378,7 +404,11 @@ public class OfferManager {
 			
 			stmt.setString(1, borrowerID.toString());
 			
-			ResultSet results = stmt.executeQuery();
+			ResultSet results = null;
+			
+			synchronized(offerTableLock){
+				results = stmt.executeQuery();
+			}
 			
 			while(results.next())
 				list.add(plugin.playerManager.getFinancialEntity(UUID.fromString(results.getString("LenderID"))));
@@ -402,7 +432,11 @@ public class OfferManager {
 			stmt.setString(1, lenderId.toString());
 			stmt.setString(2, offerName);
 			
-			ResultSet results = stmt.executeQuery();
+			ResultSet results = null;
+			
+			synchronized(preparedLock){
+				results = stmt.executeQuery();
+			}
 			
 			if(!results.next()){
 				stmt.close();
@@ -444,7 +478,11 @@ public class OfferManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet results = stmt.executeQuery(query);
+			ResultSet results = null;
+			
+			synchronized(preparedLock){
+				results = stmt.executeQuery(query);
+			}
 			
 			if(!results.next()){
 				stmt.close();
@@ -485,7 +523,11 @@ public class OfferManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet res = stmt.executeQuery(query);
+			ResultSet res = null;
+			
+			synchronized(preparedLock){
+				res = stmt.executeQuery(query);
+			}
 			
 			if(!res.next())
 				return result;
@@ -513,11 +555,13 @@ public class OfferManager {
 			stmt.setString(1, lenderId.toString());
 			stmt.setString(2, borrowerId.toString());
 			
-			int result = stmt.executeUpdate();
+			synchronized(offerTableLock){
+				int result = stmt.executeUpdate();
 			
-			if(result != 1){
-				stmt.close();
-				return false;
+				if(result != 1){
+					stmt.close();
+					return false;
+				}
 			}
 			
 			stmt.close();
@@ -542,7 +586,9 @@ public class OfferManager {
 			ps.setString(1, lenderId.toString());
 			ps.setString(2, borrowerId.toString());
 			
-			exit = ps.executeUpdate();
+			synchronized(offerTableLock){
+				exit = ps.executeUpdate();
+			}
 			
 			ps.close();
 		} catch (SQLException e) {
@@ -903,7 +949,10 @@ public class OfferManager {
 			
 			stmt.setString(1, lenderId.toString());
 			
-			int result = stmt.executeUpdate();
+			int result;
+			synchronized(preparedLock){
+				result = stmt.executeUpdate();
+			}
 			
 			stmt.close();
 			
