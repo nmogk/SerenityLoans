@@ -123,7 +123,12 @@ public final class PlayerLoginListener implements Listener {
 							if(recipient == null)
 								continue;
 
-							plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(theLoan.getLoanID()).toString(plugin));
+							try {
+								plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(theLoan.getLoanID()).toString(plugin));
+							} catch (InterruptedException | ExecutionException | TimeoutException e) {
+								// TODO add message to configuration
+								plugin.scheduleMessage(recipient, prfx + " Problem during name lookup. Try again later.");
+							}
 							plugin.scheduleMessage(recipient, String.format("%s Use %s statement to view this statement again.", prfx, firstRun? "/loan": "/crunion"));
 							
 						}

@@ -413,7 +413,13 @@ public class LoanHandler implements CommandExecutor{
 					
 					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 					for(int i = 0; i < allLoans.length ; i++){
-						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+						try {
+							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							// TODO add message to configuration
+							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							continue;
+						}
 					}
 					
 					return;
@@ -927,7 +933,12 @@ public class LoanHandler implements CommandExecutor{
 					ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
 				
 					plugin.scheduleMessage(sender, String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
-					plugin.scheduleMessage(sender, offer.toString(plugin));
+					try {
+						plugin.scheduleMessage(sender, offer.toString(plugin));
+					} catch (InterruptedException | ExecutionException | TimeoutException e) {
+						// TODO add message to configuration
+						plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+					}
 					
 					return;
 				} else {
@@ -1128,7 +1139,13 @@ public class LoanHandler implements CommandExecutor{
 					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
 					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 					for(int i = 0; i < allLoans.length ; i++){
-						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+						try {
+							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							// TODO add message to configuration
+							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							continue;
+						}
 					}
 					
 					return;
@@ -1155,7 +1172,12 @@ public class LoanHandler implements CommandExecutor{
 				
 				plugin.loanManager.applyPayment(loanSelection.result, payAmount);
 				
-				plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(	plugin, true)));
+				try {
+					plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(plugin, true)));
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+				}
 				
 			}
 		});
@@ -1376,7 +1398,13 @@ public class LoanHandler implements CommandExecutor{
 					plugin.scheduleMessage(sender, Conf.messageCenter("multiple-loans", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + alias, borrowerName}));
 					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 					for(int i = 0; i < allLoans.length ; i++){
-						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+						try {
+							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							// TODO add message to configuration
+							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							continue;
+						}
 					}
 					
 					return;
@@ -1736,8 +1764,7 @@ public class LoanHandler implements CommandExecutor{
 	 * 
 	 * This command does not use a name lookup, and so is on the main thread for now.
 	 */
-	private boolean viewSaleOffer(CommandSender sender, FinancialEntity entity, String alias,
-			String[] args) {
+	private boolean viewSaleOffer(final CommandSender sender, final FinancialEntity entity, String alias, String[] args) {
 	
 		// TODO Message center
 		
@@ -1751,13 +1778,25 @@ public class LoanHandler implements CommandExecutor{
 			return true;
 		}
 		
-		LoanSale ls = pendingSales.get(entity);
+		plugin.threads.execute(new Runnable(){
+			
+			public void run(){
+				LoanSale ls = pendingSales.get(entity);
+				
+				plugin.scheduleMessage(sender, String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
+				try {
+					plugin.scheduleMessage(sender, ls.theLoan.toString(plugin));
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+				}
+			}
+		});
 		
-		sender.sendMessage(String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
-		sender.sendMessage(ls.theLoan.toString(plugin));
 		
 		
-		return false;
+		
+		return true;
 	}
 
 	/*
@@ -1817,7 +1856,13 @@ public class LoanHandler implements CommandExecutor{
 					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
 					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
 					for(int i = 0; i < allLoans.length ; i++){
-						plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+						try {
+							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							// TODO add message to configuration
+							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							continue;
+						}
 					}
 					
 					return;
@@ -1833,7 +1878,12 @@ public class LoanHandler implements CommandExecutor{
 				plugin.scheduleMessage(recipient, String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)loanSelection.result.getBorrower()).getName() + " has"));
 				plugin.scheduleMessage(recipient, String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
 				plugin.scheduleMessage(recipient, String.format("%s Details are given below:", prfx));
-				plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
+				try {
+					plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+				}
 				plugin.scheduleMessage(recipient, String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", lenderName));
 			
 			}
