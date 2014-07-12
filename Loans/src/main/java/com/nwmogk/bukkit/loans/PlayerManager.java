@@ -382,7 +382,7 @@ public class PlayerManager {
 		Future<Map<UUID,String>> answer = plugin.threads.submit(fetcher);
 		
 		// Will give answer or throw exception
-		String result = answer.get(10L, TimeUnit.SECONDS).get(entityID);
+		String result = answer.get(Conf.getLookupTimeout(), TimeUnit.MILLISECONDS).get(entityID);
 		
 		return result;
 	}
