@@ -51,7 +51,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 
 public class Conf {
 	
-	private static SerenityLoans plugin = SerenityLoans.getPlugin();
+	private static final FileConfiguration config = SerenityLoans.getPlugin().getConfig();
 	
 	public static final String[] allMacros = {"$$c", "$$k", "$$p", "$$m", "$$r", "$$l", "$$b", "$$s", "$$h", "$$t"};
 	
@@ -183,13 +183,12 @@ public class Conf {
 		
 	}
 	
-	public static String getIntReportingString(){
+	public synchronized static String getIntReportingString(){
 		String reportingTime = "1w";
 		String path = "loan.terms-constraints.interest.reporting-time";
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isString(path))
-			reportingTime = plugin.getConfig().getString(path).replaceAll(" ", "");
+			reportingTime = config.getString(path).replaceAll(" ", "");
 		
 		if(reportingTime.equalsIgnoreCase("1d")){
 			reportingTime = "daily";
@@ -204,21 +203,19 @@ public class Conf {
 		return reportingTime;
 	}
 	
-	public static long getIntReportingTime(){
+	public synchronized static long getIntReportingTime(){
 		String reportingTime = "1w";
 		String path = "loan.terms-constraints.interest.reporting-time";
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isString(path))
-			reportingTime = plugin.getConfig().getString(path).replaceAll(" ", "");
+			reportingTime = config.getString(path).replaceAll(" ", "");
 		
 		return parseTime(reportingTime);
 	}
 	
-	public static long getLookupTimeout(){
+	public synchronized static long getLookupTimeout(){
 		String timeout = "10s";
 		String path = "options.name-fetch-timeout";
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isString(path))
 			timeout = config.getString(path).replaceAll(" ", "");
@@ -226,36 +223,33 @@ public class Conf {
 		return parseTime(timeout);
 	}
 	
-	public static String getMessageString(){
+	public synchronized static String getMessageString(){
 		String message = "$loans$>";
 		String path = "options.message-prefix";
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isString(path))
-			message = plugin.getConfig().getString(path);
+			message = config.getString(path);
 		
 		return message;
 	}
 	
-	public static double parseMinPayment(double loanValue, double minPayment){
+	public synchronized static double parseMinPayment(double loanValue, double minPayment){
 		boolean percentRule = false;
 		String path = "loan.terms-constraints.min-payment.percent-rule";
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isBoolean(path))
-			percentRule = plugin.getConfig().getBoolean(path);
+			percentRule = config.getBoolean(path);
 		
 		return percentRule? loanValue * minPayment : minPayment;
 	}
 	
-	public static String messageCenter(String messageName, String[] relevantMacros, String[] macroValues){
+	public synchronized static String messageCenter(String messageName, String[] relevantMacros, String[] macroValues){
 		String path = "options.messages." + messageName;
 		String message = getMessageString() + " ";
 		
-		FileConfiguration config = plugin.getConfig();
 		
 		if(config.contains(path) && config.isString(path))
-			message += plugin.getConfig().getString(path);
+			message += config.getString(path);
 		
 		
 		return parseMacros(message, relevantMacros, macroValues);
