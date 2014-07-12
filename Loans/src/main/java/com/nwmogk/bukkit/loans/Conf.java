@@ -215,6 +215,17 @@ public class Conf {
 		return parseTime(reportingTime);
 	}
 	
+	public static long getLookupTimeout(){
+		String timeout = "10s";
+		String path = "options.name-fetch-timeout";
+		FileConfiguration config = plugin.getConfig();
+		
+		if(config.contains(path) && config.isString(path))
+			timeout = config.getString(path).replaceAll(" ", "");
+		
+		return parseTime(timeout);
+	}
+	
 	public static String getMessageString(){
 		String message = "$loans$>";
 		String path = "options.message-prefix";

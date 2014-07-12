@@ -343,10 +343,9 @@ public class PlayerManager {
 		Callable<Map<String,UUID>> fetcher = new UUIDFetcher(Arrays.asList(entityName));
 		Future<Map<String,UUID>> answer = plugin.threads.submit(fetcher);
 		
-		//TODO configure timeout settings
 		// Will either get the answer or throw an exception.
 		// No need to return a special value.
-		result = answer.get(10L, TimeUnit.SECONDS).get(entityName);
+		result = answer.get(Conf.getLookupTimeout(), TimeUnit.MILLISECONDS).get(entityName);
 		
 		return result;
 	}
