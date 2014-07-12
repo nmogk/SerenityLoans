@@ -50,6 +50,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.ParsePosition;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -68,6 +69,7 @@ public class OfferManager {
 	// TODO make thread-safe, + comments
 	public enum OfferExitStatus{SUCCESS, IGNORED, UNKNOWN, OVERWRITE_FAIL};
 	
+	private Object offerTableLock = new Object();
 	
 	public OfferManager(SerenityLoans plugin){
 		this.plugin = plugin;
@@ -913,4 +915,44 @@ public class OfferManager {
 		
 		return false;
 	}
+	
+	public void updateAll(){
+		
+		String query = "SELECT LenderID, BorrowerID FROM Offers WHERE ExpirationDate < NOW();";
+		HashMap<UUID, UUID> expiredOffers = new HashMap<UUID, UUID>();
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = null;
+			
+			synchronized(offerTableLock){
+				rs = stmt.executeQuery(query);
+			}
+			
+			while(rs.next()){
+				UUID lenderId = UUID.fromString(rs.getString("LenderID"));
+				UUID borrowerId = UUID.fromString(rs.getString("BorrowerID"));
+				expiredOffers.put(lenderId, borrowerId);
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		for(UUID lenderId : expiredOffers.keySet()){
+			
+			removeOffer(lenderId, expiredOffers.get(lenderId));
+			
+			try {
+				Thread.sleep((int)Math.floor(Math.random() * 200));
+			} catch (InterruptedException e) {
+				return;
+			}
+			
+		}
+		
+	}
+	
 }

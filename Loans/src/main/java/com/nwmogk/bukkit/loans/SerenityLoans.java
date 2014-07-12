@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: SerenityLoans.java
  * Contributing Authors: Nathan W Mogk
@@ -46,7 +47,6 @@
 package com.nwmogk.bukkit.loans;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.*;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -175,13 +175,10 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		/*
 		 * TODO next:
-		 * Perform updates to offers/loans
-		 * 
 		 * Setup listeners/handlers
 		 * Setup recurring events
 		 * 
 		 * Work out economy stuff
-		 * Manage changes to configuration
 		 */
 		
 		econ = new EconomyManager(this);
@@ -201,10 +198,13 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		getCommand("loan").setExecutor(new LoanHandler(this));
 
-        
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new BukkitRunnable(){public void run(){loanManager.updateAll();offerManager.updateAll();}}, 0, Conf.getUpdateTime());
 	}
 	
 	public void onDisable(){
+		
+		threads.shutdown();
+		this.getServer().getScheduler().cancelTasks(this);
 		
 		try {
 			if(conn != null)
@@ -617,11 +617,7 @@ public final class SerenityLoans extends JavaPlugin {
 		 return plugin;
 	 }
 	    
-	    
-	 public FileConfiguration getConfig(){
-	 	return super.getConfig();
-	 }
-	 
+	    	 
 	 public Connection getConnection(){
 		 return conn;
 	 }

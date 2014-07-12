@@ -1026,4 +1026,41 @@ public class LoanManager {
 		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", plugin.playerManager.entityNameLookup(theLoan.getLender())));
 	}
 
+	public synchronized void updateAll() {
+		
+		String query = "SELECT DISTINCT LoanID FROM Loans WHERE Open='true' ORDER BY LastUpdate ASC;";
+		LinkedList<Integer> allLoans = new LinkedList<Integer>();
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = null;
+			
+			synchronized(loanTableLock){
+				rs = stmt.executeQuery(query);
+			}
+			
+			while(rs.next()){
+				allLoans.add(rs.getInt(1));
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		for(Integer loanID : allLoans){
+			
+			update(loanID);
+			
+			try {
+				Thread.sleep((int)Math.floor(Math.random() * 200));
+			} catch (InterruptedException e) {
+				return;
+			}
+			
+		}
+		
+	}
+
 }

@@ -224,6 +224,16 @@ public class Conf {
 		return parseTime(timeout);
 	}
 	
+	public synchronized static long getUpdateTime(){
+		String timeout = "1h";
+		String path = "options.update-frequency";
+		
+		if(config.contains(path) && config.isString(path))
+			timeout = config.getString(path).replaceAll(" ", "");
+		
+		return parseTime(timeout);
+	}
+	
 	public synchronized static String getMessageString(){
 		String message = "$loans$>";
 		String path = "options.message-prefix";
