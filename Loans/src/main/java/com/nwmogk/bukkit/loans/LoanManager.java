@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: LoanManager.java
  * Contributing Authors: Nathan W Mogk
@@ -318,7 +319,6 @@ public class LoanManager {
 
 	public boolean createLoan(UUID lenderID, UUID borrowerID, int termsID, double value){
 		String insertLoan = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES (%s, %s, %d, %f, ?, ?);", lenderID.toString(), borrowerID.toString(), termsID, value );
-		String offerDestruct = String.format("DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;");
 		String whatsNew = String.format("SELECT LoanID FROM Loans WHERE Terms=%d;", termsID);
 		
 		boolean exitFlag = false;
@@ -330,26 +330,25 @@ public class LoanManager {
 			stmt.setTimestamp(1, new Timestamp(new Date().getTime()));
 			stmt.setTimestamp(2, new Timestamp(new Date().getTime()));
 			
-			if(stmt.executeUpdate() != 1)
-				return false;
+			synchronized(loanTableLock){
+				if(stmt.executeUpdate() != 1)
+					return false;
+			}
 			
-			PreparedStatement stmt2 = plugin.conn.prepareStatement(offerDestruct);
+			plugin.offerManager.removeOffer(lenderID, borrowerID);
 			
-			stmt2.setString(1, lenderID.toString());
-			stmt2.setString(2, borrowerID.toString());
-			
-			stmt2.executeUpdate();
 			
 			Statement search = plugin.conn.createStatement();
 			
-			ResultSet loanResult = search.executeQuery(whatsNew);
+			synchronized(loanTableLock){
+				ResultSet loanResult = search.executeQuery(whatsNew);
 			
-			loanResult.next();
+				loanResult.next();
 			
-			loanID = loanResult.getInt(1);
+				loanID = loanResult.getInt(1);
+			}
 			
 			stmt.close();
-			stmt2.close();
 			search.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
@@ -368,7 +367,11 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet rs  = stmt.executeQuery(querySQL);
+			ResultSet rs = null;
+			
+			synchronized(loanTableLock){
+				rs  = stmt.executeQuery(querySQL);
+			}
 			
 			if(!rs.next()){
 				stmt.close();
@@ -385,29 +388,7 @@ public class LoanManager {
 			FinancialEntity borrower = plugin.playerManager.getFinancialEntity(UUID.fromString(rs.getString("BorrowerID")));
 			
 			
-			String offerQuery = String.format("SELECT * FROM PreparedOffers WHERE OfferID=%d;", termsID);
-			
-			ResultSet results = stmt.executeQuery(offerQuery);
-			
-			if(!results.next()){
-				stmt.close();
-				return null;
-			}
-			
-			double value = results.getDouble("Value");
-			double interestRate = results.getDouble("InterestRate");
-			double lateFee = results.getDouble("LateFee");
-			double minPayment = results.getDouble("MinPayment");
-			double serviceFee = results.getDouble("ServiceFee");
-			long term = results.getLong("Term");
-			long compoundingPeriod = results.getLong("CompoundingPeriod");
-			long gracePeriod = results.getLong("GracePeriod");
-			long paymentTime = results.getLong("PaymentTime");
-			long paymentFrequency = results.getLong("PaymentFrequency");
-			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
-			LoanType loanT = LoanType.getFromString(results.getString("LoanType"));
-			
-			ImmutableOffer offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, loanT, null, termsID);
+			ImmutableOffer offer = plugin.offerManager.getPreparedOffer(termsID, lender, borrower);
 	
 			Loan theLoan = new Loan(loanID, balance, interestBal, feeBal, offer, start, last, termsID);
 			
@@ -438,11 +419,15 @@ public class LoanManager {
 			stmt.setString(1, lender.getUserID().toString());
 			stmt.setString(2, borrower.getUserID().toString());
 			
-			ResultSet rs = stmt.executeQuery(querySQL);
+			ResultSet rs = null;
+			
+			synchronized(loanTableLock){
+				rs = stmt.executeQuery(querySQL);
+			}
 			
 			while(rs.next()){
 				Loan oneLoan = getLoan(rs.getInt("LoanID"));
-				
+					
 				if(oneLoan != null)
 					loansFound.add(oneLoan);
 			}
@@ -467,7 +452,11 @@ public class LoanManager {
 		try {
 			paymentStatements = plugin.conn.createStatement();
 			
-			ResultSet loansWithStatements = paymentStatements.executeQuery(psQuery);
+			ResultSet loansWithStatements = null;
+			
+			synchronized(paymentStatementTableLock){
+				loansWithStatements = paymentStatements.executeQuery(psQuery);
+			}
 			
 			while(loansWithStatements.next()){
 				int loanId = loansWithStatements.getInt(1);
@@ -497,7 +486,11 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet rs = stmt.executeQuery(selectSQL);
+			ResultSet rs = null;
+			
+			synchronized(paymentStatementTableLock){
+				rs = stmt.executeQuery(selectSQL);
+			}
 			
 			if(!rs.next())
 				return null;
@@ -529,7 +522,9 @@ public class LoanManager {
 			
 			ps.setString(1, newLenderId.toString());
 			
-			result = ps.executeUpdate();
+			synchronized(loanTableLock){
+				result = ps.executeUpdate();
+			}
 			
 			ps.close();
 		} catch (SQLException e) {
@@ -555,7 +550,11 @@ public class LoanManager {
 		try{
 			Statement stmt = plugin.conn.createStatement();
 		
-			ResultSet events = stmt.executeQuery(toDoQuery);
+			ResultSet events = null;
+			
+			synchronized(loanEventTableLock){
+				events = stmt.executeQuery(toDoQuery);
+			}
 			
 			while(events.next()){
 				
@@ -608,7 +607,10 @@ public class LoanManager {
 		
 		// Update Last Updated Time
 			String updateTime = String.format("UPDATE Loans SET LastUpdate=NOW() WHERE LoanID=%d;", loanID);
-			stmt.executeUpdate(updateTime);
+			
+			synchronized(loanTableLock){
+				stmt.executeUpdate(updateTime);
+			}
 			
 			stmt.close();
 		
@@ -633,44 +635,49 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet eventsList = stmt.executeQuery(eventQuery);
+			ResultSet eventsList = null;
+			synchronized(loanTableLock){
+				eventsList = stmt.executeQuery(eventQuery);
+			}
 			
 			if(eventsList.next())
-				lastTime = eventsList.getTimestamp("EventTime");
+				lastTime = eventsList.getTimestamp("EventTime");	
 			
-		
-		
-		double prorateFactor = ((double)((new Date().getTime()) - lastTime.getTime()))/((double) Conf.getIntReportingTime());
-		
-		
-		double interest;
-		
-		// Determine continuous or periodic
-		
-		
-		if(theLoan.getCompoundingPeriod() == 0){
-			double balance = theLoan.getBalance() * Math.exp(theLoan.getInterestRate() * prorateFactor);
-			interest = balance - theLoan.getBalance();
+			double prorateFactor = ((double)((new Date().getTime()) - lastTime.getTime()))/((double) Conf.getIntReportingTime());
 			
-			String balanceUpdate = String.format("UPDATE Loan SET Balance=%f WHERE LoanID=%d;", balance, theLoan.getLoanID());
 			
-			// Update balance directly
-			stmt.executeUpdate(balanceUpdate);
-		} else {
-			interest = theLoan.getBalance() * theLoan.getInterestRate() * prorateFactor;
-			double newInterestBalance = interest + theLoan.getInterestBalance();
+			double interest;
 			
-			String interestUpdate = String.format("UPDATE Loan SET InterestBalance=%f WHERE LoanID=%d;", newInterestBalance, theLoan.getLoanID());
+			// Determine continuous or periodic
 			
-			// Add to interest balance
-			stmt.executeUpdate(interestUpdate);
-		}
-		
-		// Add loanEvent
-		
-		addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.INTERESTACCRUAL, interest, theLoan.getLoanID()), true);
-		
-		stmt.close();
+			
+			if(theLoan.getCompoundingPeriod() == 0){
+				double balance = theLoan.getBalance() * Math.exp(theLoan.getInterestRate() * prorateFactor);
+				interest = balance - theLoan.getBalance();
+				
+				String balanceUpdate = String.format("UPDATE Loan SET Balance=%f WHERE LoanID=%d;", balance, theLoan.getLoanID());
+				
+				// Update balance directly
+				synchronized(loanTableLock){
+					stmt.executeUpdate(balanceUpdate);
+				}
+			} else {
+				interest = theLoan.getBalance() * theLoan.getInterestRate() * prorateFactor;
+				double newInterestBalance = interest + theLoan.getInterestBalance();
+				
+				String interestUpdate = String.format("UPDATE Loan SET InterestBalance=%f WHERE LoanID=%d;", newInterestBalance, theLoan.getLoanID());
+				
+				// Add to interest balance
+				synchronized(loanTableLock){
+					stmt.executeUpdate(interestUpdate);
+				}
+			}
+			
+			// Add loanEvent
+			
+			addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.INTERESTACCRUAL, interest, theLoan.getLoanID()), true);
+			
+			stmt.close();
 		
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
@@ -689,7 +696,9 @@ public class LoanManager {
 			
 			stmt.setTimestamp(1, loanEvent.time);
 			
-			stmt.executeUpdate();
+			synchronized(loanEventTableLock){
+				stmt.executeUpdate();
+			}
 			
 			stmt.close();
 		} catch (SQLException e) {
@@ -720,7 +729,10 @@ public class LoanManager {
 			
 				String updateFees = String.format("UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;", newFeeBalance, theLoan.getLoanID());
 				
-				stmt.executeUpdate(updateFees);
+				
+				synchronized(loanTableLock){
+					stmt.executeUpdate(updateFees);
+				}
 			} else {
 				
 				PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
@@ -731,17 +743,23 @@ public class LoanManager {
 					
 					String updateFees = String.format("UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;", newFeeBalance, theLoan.getLoanID());
 					
-					stmt.executeUpdate(updateFees);
+					synchronized(loanTableLock){
+						stmt.executeUpdate(updateFees);
+					}
 					
 				} else {
+					
 					updateLE = String.format("UPDATE LoanEvents SET Amount=0.0, Executed='true' WHERE LoanEventID=%d;", le.loanEventID);
+					
 				}
 				
 			}
 			
 	
-			stmt.executeUpdate(updateLE);
-		
+			synchronized(loanEventTableLock){
+				stmt.executeUpdate(updateLE);
+			}
+			
 			stmt.close();
 			
 		} catch (SQLException e) {
@@ -758,7 +776,11 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet rs = stmt.executeQuery(allowedSQL);
+			ResultSet rs = null;
+			
+			synchronized(loanTableLock){
+				rs = stmt.executeQuery(allowedSQL);
+			}
 			
 			if(rs.next())
 				doAutoPay = Boolean.parseBoolean(rs.getString("AutoPay"));
@@ -773,13 +795,21 @@ public class LoanManager {
 		Loan theLoan = getLoan(le.loan);
 		PaymentStatement ps = getPaymentStatement(le.loan);
 		
-		if(! plugin.econ.has(theLoan.getBorrower(), ps.getMinimumPayment()).callSuccess)
+		double paymentAmount = 0.0;
+		
+		double balance = plugin.econ.getBalance(theLoan.getBorrower()).balance;
+		
+		if(balance >= ps.getPaymentRemaining())
+			paymentAmount = ps.getPaymentRemaining();
+		else if(balance >= ps.getMinimumPayment())
+			paymentAmount = ps.getMinimumPayment();
+		else
 			return;
 		
-		plugin.econ.withdraw(theLoan.getBorrower(), ps.getMinimumPayment());
-		plugin.econ.deposit(theLoan.getLender(), ps.getMinimumPayment());
+		plugin.econ.withdraw(theLoan.getBorrower(), paymentAmount);
+		plugin.econ.deposit(theLoan.getLender(), paymentAmount);
 		
-		applyPayment(theLoan, ps.getMinimumPayment());
+		applyPayment(theLoan, paymentAmount);
 		
 	}
 
@@ -891,7 +921,9 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			stmt.executeUpdate(closeSQL);
+			synchronized(loanTableLock){
+				stmt.executeUpdate(closeSQL);
+			}
 			
 			stmt.close();
 		} catch (SQLException e) {
@@ -918,8 +950,13 @@ public class LoanManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			stmt.executeUpdate(updateLoan);
-			stmt.executeUpdate(updateLE);
+			synchronized(loanTableLock){
+				stmt.executeUpdate(updateLoan);
+			}
+			
+			synchronized(loanEventTableLock){
+				stmt.executeUpdate(updateLE);
+			}
 			
 			stmt.close();
 			
@@ -958,13 +995,17 @@ public class LoanManager {
 			prep.setTimestamp(1, le.time);
 			prep.setTimestamp(2, due);
 			
-			prep.executeUpdate();
+			synchronized(paymentStatementTableLock){
+				prep.executeUpdate();
+			}
 			
 			String updateLE = String.format("UPDATE LoanEvents SET Amount=%f, Executed='true' WHERE LoanEventID=%d;", statementAmount, le.loanEventID);
 	
 			Statement stmt = plugin.conn.createStatement();
 			
-			stmt.executeUpdate(updateLE);
+			synchronized(loanEventTableLock){
+				stmt.executeUpdate(updateLE);
+			}
 			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));

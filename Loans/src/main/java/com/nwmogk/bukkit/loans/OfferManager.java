@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: OfferManager.java
  * Contributing Authors: Nathan W Mogk
@@ -408,6 +409,46 @@ public class OfferManager {
 			
 			FinancialEntity lender = plugin.playerManager.getFinancialEntity(lenderId);
 			FinancialEntity borrower = null;
+			double value = results.getDouble("Value");
+			double interestRate = results.getDouble("InterestRate");
+			double lateFee = results.getDouble("LateFee");
+			double minPayment = results.getDouble("MinPayment");
+			double serviceFee = results.getDouble("ServiceFee");
+			long term = results.getLong("Term");
+			long compoundingPeriod = results.getLong("CompoundingPeriod");
+			long gracePeriod = results.getLong("GracePeriod");
+			long paymentTime = results.getLong("PaymentTime");
+			long paymentFrequency = results.getLong("PaymentFrequency");
+			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
+			Timestamp expDate = null;
+			int termsID = results.getInt("OfferID");
+			
+			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
+
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return offer;
+	}
+	
+	public ImmutableOffer getPreparedOffer(int offerId, FinancialEntity lender, FinancialEntity borrower){
+		String query = String.format("SELECT * FROM PreparedOffers WHERE OfferID=%d;", offerId);
+		ImmutableOffer offer = null;
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet results = stmt.executeQuery(query);
+			
+			if(!results.next()){
+				stmt.close();
+				return null;
+			}
+			
 			double value = results.getDouble("Value");
 			double interestRate = results.getDouble("InterestRate");
 			double lateFee = results.getDouble("LateFee");
