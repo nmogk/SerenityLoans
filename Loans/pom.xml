@@ -14,25 +14,33 @@
 			<comments>Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.</comments>
 		</license>
 	</licenses>
-	<developer>
-		<id>nmogk</id>
-		<name>Nathan W. Mogk</name>
-		<email>nm8911@gmail.com</email>
-		<url>http://nwmogk.com</url>
-		<timezone>-7</timezone>
-	</developer>
+	<developers>
+		<developer>
+			<id>nmogk</id>
+			<name>Nathan W. Mogk</name>
+			<email>nm8911@gmail.com</email>
+			<url>http://nwmogk.com</url>
+			<timezone>-7</timezone>
+			<roles>
+				<role>project lead</role>
+				<role>developer</role>
+			</roles>
+		</developer>
+	</developers>
   <build>
     <sourceDirectory>src/main/java</sourceDirectory>
-    <plugins>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.1</version>
-        <configuration>
-          <source>1.7</source>
-          <target>1.7</target>
-        </configuration>
-      </plugin>
-    </plugins>
+    <pluginManagement><plugins>
+    	<plugin>
+    	    <groupId>org.apache.maven.plugins</groupId>
+    	    <artifactId>maven-compiler-plugin</artifactId>
+    	    <version>3.1</version>
+    	    <configuration>
+    	      <source>1.7</source>
+    	      <target>1.7</target>
+    	    </configuration>
+    	  </plugin>
+    	</plugins>
+    </pluginManagement>
   </build>
   <repositories>
        	<repository>
