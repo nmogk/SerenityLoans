@@ -55,6 +55,7 @@ package com.nwmogk.bukkit.loans;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
@@ -70,6 +71,7 @@ import org.bukkit.entity.Player;
 
 import com.nwmogk.bukkit.evilmidget38.UUIDFetcher;
 import com.nwmogk.bukkit.evilmidget38.NameFetcher;
+import com.nwmogk.bukkit.loans.api.EconResult;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
@@ -315,6 +317,45 @@ public class PlayerManager {
 		plugin.offerManager.buildFinancialEntityInitialOffers(instituteId);
 		
 		return success;
+	}
+	
+	/**
+	 * This method adds the given amount to the specified
+	 * entity. It returns the success of the method. If the
+	 * amount given is negative, then the method will return
+	 * false. This method locks the FinancialEntities table
+	 * for the entire execution to ensure memory consistency.
+	 * 
+	 * @param entityId
+	 * @param amount
+	 * @return
+	 */
+	public EconResult depositCash(UUID entityId, double amount){
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		synchronized(financialEntitiesLock){
+			
+			FinancialEntity entity = getFinancialEntityAdd(entityId);
+			
+			if(entity == null)
+				return new EconResult(0, 0, false, "Entity is not recognized.");
+			
+			String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%s;", entity.getCash() + amount, entityId.toString());
+			
+			try {
+				Statement stmt = plugin.conn.createStatement();
+				
+				if(stmt.executeUpdate(updateSQL) == 1)
+					return new EconResult(amount, entity.getCash() + amount, true, null);
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(e.getMessage());
+				e.printStackTrace();
+			}
+		}
+		
+		return new EconResult(0, 0, false, "Problem updating database.");
 	}
 
 	/**
@@ -824,6 +865,48 @@ public class PlayerManager {
 		
 		return setToIgnore;
 		
+	}
+	
+	/**
+	 * This method subtracts the given amount to the specified
+	 * entity. It returns the success of the method. If the
+	 * amount given is negative, then the method will return
+	 * false. This method locks the FinancialEntities table
+	 * for the entire execution to ensure memory consistency.
+	 * 
+	 * @param entityId
+	 * @param amount
+	 * @return
+	 */
+	public EconResult withdrawCash(UUID entityId, double amount){
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		synchronized(financialEntitiesLock){
+			
+			FinancialEntity entity = getFinancialEntityAdd(entityId);
+			
+			if(entity == null)
+				return new EconResult(0, 0, false, "Entity is not recognized.");
+			
+			if(amount > entity.getCash())
+				return new EconResult(0, entity.getCash(), false, "Entity does not have sufficient funds.");
+						
+			String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%s;", entity.getCash() - amount, entityId.toString());
+			
+			try {
+				Statement stmt = plugin.conn.createStatement();
+				
+				if(stmt.executeUpdate(updateSQL) == 1)
+					return new EconResult(amount, entity.getCash() - amount, true, null);
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(e.getMessage());
+				e.printStackTrace();
+			}
+		}
+		
+		return new EconResult(0, 0, false, "Problem updating database.");
 	}
 
 	/*
