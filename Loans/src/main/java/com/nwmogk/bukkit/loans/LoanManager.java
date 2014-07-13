@@ -323,7 +323,7 @@ public class LoanManager {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createLoan(UUID, UUID, int, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		String insertLoan = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES (%s, %s, %d, %f, ?, ?);", lenderID.toString(), borrowerID.toString(), termsID, value );
+		String insertLoan = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES ('%s', '%s', %d, %f, ?, ?);", lenderID.toString(), borrowerID.toString(), termsID, value );
 		String whatsNew = String.format("SELECT LoanID FROM Loans WHERE Terms=%d;", termsID);
 		
 		if(SerenityLoans.debugLevel >= 3)
