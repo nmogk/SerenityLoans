@@ -361,7 +361,7 @@ public class OfferManager {
 			long paymentFrequency = results.getLong("PaymentFrequency");
 			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
 			Timestamp expDate = results.getTimestamp("ExpirationDate");
-			
+			LoanType lt = LoanType.getFromString(results.getString("LoanType"));
 			
 			synchronized(offerTableLock){
 				results = stmt2.executeQuery();
@@ -372,7 +372,7 @@ public class OfferManager {
 			
 			int termsID = results.getInt(1);
 			
-			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
+			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, lt, expDate, termsID);
 
 			
 			stmt.close();

@@ -478,7 +478,7 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 String offerView = 
 				"CREATE VIEW offer_view AS "
-				 	+ "SELECT Offers.LenderID, Offers.BorrowerID,  Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
+				 	+ "SELECT Offers.LenderID, Offers.BorrowerID,  Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee, PreparedOffers.LoanType " 
 				 	+ "FROM Offers JOIN (PreparedOffers) "
 				 	+ "ON Offers.PreparedTerms = PreparedOffers.OfferID;";
 		 
