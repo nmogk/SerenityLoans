@@ -95,6 +95,7 @@ public class LoanHandler implements CommandExecutor{
 	public LoanHandler(SerenityLoans plugin){
 		this.plugin = plugin;
 		prfx = Conf.getMessageString();
+		pendingSales = new ConcurrentHashMap<FinancialEntity, LoanSale>();
 	}
 	
 	@Override
