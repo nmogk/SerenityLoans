@@ -274,7 +274,7 @@ public class OfferManager {
 				int output = deleteOldOfferSQL.executeUpdate();
 				ResultSet shouldBeEmpty = checkDeletedSQL.executeQuery();
 			
-				if(output != 1 || output != 0 || shouldBeEmpty.next())
+				if(!(output == 1 || output == 0) || shouldBeEmpty.next())
 					return OfferExitStatus.OVERWRITE_FAIL;
 			}
 			
@@ -299,7 +299,7 @@ public class OfferManager {
 			deleteOldOfferSQL.close();
 			checkDeletedSQL.close();
 		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			SerenityLoans.logFail(e.getMessage());
 			e.printStackTrace();
 		}
 		
