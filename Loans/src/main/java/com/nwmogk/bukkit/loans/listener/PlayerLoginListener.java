@@ -93,6 +93,9 @@ public final class PlayerLoginListener implements Listener {
 				
 				Vector<UUID> toCheck = plugin.playerManager.getManagedEntities(playerID);
 				
+				if(toCheck == null)
+					toCheck = new Vector<UUID>();
+				
 				if(toCheck.size() != 0)
 					for(UUID i : toCheck)
 						toCheck.add(i);
