@@ -521,14 +521,14 @@ public class LoanHandler implements CommandExecutor{
 					"         /loan defaultoffering [param-list]",
 					"",
 					"Permissions: serenityloans.loan.lend",
-					"param-list = space delimited list of the form <termName>=<value>. Term names",
+					"param-list = space delimited list of the form <termName>=<value>. Term names"+
 					"are not case sensitive. Note there must be no spaces next to the `='.",
 					"",
-					"If no arguments are given, then the command displays the current state of the",
-					"offer. If param-list is given, then the command sets the parameter to the",
+					"If no arguments are given, then the command displays the current state of the"+
+					"offer. If param-list is given, then the command sets the parameter to the"+
 					"given value and reports success or failure. It then displays the new values.",
 					"",
-					"/loan offering updates the current prepared offer, /loan defaultoffering updates the",
+					"/loan offering updates the current prepared offer, /loan defaultoffering updates the"+
 					"default prepared offer."
 			});
 		} else if (subCommand.equalsIgnoreCase("sendoffer") || subCommand.equalsIgnoreCase("quickoffer")) {
