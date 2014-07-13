@@ -1242,7 +1242,7 @@ public class LoanHandler implements CommandExecutor{
 					return;
 				}
 				
-				boolean success = plugin.offerManager.removeOffer(entity.getUserID(), lender.getUserID());
+				boolean success = plugin.offerManager.removeOffer(lender.getUserID(), entity.getUserID());
 				
 				if(success)
 					plugin.scheduleMessage(sender, prfx + " Offer removed successfully.");
