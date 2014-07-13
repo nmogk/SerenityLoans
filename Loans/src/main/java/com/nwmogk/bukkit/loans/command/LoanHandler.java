@@ -979,6 +979,11 @@ public class LoanHandler implements CommandExecutor{
 					
 					ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), fe.getUserID()) : plugin.offerManager.getOffer(fe.getUserID(), player.getUserID());
 				
+					if(offer == null){
+						plugin.scheduleMessage(sender, Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), alias, args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
+						return;
+					}
+					
 					Timestamp exp = offer.getExpirationDate();
 					
 					output += String.format("\n    %s - %s", name, DateFormat.getDateInstance().format(exp));
@@ -1659,8 +1664,8 @@ public class LoanHandler implements CommandExecutor{
 				String recipientName = recipient.getName().equals(entityTarget)? "You" : entityTarget;
 				String commandName = recipient.getName().equals(entityTarget)? "/loan " : "/crunion ";
 							
-				plugin.scheduleMessage(recipient, Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
-				plugin.scheduleMessage(recipient, Conf.messageCenter("view-offers", new String[]{"$$p", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName + args[0], sender.getName(), recipientName}));
+				plugin.scheduleMessage(recipient, Conf.messageCenter("offer-receipt", new String[]{"$$p", "$$k", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName, args[0], sender.getName(), recipientName}));
+				plugin.scheduleMessage(recipient, Conf.messageCenter("view-offers", new String[]{"$$p", "$$k", "$$c", "$$r", "$$m"}, new String[]{recipient.getName(), "/" + commandName, args[0], sender.getName(), recipientName}));
 							
 				if(plugin.offerManager.registerOfferSend(entity.getUserID(), borrower.getUserID()))	
 					plugin.scheduleMessage(sender, Conf.messageCenter("offer-send-success", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), "/" + commandName + args[0], entityTarget}));
