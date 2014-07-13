@@ -923,7 +923,7 @@ public class OfferManager {
 			updateColumn = "LoanType";
 
 			String s  = parsedArg[1];
-			if(s.equals("Amortizing") || s.equals("InterestOnly") || s.equals("FixedFee") || s.equals("Bullet") || s.equals("Credit") || s.equals("Gift") || s.equals("Bond") || s.equals("Deposit") || s.equals("Salary"))
+			if(s.equalsIgnoreCase("Amortizing") || s.equalsIgnoreCase("InterestOnly") || s.equalsIgnoreCase("FixedFee") || s.equalsIgnoreCase("Bullet") || s.equalsIgnoreCase("Credit") || s.equalsIgnoreCase("Gift") || s.equalsIgnoreCase("Bond") || s.equalsIgnoreCase("Deposit") || s.equalsIgnoreCase("Salary"))
 				objective = "'" + s + "'";
 			else
 				return false;
