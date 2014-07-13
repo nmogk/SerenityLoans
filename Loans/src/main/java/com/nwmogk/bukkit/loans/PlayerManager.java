@@ -254,8 +254,10 @@ public class PlayerManager {
 	 */
 	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
 		
+		
+		if(desiredName.equalsIgnoreCase("CentralBank"));
 		// Manager must be a player (yeah yeah)
-		if(manager.getPlayerType() != PlayerType.PLAYER)
+		else if(manager == null || manager.getPlayerType() != PlayerType.PLAYER)
 			return false;
 		
 		// Institution must not be a player
