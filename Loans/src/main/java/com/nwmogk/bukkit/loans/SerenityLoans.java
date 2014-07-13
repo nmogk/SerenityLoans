@@ -665,10 +665,11 @@ public final class SerenityLoans extends JavaPlugin {
 	 private class MessageSender extends BukkitRunnable {
 		 
 		 CommandSender sendTo;
-		 String message;
+		 String[] message;
 		 
 		 private MessageSender(CommandSender sendTo, String[] message){
 			 this.sendTo = sendTo;
+			 this.message = message;
 		 }
 		 
 		 public void run(){

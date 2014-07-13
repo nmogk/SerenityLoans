@@ -290,8 +290,8 @@ public class Conf {
 		}
 		
 		if(SerenityLoans.debugLevel >= 2){
-			SerenityLoans.log.info(String.format("Message before: %s", message));
-			SerenityLoans.log.info(String.format("Message after: %s", result));
+			SerenityLoans.logInfo(String.format("Message before: %s", message));
+			SerenityLoans.logInfo(String.format("Message after: %s", result));
 			
 		}
 		
