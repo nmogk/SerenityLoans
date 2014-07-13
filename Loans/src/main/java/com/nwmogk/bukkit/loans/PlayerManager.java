@@ -296,7 +296,7 @@ public class PlayerManager {
 			
 			ps2.setString(1, instituteId.toString());
 			ps2.setString(2, desiredName);
-			ps2.setString(3, manager.getUserID().toString());
+			ps2.setString(3, desiredName.equalsIgnoreCase("CentralBank")? instituteId.toString() : manager.getUserID().toString());
 			
 			// I should probably acquire both locks at the same time, but I don't think
 			// a problem is likely.
