@@ -450,7 +450,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "("
 				 	+ "LenderID varchar(36) NOT NULL,"
 				 	+ "BorrowerID varchar(36) NOT NULL,"
-				 	+ "ExpirationDate TIMESTAMP NOT NULL,"
+				 	+ "ExpirationDate TIMESTAMP DEFAULT 0,"
 				 	+ "PreparedTerms int NOT NULL,"
 				 	+ "Sent ENUM('true','false') NOT NULL DEFAULT 'false',"
 				 	+ "CONSTRAINT uc_offerID PRIMARY KEY (LenderID,BorrowerID),"

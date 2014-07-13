@@ -285,6 +285,8 @@ public class OfferManager {
 			}
 			
 			String sentOfferString = String.format("INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (?, ?, ?, %d);", offerId);
+			if(SerenityLoans.debugLevel >= 3)
+				SerenityLoans.logInfo(sentOfferString);
 			
 			PreparedStatement buildOffer = plugin.conn.prepareStatement(sentOfferString);
 			
