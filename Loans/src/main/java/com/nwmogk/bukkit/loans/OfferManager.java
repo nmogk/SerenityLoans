@@ -292,6 +292,9 @@ public class OfferManager {
 			buildOffer.setString(2, borrowerID.toString());
 			buildOffer.setTimestamp(3, offerExpiry);
 			
+			if(SerenityLoans.debugLevel >= 3)
+				SerenityLoans.logInfo(offerExpiry.toString());
+			
 			synchronized(offerTableLock){
 				int output = buildOffer.executeUpdate();
 			

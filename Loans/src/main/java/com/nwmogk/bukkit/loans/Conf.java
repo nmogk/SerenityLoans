@@ -140,6 +140,9 @@ public class Conf {
 			
 		}
 		
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Parsed time: %d.", result));
+		
 		return result;
 	}
 	
