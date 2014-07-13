@@ -139,7 +139,7 @@ options:
     # Available styles: queue, email (not implemented)
     audit-style: queue
   logging: 
-    debug-level: 2
+    debug-level: 4
 #    log-events: true
   
   # These settings control the display of a usage disclaimer

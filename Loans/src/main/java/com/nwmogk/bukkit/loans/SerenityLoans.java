@@ -99,6 +99,9 @@ public final class SerenityLoans extends JavaPlugin {
 		else
 			debugLevel = 2;
 		
+		if(debugLevel >= 4)
+			logInfo("Main thread ID: " + Thread.currentThread().getId() + ".");
+		
 		String squrl = "jdbc:mysql://";
 		
 		if(getConfig().contains("mysql.host") && getConfig().contains("mysql.port") && getConfig().contains("mysql.databasename")){
@@ -107,7 +110,7 @@ public final class SerenityLoans extends JavaPlugin {
 			squrl += "/" + getConfig().getString("mysql.databasename");
 		}
 		else {
-			log.severe(String.format("[%s] Database configuration info not found, disabling...", getDescription().getName()));
+			logFail("Database configuration info not found, disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
@@ -115,22 +118,22 @@ public final class SerenityLoans extends JavaPlugin {
 		if(getConfig().contains("mysql.username") || getConfig().contains("mysql.password")){
 			squrl += "?";
 			if(debugLevel >= 1)
-				log.info(String.format("[%s] Using username and password info.", getDescription().getName()));
+				logInfo("Using username and password info.");
 		}
 		
 		if(getConfig().contains("mysql.username")){
 			squrl += "user=" + getConfig().getString("mysql.username") + (getConfig().contains("mysql.password")?"&":"");
 			if(debugLevel >= 2)
-				log.info(String.format("[%s] Username given.", getDescription().getName()));
+				logInfo("Username given.");
 		}
 		if(getConfig().contains("mysql.password")){
 			squrl += "password=" + getConfig().getString("mysql.password");
 			if(debugLevel >= 2)
-				log.info(String.format("[%s] Password given.", getDescription().getName()));
+				logInfo("Password given.");
 		}
 		
 		if(debugLevel >= 2)
-			log.info( String.format("[%s] Database configuration loaded. Setting up...", getDescription().getName()));
+			logInfo("Database configuration loaded. Setting up...");
 		
 		try {
 			conn = DriverManager.getConnection(squrl);
@@ -139,9 +142,9 @@ public final class SerenityLoans extends JavaPlugin {
 				throw new SQLException("conn null.");
 		} catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			
-			log.severe(String.format("[%s] Unable to connect to database! Disabling...", getDescription().getName()));
+			logFail("Unable to connect to database! Disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
@@ -154,13 +157,13 @@ public final class SerenityLoans extends JavaPlugin {
 				setupTables();
 		} catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			
-			log.severe(String.format("[%s] Unable to build database! Disabling...", getDescription().getName()));
+			logFail("Unable to build database! Disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}	catch (DatabaseVersionMismatchException e) {
-			log.severe(String.format("[%s] " + e.getMessage() + " Disabling...", getDescription().getName()));
+			logFail(String.format("%s Disabling...", e.getMessage()));
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
@@ -168,7 +171,7 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		// Attempt to add online players to the loan system.
 		if(debugLevel >= 1)
-			log.info(String.format("[%s] Attempting to add players to the system...", getDescription().getName()));
+			logInfo("Attempting to add players to the system...");
 		
 		playerManager.addPlayers(getServer().getOnlinePlayers());
 		
@@ -183,10 +186,13 @@ public final class SerenityLoans extends JavaPlugin {
 		 * Work out economy stuff
 		 */
 		
+		if(debugLevel >=1)
+			logInfo("Setting up economy functions.");
+		
 		econ = new EconomyManager(this);
 		
 		if (!econ.isInitialized() ) {
-            log.severe(String.format("[%s] Disabled due to no Vault dependency found!", getDescription().getName()));
+            logFail("Disabled due to no Vault dependency found!");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -197,8 +203,13 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		// Populate tables with online users
 		
+		if(debugLevel >= 3)
+			logInfo("Setting command handlers.");
 		
 		getCommand("loan").setExecutor(new LoanHandler(this));
+		
+		if(debugLevel >= 2)
+			logInfo("Scheduling repeating upates.");
 
         getServer().getScheduler().runTaskTimerAsynchronously(this, new BukkitRunnable(){public void run(){loanManager.updateAll();offerManager.updateAll();}}, 0, Conf.getUpdateTime());
 	}
@@ -212,7 +223,7 @@ public final class SerenityLoans extends JavaPlugin {
 			if(conn != null)
 				conn.close();
 		} catch (SQLException e) {
-			log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+			logFail(e.getMessage());
 		}
 		
 	}
@@ -264,7 +275,7 @@ public final class SerenityLoans extends JavaPlugin {
 			
 		 } catch (SQLException e) {
 			 if(debugLevel >=2)
-					log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+					logFail(e.getMessage());
 				
 			 throw e;
 		 } finally {
@@ -284,20 +295,20 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 if(getConfig().contains("trust.credit-score.no-history-score")){
 			 defaultCreditScore = getConfig().getInt("trust.credit-score.no-history-score");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded default credit score.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded default credit score.");
 		 }
 		 
 		 if(getConfig().contains("trust.credit-score.dissipation-factor")){
 			 dissipationFactor = getConfig().getInt("trust.credit-score.dissipation-factor");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded dissipation factor.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded dissipation factor.");
 		 }
 		 
 		 if(getConfig().contains("economy.currency.fractional-digits")){
 			 decimals = getConfig().getInt("economy.currency.fractional-digits");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded currency digits.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded currency digits.");
 		 }
 		 
 		 String financialEntityTable = 
@@ -494,106 +505,106 @@ public final class SerenityLoans extends JavaPlugin {
 			statement = conn.createStatement();
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Statement created successfully.",getDescription().getName()));
+				logInfo("Statement created successfully.");
 			
 			statement.executeUpdate(financialEntityTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built FinancialEntities table successfully.",getDescription().getName()));
+				logInfo("Built FinancialEntities table successfully.");
 			
 			statement.executeUpdate(financialInstitutionsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built FinancialInstitutions table successfully.",getDescription().getName()));
+				logInfo("Built FinancialInstitutions table successfully.");
 			
 			statement.executeUpdate(trustTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Trust table successfully.",getDescription().getName()));
+				logInfo("Built Trust table successfully.");
 			
 			statement.executeUpdate(creditHistoryTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built CreditHistory table successfully.",getDescription().getName()));
+				logInfo("Built CreditHistory table successfully.");
 			
 			statement.executeUpdate(membershipTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Memberships table successfully.",getDescription().getName()));
+				logInfo("Built Memberships table successfully.");
 			
 			statement.executeUpdate(preparedOffersTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built PreparedOffers table successfully.",getDescription().getName()));
+				logInfo("Built PreparedOffers table successfully.");
 			
 			statement.executeUpdate(loanTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Loans table successfully.",getDescription().getName()));
+				logInfo("Built Loans table successfully.");
 			
 			statement.executeUpdate(loanEventsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built LoanEvents table successfully.",getDescription().getName()));
+				logInfo("Built LoanEvents table successfully.");
 			
 			statement.executeUpdate(paymentStatementsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built PaymentStatements table successfully.",getDescription().getName()));
+				logInfo("Built PaymentStatements table successfully.");
 			
 			statement.executeUpdate(offersTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Offers table successfully.",getDescription().getName()));
+				logInfo("Built Offers table successfully.");
 
 			statement.executeUpdate(signShopsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built SignShops table successfully.",getDescription().getName()));
+				logInfo("Built SignShops table successfully.");
 			
 			statement.execute(loanView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Loans view successfully.",getDescription().getName()));
+				logInfo("Built Loans view successfully.");
 
 			statement.executeUpdate(offerView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Offers view successfully.",getDescription().getName()));
+				logInfo("Built Offers view successfully.");
 			
 			statement.executeUpdate(debtorView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Debtors view successfully.",getDescription().getName()));
+				logInfo("Built Debtors view successfully.");
 		 
 			statement.executeUpdate(infoTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Info table successfully.",getDescription().getName()));
+				logInfo("Built Info table successfully.");
 		 
 			statement.executeUpdate(writeVersion);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Wrote version info successfully.",getDescription().getName()));
+				logInfo("Wrote version info successfully.");
 			
 			
 			
 		 } catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			success = false;
 		 } finally {
 			 if(statement != null){statement.close();};
 		 }
 		 
 		 if(!success){
-			 log.severe(String.format("[%s] Unable to build database tables! Disabling...", getDescription().getName()));
+			 logFail("Unable to build database tables! Disabling...");
 			 getServer().getPluginManager().disablePlugin(this);
 			 return;
 		 }
 		 
 		 if(success && debugLevel >= 1)
-			 log.info(String.format("[%s] Database tables built successfully.", getDescription().getName()));
+			 logInfo("Database tables built successfully.");
 		 
 		 
 		 double centralBankCash = 0;
@@ -608,9 +619,9 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 if(debugLevel >= 1){
 			 if (cbResult)
-				 log.info(String.format("[%s] Central bank entry added.", getDescription().getName()));
+				 logInfo("Central bank entry added.");
 			 else
-				 log.warning(String.format("[%s] Central bank entry failed.", getDescription().getName()));
+				 logWarn("Central bank entry failed.");
 					
 			}
 	 }
@@ -626,6 +637,18 @@ public final class SerenityLoans extends JavaPlugin {
 	 
 	 public EconomyManager getEcon(){
 		 return econ;
+	 }
+	 
+	 public static void logInfo(String message){
+		 log.info(String.format("[%s] %s", "SerenityLoans", message));
+	 }
+	 
+	 public static void logWarn(String message){
+		 log.warning(String.format("[%s] %s", "SerenityLoans", message));
+	 }
+	 
+	 public static void logFail(String message){
+		 log.severe(String.format("[%s] %s", "SerenityLoans", message));
 	 }
 	 
 	 public void scheduleMessage(CommandSender sender, String message){

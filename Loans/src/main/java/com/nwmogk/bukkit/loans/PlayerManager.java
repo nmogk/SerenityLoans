@@ -114,6 +114,9 @@ public class PlayerManager {
 	 * by the end of the method, false otherwise.
 	 */
 	public boolean addPlayer(UUID playerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "addPlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		// Check to see if the entity is already in the table
 		if(inFinancialEntitiesTable(playerID)){
 			
@@ -147,6 +150,10 @@ public class PlayerManager {
 	 * @return true if all players were added successfully, false otherwise.
 	 */
 	public boolean addPlayers(Player[] players){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "addPlayers(Player[])", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		
 		boolean result = true;
 		
 				
@@ -232,6 +239,9 @@ public class PlayerManager {
 	 * false otherwise.
 	 */
 	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, manager.getCreditScore());
 	}
 
@@ -253,6 +263,8 @@ public class PlayerManager {
 	 * false otherwise.
 	 */
 	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity, PlayerType, double, int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		
 		if(desiredName.equalsIgnoreCase("CentralBank"));
@@ -356,6 +368,8 @@ public class PlayerManager {
 	 * @return
 	 */
 	public EconResult depositCash(UUID entityId, double amount){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "depositCash(UUID, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		if(amount < 0)
 			return new EconResult(0, 0, false, "Amount query is negative!");
@@ -398,6 +412,8 @@ public class PlayerManager {
 	 * @throws TimeoutException When the timeout has been reached without a response.
 	 */
 	public UUID entityIdLookup(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityIdLookup(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		// First perform the FinancialIstitution search
 		UUID result = getFinancialInstituteID(entityName);
@@ -431,6 +447,8 @@ public class PlayerManager {
 	 * @throws TimeoutException When the timeout has been reached without a response.
 	 */
 	public String entityNameLookup(UUID entityID) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityNameLookup(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		// First search FinancialInstitutions
 		FinancialInstitution bank = getFinancialInstitution(entityID);
@@ -466,6 +484,9 @@ public class PlayerManager {
 	 * @throws TimeoutException
 	 */
 	public String entityNameLookup(FinancialEntity entity) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityNameLookup(FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		if(entity instanceof FinancialInstitution)
 			return ((FinancialInstitution) entity).getName();
 		return entityNameLookup(entity.getUserID());
@@ -480,6 +501,8 @@ public class PlayerManager {
 	 * @return The FinancialEntity object represented by the UUID, or null.
 	 */
 	public FinancialEntity getFinancialEntity(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntity(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return buildEntity(queryFinancialEntitiesTable(userID));
 	}
 	
@@ -497,6 +520,8 @@ public class PlayerManager {
 	 */
 	@Deprecated
 	public FinancialEntity getFinancialEntity(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntity(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return getFinancialEntity(entityIdLookup(name));
 	}
 
@@ -510,6 +535,8 @@ public class PlayerManager {
 	 * @return The FinancialEntity object represented by the UUID, or null.
 	 */
 	public FinancialEntity getFinancialEntityAdd(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntityAdd(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		FinancialEntity result = getFinancialEntity(userID);
 		
@@ -542,6 +569,8 @@ public class PlayerManager {
 	 */
 	@Deprecated
 	public FinancialEntity getFinancialEntityAdd(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntityAdd(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return getFinancialEntityAdd(entityIdLookup(name));
 	}
 
@@ -555,6 +584,8 @@ public class PlayerManager {
 	 * @return UUID of the FinancialInstitution with the given name or null.
 	 */
 	public UUID getFinancialInstituteID(String entityName) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstituteID(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		String query = "SELECT BankID from FinancialInstitutions WHERE Name=?;";
 		String idString = null;
@@ -607,6 +638,8 @@ public class PlayerManager {
 	 * @return FinancialInstitution object representing the entry or null.
 	 */
 	public FinancialInstitution getFinancialInstitution(UUID bankId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return (FinancialInstitution) buildEntity(queryFinancialEntitiesTable(bankId));
 	}
 	
@@ -619,6 +652,8 @@ public class PlayerManager {
 	 * @return FinancialInstitution object representing the entry or null.
 	 */
 	public FinancialInstitution getFinancialInstitution(String bankName){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return getFinancialInstitution(getFinancialInstituteID(bankName));
 	}
 
@@ -631,6 +666,9 @@ public class PlayerManager {
 	 * @return A vector of UUIDs of managed entities or null.
 	 */
 	public Vector<UUID> getManagedEntities(UUID playerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getManagedEntities(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		Vector<UUID> results = new Vector<UUID>();
 		
 		String query = "SELECT BankID FROM FinancialInstitutions WHERE Manager=?;";
@@ -675,6 +713,8 @@ public class PlayerManager {
 	 * @return OfflinePlayer object corresponding to the input ID or manager thereof, or null.
 	 */
 	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfflinePlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		FinancialEntity entity = getFinancialEntity(financialEntityID);
 		
 		if(entity == null)
@@ -722,6 +762,8 @@ public class PlayerManager {
 	 * @return Player corresponding to the input ID or manager thereof, or null.
 	 */
 	public Player getPlayer(UUID financialEntityID) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		FinancialEntity entity = getFinancialEntity(financialEntityID);
 		
@@ -744,6 +786,8 @@ public class PlayerManager {
 	 * @return true if the entry was found, false otherwise.
 	 */
 	public boolean inFinancialEntitiesTable(UUID entityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialEntitiesTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		ResultSet result = queryFinancialEntitiesTable(entityID);
 		boolean answer = false;
@@ -771,6 +815,8 @@ public class PlayerManager {
 	 */
 	@Deprecated
 	public boolean inFinancialEntitiesTable(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialEntitiesTable(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return inFinancialEntitiesTable(entityIdLookup(entityName));
 	}
 
@@ -782,6 +828,8 @@ public class PlayerManager {
 	 * @return true if the entry was found, false otherwise.
 	 */
 	public boolean inFinancialInstitutionsTable(UUID entityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialInstitutionsTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		ResultSet result = queryFinancialInstitutionsTable(entityID);
 		boolean answer = false;
@@ -805,6 +853,9 @@ public class PlayerManager {
 	 * @return true if user is ignoring target, false otherwise.
 	 */
 	public boolean isIgnoring(UUID userId, UUID targetId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "isIgnoring(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
 		
 		try {
@@ -843,6 +894,9 @@ public class PlayerManager {
 	 * @return true if user is now ignoring target, false otherwise.
 	 */
 	public boolean toggleIgnore(UUID playerId, UUID targetId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "toggleIgnore(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
 		
 		// Default if there isn't an entry already
@@ -905,6 +959,8 @@ public class PlayerManager {
 	 * @return
 	 */
 	public EconResult withdrawCash(UUID entityId, double amount){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "withdrawCash(UUID, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		if(amount < 0)
 			return new EconResult(0, 0, false, "Amount query is negative!");
@@ -943,6 +999,9 @@ public class PlayerManager {
 	 * A Player type will produce a FinancialPlayer object.
 	 */
 	private FinancialEntity buildEntity(ResultSet successfulQuery){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildEntity(ResultSet)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		if(successfulQuery == null)
 			return null;
 		
@@ -990,6 +1049,9 @@ public class PlayerManager {
 	 * ResultSet may be empty if it was not found.
 	 */
 	private ResultSet queryFinancialEntitiesTable(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "queryFinancialEntitiesTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		if(userID==null)
 			return null;
 		
@@ -1016,6 +1078,8 @@ public class PlayerManager {
 	 * ResultSet may be empty if it was not found.
 	 */
 	private ResultSet queryFinancialInstitutionsTable(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "queryFinancialInstitutionsTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		if(userID==null)
 			return null;
 		
