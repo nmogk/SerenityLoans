@@ -640,7 +640,10 @@ public class PlayerManager {
 	public FinancialInstitution getFinancialInstitution(UUID bankId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
-		return (FinancialInstitution) buildEntity(queryFinancialEntitiesTable(bankId));
+		FinancialEntity result = buildEntity(queryFinancialEntitiesTable(bankId));
+		if(result != null && result instanceof FinancialInstitution)
+			return (FinancialInstitution) result;
+		return null;
 	}
 	
 	/**
