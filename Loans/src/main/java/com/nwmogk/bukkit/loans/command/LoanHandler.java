@@ -938,6 +938,11 @@ public class LoanHandler implements CommandExecutor{
 					
 					ImmutableOffer offer = sentOffers? plugin.offerManager.getOffer(player.getUserID(), other.getUserID()) : plugin.offerManager.getOffer(other.getUserID(), player.getUserID());
 				
+					if(offer == null){
+						plugin.scheduleMessage(sender, Conf.messageCenter("no-offers", new String[]{"$$p", "$$c", "$$r"}, new String[]{sender.getName(), alias, args.length == 2 && args[1].equalsIgnoreCase(sender.getName()) ? args[1] : ""}));
+						return;
+					}
+					
 					plugin.scheduleMessage(sender, String.format(prfx + " Details for offer %s %s.", sentOffers? "to":"from", args[1]));
 					try {
 						plugin.scheduleMessage(sender, offer.toString(plugin));
