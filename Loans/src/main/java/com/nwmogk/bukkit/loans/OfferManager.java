@@ -60,6 +60,7 @@ import java.util.UUID;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.LoanType;
 import com.nwmogk.bukkit.loans.exception.InvalidLoanTermsException;
 import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 
@@ -458,8 +459,9 @@ public class OfferManager {
 			long serviceFeeFrequency = results.getLong("ServiceFeeFrequency");
 			Timestamp expDate = null;
 			int termsID = results.getInt("OfferID");
+			LoanType lt = LoanType.getFromString(results.getString("LoanType"));
 			
-			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
+			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, lt, expDate, termsID);
 
 			
 			stmt.close();
