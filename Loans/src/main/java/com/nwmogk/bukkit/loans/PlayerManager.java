@@ -298,7 +298,7 @@ public class PlayerManager {
 			SerenityLoans.log.info(String.format("Free UUID found: %s", instituteId.toString()));
 		
 		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
-		String fInstituteString = "INSERT INTO FinancialInstitutions (UserID, Name, Manager) VALUES (?, ?, ?);";
+		String fInstituteString = "INSERT INTO FinancialInstitutions (BankID, Name, Manager) VALUES (?, ?, ?);";
 		
 		boolean success = true;
 		
