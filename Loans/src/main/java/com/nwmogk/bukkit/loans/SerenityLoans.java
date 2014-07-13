@@ -307,7 +307,7 @@ public final class SerenityLoans extends JavaPlugin {
 					+ "Cash DECIMAL(10," + decimals +"),"
 					+ "CreditScore int DEFAULT "+ defaultCreditScore + ","
 					+ "LastSystemUse TIMESTAMP NOT NULL DEFAULT NOW() ON UPDATE NOW(),"
-					+ "PRIMARY KEY (UserID),"
+					+ "PRIMARY KEY (UserID)"
 					+ ");";
 		 
 		 String financialInstitutionsTable = 
