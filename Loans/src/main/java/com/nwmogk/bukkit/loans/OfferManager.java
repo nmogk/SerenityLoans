@@ -350,6 +350,9 @@ public class OfferManager {
 				results = stmt2.executeQuery();
 			}
 			
+			if(!results.next())
+				return null;
+			
 			int termsID = results.getInt(1);
 			
 			offer = new ImmutableOffer(lender, borrower, value, interestRate, lateFee, minPayment, serviceFee, term, compoundingPeriod, gracePeriod, paymentTime, paymentFrequency, serviceFeeFrequency, null, expDate, termsID);
