@@ -521,14 +521,14 @@ public class LoanHandler implements CommandExecutor{
 					"         /loan defaultoffering [param-list]",
 					"",
 					"Permissions: serenityloans.loan.lend",
-					"param-list = space delimited list of the form <termName>=<value>. Term names"+
+					"param-list = space delimited list of the form <termName>=<value>. Term names "+
 					"are not case sensitive. Note there must be no spaces next to the `='.",
 					"",
-					"If no arguments are given, then the command displays the current state of the"+
-					"offer. If param-list is given, then the command sets the parameter to the"+
+					"If no arguments are given, then the command displays the current state of the "+
+					"offer. If param-list is given, then the command sets the parameter to the "+
 					"given value and reports success or failure. It then displays the new values.",
 					"",
-					"/loan offering updates the current prepared offer, /loan defaultoffering updates the"+
+					"/loan offering updates the current prepared offer, /loan defaultoffering updates the "+
 					"default prepared offer."
 			});
 		} else if (subCommand.equalsIgnoreCase("sendoffer") || subCommand.equalsIgnoreCase("quickoffer")) {
@@ -540,14 +540,14 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"borrower = name of a player or financial institution (bank)",
 					"",
-					"expiration time = length of time for loan to be active formatted",
-					"as a list of integers followed by units. Available units are",
-					"y (year), d (day), h (hour), m (minutes), s (seconds). Spaces",
+					"expiration time = length of time for loan to be active formatted "+
+					"as a list of integers followed by units. Available units are "+
+					"y (year), d (day), h (hour), m (minutes), s (seconds). Spaces "+
 					"are optional. ex - \"3d 4h 1 s\" represents 3 days 4 hours and 1 second.",
 					"",
-					"This command sends a loan offer to the given potential borrower.",
-					"The borrower may be either a player or a financial institution and",
-					"can be offline. However, the borrower must have the proper",
+					"This command sends a loan offer to the given potential borrower. "+
+					"The borrower may be either a player or a financial institution and "+
+					"can be offline. However, the borrower must have the proper "+ 
 					"permissions to borrow for the command to work. ",
 					"",
 					"/loan sendoffer sends the current prepared offer",
@@ -561,8 +561,8 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"borrower = name of a player or financial institution (bank)",
 					"",
-					"This command removes an offer from the given financial entity name.",
-					"If there was no offer sent in the first place, this command will not",
+					"This command removes an offer from the given financial entity name. "+
+					"If there was no offer sent in the first place, this command will not "+
 					"give an error."
 			});
 		} else if (subCommand.equalsIgnoreCase("forgive")) {
@@ -575,10 +575,10 @@ public class LoanHandler implements CommandExecutor{
 					"account = loan number if multiple loans with same borrower",
 					"amount = dollar value to forgive. Default: {total balance}",
 					"",
-					"This command forgives the borrower loan by the amount given. If",
-					"no amount argument is given, will forgive entire loan. If the",
-					"borrower has multiple loans, a specific loan must be chosen from",
-					"an index list. /loan forgive <borrower> 0 is a safe way to view",
+					"This command forgives the borrower loan by the amount given. If "+
+					"no amount argument is given, will forgive entire loan. If the "+
+					"borrower has multiple loans, a specific loan must be chosen from "+
+					"an index list. /loan forgive <borrower> 0 is a safe way to view "+
 					"the index list without accidentally forgiving anything." 
 			});
 		} else if (subCommand.equalsIgnoreCase("sell")) {
@@ -592,10 +592,10 @@ public class LoanHandler implements CommandExecutor{
 					"new lender = entity to attempt to sell loan to",
 					"amount = dollar value of sale",
 					"",
-					"This command sets up a loan to be sold to new lender for the",
-					"given amount. If the borrower has multiple loans, a specific",
-					"loan must be chosen from an index list. Sale offers will not",
-					"persist across plugin resets, and the new lender must be ",
+					"This command sets up a loan to be sold to new lender for the "+
+					"given amount. If the borrower has multiple loans, a specific "+
+					"loan must be chosen from an index list. Sale offers will not "+
+					"persist across plugin resets, and the new lender must be "+
 					"online. "
 			});
 		} else if (subCommand.equalsIgnoreCase("buy")) {
@@ -604,9 +604,9 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"Permissions: serenityloans.loan.lend",
 					"",
-					"This command executes the pending sale offer for the sender.",
-					"It will fail if the sender does not have enough money. If",
-					"the sale is successful, the old lender and the borrower are",
+					"This command executes the pending sale offer for the sender. "+
+					"It will fail if the sender does not have enough money. If "+
+					"the sale is successful, the old lender and the borrower are "+
 					"notified if they are online."
 			});
 		} else if (subCommand.equalsIgnoreCase("viewsaleoffer")) {
@@ -615,7 +615,7 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"Permissions: serenityloans.loan.lend",
 					"",
-					"This command displays a received loan sale offer including",
+					"This command displays a received loan sale offer including "+
 					"the price and the loan in question."
 			});
 		} else if (subCommand.equalsIgnoreCase("viewoffers") || subCommand.equalsIgnoreCase("viewoffer") || subCommand.equalsIgnoreCase("viewsentoffer") || subCommand.equalsIgnoreCase("viewsentoffers")) { 			
@@ -629,13 +629,13 @@ public class LoanHandler implements CommandExecutor{
 					"lender = name of entity which sent the offer",
 					"borrower = name of entity to which the offer was sent",
 					"",
-					"*The plural form of both of these commands are built-in",
+					"*The plural form of both of these commands are built-in "+
 					"aliases.",
 					"",
-					"This command shows outstanding offers. Giving a particular",
-					"other entity to the command shows the detailed terms of an offer",
-					"while leaving the argument blank will show the list of all",
-					"relevant offers. Putting your own name as the optional argument",
+					"This command shows outstanding offers. Giving a particular "+
+					"other entity to the command shows the detailed terms of an offer "+
+					"while leaving the argument blank will show the list of all "+
+					"relevant offers. Putting your own name as the optional argument "+
 					"has the same effect as /loan viewsentoffer with no arguments.",
 					"",
 					"/loan viewoffer shows offers which you have received",
@@ -650,8 +650,8 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"lender = name of the entity which sent the offer",
 					"",
-					"This command will accept a loan offer from the given",
-					"lender and create a new loan with the terms of the",
+					"This command will accept a loan offer from the given "+
+					"lender and create a new loan with the terms of the "+
 					"offer."
 			});
 		} else if (subCommand.equalsIgnoreCase("reject") || subCommand.equalsIgnoreCase("rejectoffer")) {
@@ -674,9 +674,9 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"lender = name of the entity to ignore",
 					"",
-					"This command toggles your ignore status with the given",
-					"lender. When being ignored, you will not receive loan",
-					"offers from the given lender. This does not affect your",
+					"This command toggles your ignore status with the given "+
+					"lender. When being ignored, you will not receive loan "+
+					"offers from the given lender. This does not affect your "+
 					"ability to pay/be paid or to use other loan features."
 			});
 		} else if (subCommand.equalsIgnoreCase("pay") || subCommand.equalsIgnoreCase("payoff")) {
@@ -690,13 +690,13 @@ public class LoanHandler implements CommandExecutor{
 					"account = loan number if multiple loans with same lender",
 					"amount = amount to pay off",
 					"",
-					"This command will apply a payment to the specified loan.",
-					"If no amount is given, then the default is to specify the",
+					"This command will apply a payment to the specified loan. "+
+					"If no amount is given, then the default is to specify the "+
 					"total due. ",
 					"",
 					"/loan pay applies payments only for outstanding payment statements.",
-					"/loan payoff will pay down the principal balance of the loan. Be ",
-					"careful with payoff, as it will pay the entire principal balance",
+					"/loan payoff will pay down the principal balance of the loan. Be "+
+					"careful with payoff, as it will pay the entire principal balance "+
 					"if used without arguments."
 			});
 		} else if (subCommand.equalsIgnoreCase("summary")) {
@@ -709,8 +709,8 @@ public class LoanHandler implements CommandExecutor{
 					"entity = entity for which you want the relationship summary with",
 					"to|from = restrict information direction",
 					"",
-					"This command gives a summary of the relationship with the",
-					"given entity. This includes offers outstanding, loans outstanding,",
+					"This command gives a summary of the relationship with the "+
+					"given entity. This includes offers outstanding, loans outstanding, "+
 					"debts between the two entities, and trust information."
 			});
 		} else if (subCommand.equalsIgnoreCase("setautopay")) {
@@ -723,10 +723,10 @@ public class LoanHandler implements CommandExecutor{
 					"account = loan number if multiple loans with same lender",
 					"on|off = whether to turn autopay on or off for the loan",
 					"",
-					"This command sets the autopay feature for the given loan.",
-					"Autopay will attempt to pay payment statements from the",
-					"loan when they are due, with no interraction from the",
-					"borrower. If the whole bill cannot be paid, then it will",
+					"This command sets the autopay feature for the given loan. "+
+					"Autopay will attempt to pay payment statements from the "+
+					"loan when they are due, with no interraction from the "+
+					"borrower. If the whole bill cannot be paid, then it will "+
 					"pay the minimum payment."
 			});
 		} else if (subCommand.equalsIgnoreCase("statement")) {
@@ -738,7 +738,7 @@ public class LoanHandler implements CommandExecutor{
 					"lender = name of lender",
 					"account = loan number if multiple loans with same lender",
 					"",
-					"This command checks for an outstanding payment statement",
+					"This command checks for an outstanding payment statement "+
 					"on the given loan and displays the result to the caller."
 			});
 		} else {
