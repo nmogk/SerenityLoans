@@ -267,13 +267,25 @@ public class PlayerManager {
 		// Name check. Names must be unique
 		UUID existingId = getFinancialInstituteID(desiredName);
 		if(existingId != null){
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info("Institute with same name found.");
+			
 			FinancialInstitution currentHolder = getFinancialInstitution(existingId);
 			
-			if(currentHolder.getResponsibleParty().equals(manager.getUserID()))
+			if(currentHolder.getResponsibleParty().equals(manager.getUserID())){
+				if(SerenityLoans.debugLevel > 1)
+					SerenityLoans.log.info("Looks like the institute already exists.");
+				
 				return true;
-			else
+			} else {
+				if(SerenityLoans.debugLevel > 1)
+					SerenityLoans.log.info("Institute name taken.");
+				
+				
 				return false;
+			}
 		}
+		
 		
 		UUID instituteId = null;
 		
@@ -281,6 +293,9 @@ public class PlayerManager {
 		do {
 			instituteId = UUID.randomUUID();
 		} while(inFinancialEntitiesTable(instituteId));
+		
+		if(SerenityLoans.debugLevel > 1)
+			SerenityLoans.log.info(String.format("Free UUID found: %s", instituteId.toString()));
 		
 		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
 		String fInstituteString = "INSERT INTO FinancialInstitutions (UserID, Name, Manager) VALUES (?, ?, ?);";
@@ -303,6 +318,10 @@ public class PlayerManager {
 			synchronized(financialEntitiesLock){
 				success &= ps1.executeUpdate() == 1;
 			}
+			
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info("FinancialEntities written successfully.");
+			
 			
 			synchronized(financialInstitutionsLock){
 				success &= ps2.executeUpdate() == 1;
@@ -552,6 +571,7 @@ public class PlayerManager {
 						SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
 					}
 					
+					stmt.close();
 					return result;
 					
 				}

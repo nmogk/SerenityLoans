@@ -61,4 +61,21 @@ public enum PlayerType {
 		
 		return PLAYER;
 	}
+	
+	public String toString(){
+		switch(this){
+		case PLAYER:
+			return "Player";
+		case BANK:
+			return "Bank";
+		case CREDIT_UNION:
+			return "CreditUnion";
+		case TOWN:
+			return "Town/Faction";
+		case EMPLOYER:
+			return "Employer";
+		}
+		
+		return null;
+	}
 }
