@@ -442,8 +442,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "ServiceFee DECIMAL(7," + decimals + "),"
 				 	+ "LoanType ENUM('Amortizing','Bullet','FixedFee','InterestOnly','Credit','Gift','Deposit','Bond','Salary') NOT NULL,"
 				 	+ "PRIMARY KEY (OfferID),"
-				 	+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID),"
-				 	+ "CONSTRAINT uc_nameID UNIQUE (LenderID,OfferName)"
+				 	+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID)"
 				 	+ ");";
 
 		 String offersTable = 
