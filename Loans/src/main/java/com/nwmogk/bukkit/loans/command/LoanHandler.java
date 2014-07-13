@@ -1617,6 +1617,9 @@ public class LoanHandler implements CommandExecutor{
 				} else if(plugin.getConfig().contains("loan.default-offer-time"))
 					timeString = plugin.getConfig().getString("loan.default-offer-time");
 						
+				if(SerenityLoans.debugLevel >= 3)
+					SerenityLoans.logInfo(String.format("Epiration time string: %s.", timeString));
+				
 				// Parsing string
 				long expirationTime = Conf.parseTime(timeString);
 						

@@ -78,6 +78,8 @@ public class OfferManager {
 	}
 	
 	public void buildFinancialEntityInitialOffers(UUID playerID) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildFinancialEntityInitialOffers(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
 		// Collect config info
 		double value = 100;
@@ -204,6 +206,10 @@ public class OfferManager {
 	}
 	
 	public OfferExitStatus createOffer(UUID lenderID, UUID borrowerID, String preparedOfferName, Timestamp offerExpiry){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createOffer(UUID, UUID, String, Timestamp)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
+		
 		if(plugin.playerManager.isIgnoring(borrowerID, lenderID))
 			return OfferExitStatus.IGNORED;
 		
@@ -307,10 +313,16 @@ public class OfferManager {
 	}
 	
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOffer(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		return getOffer(lenderID, borrowerID, false);
 	}
 	
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID, boolean filterSent){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOffer(UUID, UUID, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = String.format("SELECT * FROM offer_view WHERE LenderID=? AND BorrowerID=?%s;", filterSent? " AND Sent='false'" : "");
 		String query2 = "SELECT PreparedTerms FROM Offers WHERE LenderID=? AND BorrowerID=?;";
 		ImmutableOffer offer = null;
@@ -368,6 +380,9 @@ public class OfferManager {
 	}
 	
 	public List<FinancialEntity> getOfferRecipientsFrom(UUID lenderID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferRecipientsFrom(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = "SELECT BorrowerID FROM Offers WHERE LenderID=?;";
 		LinkedList<FinancialEntity> list = new LinkedList<FinancialEntity>();
 		
@@ -396,10 +411,16 @@ public class OfferManager {
 	}
 	
 	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferSendersTo(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		return getOfferSendersTo(borrowerID, false);
 	}
 	
 	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID, boolean filterSent){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferSendersTo(UUID, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = String.format("SELECT LenderID FROM Offers WHERE BorrowerID=?%s;", filterSent? " AND Sent='false'" : "");
 		LinkedList<FinancialEntity> list = new LinkedList<FinancialEntity>();
 		
@@ -427,6 +448,9 @@ public class OfferManager {
 	}
 	
 	public ImmutableOffer getPreparedOffer(UUID lenderId, String offerName){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPreparedOffer(UUID, String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = "SELECT * FROM PreparedOffers WHERE LenderID=? AND OfferName=?;";
 		ImmutableOffer offer = null;
 		
@@ -477,6 +501,9 @@ public class OfferManager {
 	}
 	
 	public ImmutableOffer getPreparedOffer(int offerId, FinancialEntity lender, FinancialEntity borrower){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPreparedOffer(int, FinancialEntity, FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = String.format("SELECT * FROM PreparedOffers WHERE OfferID=%d;", offerId);
 		ImmutableOffer offer = null;
 		
@@ -522,6 +549,9 @@ public class OfferManager {
 	
 
 	public double getTermsValue(int preparedTermsId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getTermsValue(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String query = String.format("SELECT Value FROM PreparedOffers WHERE OfferID=%d;", preparedTermsId);
 		double result = -1;
 		
@@ -551,6 +581,9 @@ public class OfferManager {
 	}
 	
 	public boolean registerOfferSend(UUID lenderId, UUID borrowerId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "registerOfferSend(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String sentUpdate = "UPDATE Offers SET Sent='true' WHERE LenderID=? AND BorrowerID=?;";
 
 		try {
@@ -582,6 +615,9 @@ public class OfferManager {
 	}
 	
 	public boolean removeOffer(UUID lenderId, UUID borrowerId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "removeOffer(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String update = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
 		int exit = -1;
 		
@@ -607,6 +643,9 @@ public class OfferManager {
 	}
 	
 	public boolean setTerms(UUID lenderId, boolean isDefault, String argument) throws InvalidLoanTermsException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "setTerms(UUID, boolean, String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		String[] parsedArg = argument.split("=");
 		
 		if(parsedArg.length != 2)
@@ -971,6 +1010,9 @@ public class OfferManager {
 	}
 	
 	public void updateAll(){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "updateAll()", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		
 		String query = "SELECT LenderID, BorrowerID FROM Offers WHERE ExpirationDate < NOW();";
 		HashMap<UUID, UUID> expiredOffers = new HashMap<UUID, UUID>();
