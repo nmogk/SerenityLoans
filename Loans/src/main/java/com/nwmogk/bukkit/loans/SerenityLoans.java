@@ -656,6 +656,8 @@ public final class SerenityLoans extends JavaPlugin {
 	 }
 	 
 	 public void scheduleMessage(CommandSender sender, String[] message){
+		 if(debugLevel >= 3)
+				logInfo(String.format("Entering %s method. %s", "scheduleMessage(CommandSender, String[])", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
 	 }
 	 
@@ -670,6 +672,10 @@ public final class SerenityLoans extends JavaPlugin {
 		 }
 		 
 		 public void run(){
+			 if(SerenityLoans.debugLevel >= 3)
+					SerenityLoans.logInfo(String.format("MessageSender run() method. %s", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+				
+			 
 			 sendTo.sendMessage(message);
 		 }
 		 

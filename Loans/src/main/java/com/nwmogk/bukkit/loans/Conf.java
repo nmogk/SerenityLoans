@@ -255,6 +255,9 @@ public class Conf {
 	}
 	
 	public synchronized static String messageCenter(String messageName, String[] relevantMacros, String[] macroValues){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "messageCenter(String, String[], String[])", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
 		String path = "options.messages." + messageName;
 		String message = getMessageString() + " ";
 		

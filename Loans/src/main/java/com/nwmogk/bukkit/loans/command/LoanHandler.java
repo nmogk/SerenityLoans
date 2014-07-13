@@ -887,6 +887,8 @@ public class LoanHandler implements CommandExecutor{
 	 * /loan viewsentoffer shows offers which you have sent
 	 */
 	private boolean loanViewoffersCommand(final CommandSender sender, final FinancialEntity player, final String alias, final String[] args, final boolean sentOffers) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "loanViewoffersCommand(CommandSender, FinancialEntity, String, String, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		// Check perms			
 		if(!sender.hasPermission("serenityloans.loan.borrow") || !sender.hasPermission("serenityloans.loan.lend")) {
@@ -905,6 +907,9 @@ public class LoanHandler implements CommandExecutor{
 			
 			@SuppressWarnings("deprecation")
 			public void run(){
+				
+				if(SerenityLoans.debugLevel >= 3)
+					SerenityLoans.logInfo(String.format("Entering %s method. %s", "run()", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 				
 				List<FinancialEntity> othersList = null;
 				
