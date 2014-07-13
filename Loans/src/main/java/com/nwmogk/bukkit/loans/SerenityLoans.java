@@ -147,6 +147,7 @@ public final class SerenityLoans extends JavaPlugin {
 		}
 		
 		playerManager = new PlayerManager(this);
+		offerManager = new OfferManager(this);
 		
 		try {
 			if(buildRequired())

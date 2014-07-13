@@ -295,7 +295,7 @@ public class PlayerManager {
 		} while(inFinancialEntitiesTable(instituteId));
 		
 		if(SerenityLoans.debugLevel > 1)
-			SerenityLoans.log.info(String.format("Free UUID found: %s", instituteId.toString()));
+			SerenityLoans.log.info(String.format("[%s] Free UUID found: %s", plugin.getDescription().getName(), instituteId.toString()));
 		
 		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
 		String fInstituteString = "INSERT INTO FinancialInstitutions (BankID, Name, Manager) VALUES (?, ?, ?);";
@@ -320,12 +320,16 @@ public class PlayerManager {
 			}
 			
 			if(SerenityLoans.debugLevel > 1)
-				SerenityLoans.log.info("FinancialEntities written successfully.");
+				SerenityLoans.log.info(String.format("[%s] FinancialEntities written successfully.", plugin.getDescription().getName()));
 			
 			
 			synchronized(financialInstitutionsLock){
 				success &= ps2.executeUpdate() == 1;
 			}
+			
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info(String.format("[%s] FinancialInstitutions written successfully.", plugin.getDescription().getName()));
+			
 			
 			ps1.close();
 			ps2.close();
