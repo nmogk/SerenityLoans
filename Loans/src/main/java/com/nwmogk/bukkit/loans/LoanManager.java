@@ -330,7 +330,7 @@ public class LoanManager {
 			SerenityLoans.logInfo(insertLoan);
 		
 		
-		boolean exitFlag = false;
+		boolean exitFlag = true;
 		int loanID = 0;
 		
 		try {
@@ -362,6 +362,7 @@ public class LoanManager {
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
+			return false;
 		}
 		
 		buildLoanEvents(loanID);
