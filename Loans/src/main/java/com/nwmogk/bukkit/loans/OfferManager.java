@@ -282,13 +282,23 @@ public class OfferManager {
 			
 			int offerId;
 			
+			// This synchronized block has to cover the entire copying process
+			// until we have the id of the permanent prepared offer with no name.
+			// Otherwise, the update step to change names could interfere with
+			// another thread creating an offer at the same time.
 			synchronized(preparedLock){
 				int output = offerTermsCopier.executeUpdate();
 				
 				offerTermsCopier.close();
 				
-				if(output != 1)
+				if(output != 1){
+					if(SerenityLoans.debugLevel >= 2)
+						SerenityLoans.logInfo("Problem during terms copying.");
 					return OfferExitStatus.UNKNOWN;
+				}
+				
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.logInfo("Offer terms copied.");
 				
 			
 				PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
@@ -306,7 +316,13 @@ public class OfferManager {
 					return OfferExitStatus.UNKNOWN;
 				}
 				
+				
+				
 				offerId = newOfferId.getInt(1);
+				
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.logInfo(String.format("Offer terms copy ID located: ID:%d.", offerId));
+				
 				
 				PreparedStatement renameOffer = plugin.conn.prepareStatement(offerNameUpdate);
 				
@@ -320,6 +336,10 @@ public class OfferManager {
 			
 				if(output != 1)
 					return OfferExitStatus.UNKNOWN;
+				
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.logInfo(String.format("Offer terms renamed successfully.", offerId));
+				
 			}
 			
 			PreparedStatement deleteOldOfferSQL = plugin.conn.prepareStatement(deleteOldOffer);
