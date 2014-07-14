@@ -300,7 +300,7 @@ public class OfferManager {
 				if(SerenityLoans.debugLevel >= 2)
 					SerenityLoans.logInfo("Offer terms copied.");
 				
-			
+				
 				PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
 				
 				offerIdFinder.setString(1, lenderID.toString());
@@ -358,6 +358,7 @@ public class OfferManager {
 					return OfferExitStatus.OVERWRITE_FAIL;
 			}
 			
+			// Prepare SQL for inserting the new Offer.
 			String sentOfferString = String.format("INSERT INTO Offers (LenderID, BorrowerID, ExpirationDate, PreparedTerms) VALUES (?, ?, ?, %d);", offerId);
 			if(SerenityLoans.debugLevel >= 3)
 				SerenityLoans.logInfo(sentOfferString);
@@ -385,9 +386,25 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo("Offer created successfully.");
+		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "createOffer(UUID, UUID, String, Timestamp)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
+		
 		return OfferExitStatus.SUCCESS;
 	}
 	
+	/**
+	 * Returns an ImmutableOffer object representing the offer
+	 * including all of the relevant terms information or null
+	 * if the offer doesn't exist.
+	 * 
+	 * @param lenderID 
+	 * @param borrowerID
+	 * @return Object representing the offer or null.
+	 */
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOffer(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -395,6 +412,18 @@ public class OfferManager {
 		return getOffer(lenderID, borrowerID, false);
 	}
 	
+	/**
+	 * Returns an ImmutableOffer object representing the offer
+	 * if it exists or null otherwise. Will filter out offers
+	 * that have been sent if the boolean flag is set to true.
+	 * If no offers have been found after the filter, it 
+	 * returns null.
+	 * 
+	 * @param lenderID
+	 * @param borrowerID
+	 * @param filterSent Whether or not to filter out sent offers.
+	 * @return Object representing the offer or null;
+	 */
 	public ImmutableOffer getOffer(UUID lenderID, UUID borrowerID, boolean filterSent){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOffer(UUID, UUID, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -452,9 +481,21 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getOffer(UUID, UUID, boolean)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
+		
 		return offer;
 	}
 	
+	/**
+	 * Returns a list of FinancialEntities who have been sent
+	 * offers from the given lender. The returned list is of
+	 * type LinkedList.
+	 * 
+	 * @param lenderID
+	 * @return
+	 */
 	public List<FinancialEntity> getOfferRecipientsFrom(UUID lenderID){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferRecipientsFrom(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -482,10 +523,21 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getOfferRecipientsFrom(UUID)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		return list;
 		
 	}
 	
+	/**
+	 * Returns a list of FinancialEntities who have sent offers
+	 * to the given borrower. The list returned is of type
+	 * LinkedList.
+	 * 
+	 * @param borrowerID
+	 * @return
+	 */
 	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferSendersTo(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -493,6 +545,15 @@ public class OfferManager {
 		return getOfferSendersTo(borrowerID, false);
 	}
 	
+	/**
+	 * Returns a list of FinancialEntities who have sent offers
+	 * to the given borrower. The list will be filtered so that
+	 * only offers which have not been sent will be included.
+	 * 
+	 * @param borrowerID
+	 * @param filterSent
+	 * @return
+	 */
 	public List<FinancialEntity> getOfferSendersTo(UUID borrowerID, boolean filterSent){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfferSendersTo(UUID, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -519,6 +580,9 @@ public class OfferManager {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
+		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getOfferSendersTo(UUID, boolean)",  "Thread: " + Thread.currentThread().getId() + "."));
 		
 		return list;
 	}
@@ -573,6 +637,9 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getPreparedOffer(UUID, String)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		return offer;
 	}
 	
@@ -620,6 +687,9 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getPreparedOffer(int, FinancialEntity, FinancialEntity)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		return offer;
 	}
 	
@@ -651,6 +721,10 @@ public class OfferManager {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
+		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "getTermsValue(int)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		
 		return result;
 		
@@ -687,6 +761,10 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "registerOfferSend(UUID, UUID)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
+		
 		return false;
 	}
 	
@@ -713,6 +791,10 @@ public class OfferManager {
 			e.printStackTrace();
 			return false;
 		}
+		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "removeOffer(UUID, UUID)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		
 		return exit == 0 || exit == 1;
 		
@@ -1082,6 +1164,9 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "setTerms(UUID, boolean, String)",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		return false;
 	}
 	
@@ -1124,6 +1209,10 @@ public class OfferManager {
 			}
 			
 		}
+		
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "updateAll()",  "Thread: " + Thread.currentThread().getId() + "."));
+		
 		
 	}
 	
