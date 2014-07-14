@@ -6,9 +6,11 @@
  * File: FinancialEntity.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This class contains information relating to a FinancialEntity as it is
- * represented in the mySQL table. Objects of this class are immutable and
- * cannot be changed once created.
+ * This class contains information relating to a FinancialInstitution. It 
+ * contains additional information over and above that of a FinancialEntity
+ * representing all of the information contained about the entry in the
+ * FinancialEntities and FinancialInstitutions tables. Objects of this 
+ * class are immutable and cannot be changed once created.
  * 
  * 
  * ========================================================================
@@ -43,24 +45,22 @@
 package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
+import java.util.UUID;
 
-import com.nwmogk.bukkit.loans.PlayerType;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.PlayerType;
 
-public final class FinancialEntity implements Cloneable {
+public final class FinancialInstitution implements FinancialEntity {
 
-	private final int userID;
+	private final UUID userID;
 	//private final Timestamp ts;
 	private final String name;
-	private final int managerID; 
+	private final UUID managerID; 
 	private final double cash;
 	private final int creditScore;
 	private final PlayerType pt;
 	
-	public FinancialEntity(int userID, String name, PlayerType type,  double money, int crScore){
-		this(userID, name, type, userID, money, crScore);
-	}
-	
-	public FinancialEntity(int userID, String name, PlayerType type, int managerID, double money, int crScore){
+	public FinancialInstitution(UUID userID, String name, PlayerType type, UUID managerID, double money, int crScore){
 		this.userID = userID;
 		this.name = name;
 		pt = type;
@@ -69,13 +69,13 @@ public final class FinancialEntity implements Cloneable {
 		creditScore = crScore;
 	}
 	
-	public int getUserID() {return userID;}
+	public UUID getUserID() {return userID;}
 
 	public String getName() {return name;}
 
 	public double getCash() {return cash;}
 
-	public int getResponsibleParty() {return managerID;}
+	public UUID getResponsibleParty() {return managerID;}
 	
 	public int getCreditScore() {return creditScore;}
 

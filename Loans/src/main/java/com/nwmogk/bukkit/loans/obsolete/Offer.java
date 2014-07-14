@@ -1,10 +1,10 @@
 package com.nwmogk.bukkit.loans.obsolete;
 
-import com.nwmogk.bukkit.loans.LoanInfo;
-import com.nwmogk.bukkit.loans.LoanType;
 import com.nwmogk.bukkit.loans.SerenityLoans;
-import com.nwmogk.bukkit.loans.Terms;
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.LoanInfo;
+import com.nwmogk.bukkit.loans.api.LoanType;
+import com.nwmogk.bukkit.loans.api.Terms;
 
 
 /**
@@ -236,8 +236,8 @@ public String toString(){
 		//dollars = SerenityLoans.econ.currencyNamePlural();
 		
 		String result = "";
-		result += "Lender: " + lender.getName() + "\n";
-		result += "Borrower: " + borrower.getName() + "\n";
+//		result += "Lender: " + lender.getName() + "\n";
+//		result += "Borrower: " + borrower.getName() + "\n";
 		result += "Loan value: " + value + " " + dollars + "\n";
 		result += "Interest rate: " + interestRate + "% (weekly)\n";
 		result += "Minimum payment: " + minPayment + " " + dollars + "\n";

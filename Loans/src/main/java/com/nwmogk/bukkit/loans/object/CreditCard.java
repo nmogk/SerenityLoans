@@ -9,7 +9,7 @@ public class CreditCard extends Loan{
 			double feeBalance, ImmutableOffer terms, Timestamp startDate,
 			Timestamp lastUpdate) {
 		super(loanID, balance, interestBalance, feeBalance, terms, startDate,
-				lastUpdate);
+				lastUpdate, 0);
 		
 	};
 

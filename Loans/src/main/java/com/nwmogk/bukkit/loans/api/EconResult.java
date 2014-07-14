@@ -3,11 +3,14 @@
  *                               DESCRIPTION
  * ========================================================================
  * 
- * File: LoanType.java
+ * File: EconResult.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This enum provides identifiers for the different types of loans. It also
- * provides string parsing to get the proper identifier.
+ * This class contains information regarding the outcome of an economic
+ * call, independent of the economy implementation. This class is meant to
+ * serve as an adapter to Vault-dependent plugins that will utilize this
+ * plugin as an economy. Instances of this class are immutable, and all
+ * fields are public access.
  * 
  * 
  * ========================================================================
@@ -34,39 +37,34 @@
  * ========================================================================
  *    Date          Name                  Description              Defect #
  * ----------  --------------  ----------------------------------  --------
- * 2014-xx-xx  nmogk           Initial release for v0.1
+ * 2014-02-11  nmogk           Initial release for v0.1
  * 
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
-/*
- * I am not sure if this enum even matters.
- */
-public enum LoanType {
+import net.milkbowl.vault.economy.EconomyResponse;
+
+public final class EconResult {
 	
-	INTERESTONLY, FIXEDFEE, CREDIT, GIFT, DEPOSIT, BULLET, AMORTIZING, BOND, SALARY;
+	public final double amount;
+	public final double balance;
+	public final boolean callSuccess;
+	public final String errMsg;
 	
-	public static LoanType getFromString(String input){
-		if(input.equalsIgnoreCase("InterestOnly"))
-			return INTERESTONLY;
-		else if(input.equalsIgnoreCase("FixedFee"))
-			return FIXEDFEE;
-		else if(input.equalsIgnoreCase("Credit"))
-			return CREDIT;
-		else if(input.equalsIgnoreCase("Gift"))
-			return GIFT;
-		else if(input.equalsIgnoreCase("Deposit"))
-			return DEPOSIT;
-		else if(input.equalsIgnoreCase("Bond"))
-			return BOND;
-		else if(input.equalsIgnoreCase("Salary"))
-			return SALARY;
-		else if(input.equalsIgnoreCase("Amortizing"))
-			return AMORTIZING;
-		else
-			return BULLET;
+	public EconResult(double amount, double balance, boolean callSuccess, String errMsg){
+		this.amount = amount;
+		this.balance = balance;
+		this.callSuccess = callSuccess;
+		this.errMsg = errMsg;
 	}
 	
+	public EconResult(EconomyResponse vaultResponse){
+		amount = vaultResponse.amount;
+		balance = vaultResponse.balance;
+		callSuccess = vaultResponse.transactionSuccess();
+		errMsg = vaultResponse.errorMessage;
+	}
+
 }

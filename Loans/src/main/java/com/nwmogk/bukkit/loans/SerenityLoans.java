@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: SerenityLoans.java
  * Contributing Authors: Nathan W Mogk
@@ -45,42 +46,50 @@
 
 package com.nwmogk.bukkit.loans;
 
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.*;
+import org.bukkit.scheduler.BukkitRunnable;
 
+import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.command.LoanHandler;
 import com.nwmogk.bukkit.loans.exception.DatabaseVersionMismatchException;
 import com.nwmogk.bukkit.loans.listener.PlayerLoginListener;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
 public final class SerenityLoans extends JavaPlugin {
 	
-	public static final Logger log = Logger.getLogger("Minecraft");
+	public static Logger log;
 	
-    public static EconomyManager econ = null;
-//    public Permission perms = null;
-//    public Chat chat = null;
-    
+    // Incrementing these numbers will force a rebuild of the database.
     public static final int dbMajorVersion = 0;
-    public static final int dbMinorVersion = 5;
+    public static final int dbMinorVersion = 6;
     
     private static SerenityLoans plugin;
 	
     public static int debugLevel;
     
     public Connection conn = null;
+    
     public PlayerManager playerManager;
-
+    public EconomyManager econ;
 	public LoanManager loanManager;
+	public OfferManager offerManager;
+	
+	public ExecutorService threads;
     
 	public void onEnable(){
+		
+		log = Logger.getLogger("Minecraft." + getDescription().getName());
+		
+		this.threads = Executors.newCachedThreadPool();
 		
 		this.saveDefaultConfig();
 		plugin = this;
@@ -90,6 +99,9 @@ public final class SerenityLoans extends JavaPlugin {
 		else
 			debugLevel = 2;
 		
+		if(debugLevel >= 4)
+			logInfo("Main thread ID: " + Thread.currentThread().getId() + ".");
+		
 		String squrl = "jdbc:mysql://";
 		
 		if(getConfig().contains("mysql.host") && getConfig().contains("mysql.port") && getConfig().contains("mysql.databasename")){
@@ -98,7 +110,7 @@ public final class SerenityLoans extends JavaPlugin {
 			squrl += "/" + getConfig().getString("mysql.databasename");
 		}
 		else {
-			log.severe(String.format("[%s] Database configuration info not found, disabling...", getDescription().getName()));
+			logFail("Database configuration info not found, disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
@@ -106,22 +118,22 @@ public final class SerenityLoans extends JavaPlugin {
 		if(getConfig().contains("mysql.username") || getConfig().contains("mysql.password")){
 			squrl += "?";
 			if(debugLevel >= 1)
-				log.info(String.format("[%s] Using username and password info.", getDescription().getName()));
+				logInfo("Using username and password info.");
 		}
 		
 		if(getConfig().contains("mysql.username")){
 			squrl += "user=" + getConfig().getString("mysql.username") + (getConfig().contains("mysql.password")?"&":"");
 			if(debugLevel >= 2)
-				log.info(String.format("[%s] Username given.", getDescription().getName()));
+				logInfo("Username given.");
 		}
 		if(getConfig().contains("mysql.password")){
 			squrl += "password=" + getConfig().getString("mysql.password");
 			if(debugLevel >= 2)
-				log.info(String.format("[%s] Password given.", getDescription().getName()));
+				logInfo("Password given.");
 		}
 		
 		if(debugLevel >= 2)
-			log.info( String.format("[%s] Database configuration loaded. Setting up...", getDescription().getName()));
+			logInfo("Database configuration loaded. Setting up...");
 		
 		try {
 			conn = DriverManager.getConnection(squrl);
@@ -130,27 +142,28 @@ public final class SerenityLoans extends JavaPlugin {
 				throw new SQLException("conn null.");
 		} catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			
-			log.severe(String.format("[%s] Unable to connect to database! Disabling...", getDescription().getName()));
+			logFail("Unable to connect to database! Disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
 		
 		playerManager = new PlayerManager(this);
+		offerManager = new OfferManager(this);
 		
 		try {
 			if(buildRequired())
 				setupTables();
 		} catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			
-			log.severe(String.format("[%s] Unable to build database! Disabling...", getDescription().getName()));
+			logFail("Unable to build database! Disabling...");
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}	catch (DatabaseVersionMismatchException e) {
-			log.severe(String.format("[%s] " + e.getMessage() + " Disabling...", getDescription().getName()));
+			logFail(String.format("%s Disabling...", e.getMessage()));
 			getServer().getPluginManager().disablePlugin(this);
 			return;
 		}
@@ -158,27 +171,28 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		// Attempt to add online players to the loan system.
 		if(debugLevel >= 1)
-			log.info(String.format("[%s] Attempting to add players to the system...", getDescription().getName()));
+			logInfo("Attempting to add players to the system...");
 		
-		playerManager.addToFinancialEntitiesTable(getServer().getOnlinePlayers());
+		playerManager.addPlayers(getServer().getOnlinePlayers());
 		
 		getServer().getPluginManager().registerEvents(new PlayerLoginListener(this), this);
 		
 		/*
 		 * TODO next:
-		 * Perform updates to offers/loans
-		 * 
 		 * Setup listeners/handlers
-		 * Setup recurring events
+		 * 
+		 * Remove references to the regular configuration pathway in other classes. Use only the Conf object
 		 * 
 		 * Work out economy stuff
-		 * Manage changes to configuration
 		 */
+		
+		if(debugLevel >=1)
+			logInfo("Setting up economy functions.");
 		
 		econ = new EconomyManager(this);
 		
 		if (!econ.isInitialized() ) {
-            log.severe(String.format("[%s] Disabled due to no Vault dependency found!", getDescription().getName()));
+            logFail("Disabled due to no Vault dependency found!");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -189,19 +203,27 @@ public final class SerenityLoans extends JavaPlugin {
 		
 		// Populate tables with online users
 		
+		if(debugLevel >= 3)
+			logInfo("Setting command handlers.");
 		
 		getCommand("loan").setExecutor(new LoanHandler(this));
+		
+		if(debugLevel >= 2)
+			logInfo("Scheduling repeating upates.");
 
-        
+        getServer().getScheduler().runTaskTimerAsynchronously(this, new BukkitRunnable(){public void run(){loanManager.updateAll();offerManager.updateAll();}}, 0, Conf.getUpdateTime());
 	}
 	
 	public void onDisable(){
+		
+		threads.shutdown();
+		this.getServer().getScheduler().cancelTasks(this);
 		
 		try {
 			if(conn != null)
 				conn.close();
 		} catch (SQLException e) {
-			log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+			logFail(e.getMessage());
 		}
 		
 	}
@@ -253,7 +275,7 @@ public final class SerenityLoans extends JavaPlugin {
 			
 		 } catch (SQLException e) {
 			 if(debugLevel >=2)
-					log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+					logFail(e.getMessage());
 				
 			 throw e;
 		 } finally {
@@ -273,67 +295,64 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 if(getConfig().contains("trust.credit-score.no-history-score")){
 			 defaultCreditScore = getConfig().getInt("trust.credit-score.no-history-score");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded default credit score.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded default credit score.");
 		 }
 		 
 		 if(getConfig().contains("trust.credit-score.dissipation-factor")){
 			 dissipationFactor = getConfig().getInt("trust.credit-score.dissipation-factor");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded dissipation factor.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded dissipation factor.");
 		 }
 		 
 		 if(getConfig().contains("economy.currency.fractional-digits")){
 			 decimals = getConfig().getInt("economy.currency.fractional-digits");
-			 if(debugLevel >=2)
-				log.info(String.format("[%s] Loaded currency digits.",getDescription().getName()));
+			 if(debugLevel >=3)
+				logInfo("Loaded currency digits.");
 		 }
 		 
 		 String financialEntityTable = 
 				 "CREATE TABLE FinancialEntities"
 					+ "(" 
-					+ "UserID int NOT NULL AUTO_INCREMENT,"
-					+ "Name varchar(255) NOT NULL,"
+					+ "UserID varchar(36) NOT NULL,"
 					+ "Type ENUM('Player','Bank','CreditUnion','Town/Faction','Employer') NOT NULL DEFAULT 'Player',"
-					+ "Manager int,"
 					+ "Cash DECIMAL(10," + decimals +"),"
 					+ "CreditScore int DEFAULT "+ defaultCreditScore + ","
 					+ "LastSystemUse TIMESTAMP NOT NULL DEFAULT NOW() ON UPDATE NOW(),"
-					+ "PRIMARY KEY (UserID),"
-					+ "UNIQUE (Name)"
+					+ "PRIMARY KEY (UserID)"
 					+ ");";
 		 
-		 String editFinancialEntities = 
-				 "ALTER TABLE FinancialEntities ADD FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID);";
+		 String financialInstitutionsTable = 
+				 "CREATE TABLE FinancialInstitutions"
+				 	+ "("
+				 	+ "BankID varchar(36) NOT NULL,"
+				 	+ "Name varchar(255) NOT NULL,"
+				 	+ "Manager varchar(36) NOT NULL,"
+				 	+ "UNIQUE (Name),"
+				 	+ "PRIMARY KEY (BankID),"
+				 	+ "FOREIGN KEY (BankID) REFERENCES FinancialEntities(UserID),"
+				 	+ "FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID)"
+				 	+ ");";
 		 
+		
 		 String trustTable = 
 				 "CREATE TABLE Trust"
 				 	+ "("
-				 	+ "UserID int NOT NULL,"
-				 	+ "TargetID int NOT NULL,"
+				 	+ "UserID varchar(36) NOT NULL,"
+				 	+ "TargetID varchar(36) NOT NULL,"
 				 	+ "TrustLevel int NOT NULL DEFAULT 0,"
 				 	+ "IgnoreOffers ENUM('true','false') NOT NULL DEFAULt 'false',"
 				 	+ "CONSTRAINT uc_relationID PRIMARY KEY (UserID,TargetID),"
 				 	+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
 				 	+ "FOREIGN KEY (TargetID) REFERENCES FinancialEntities(UserID)"
 				 	+ ");";
-		 
-		 String trustView = 
-				 "CREATE VIEW trust_names AS "
-				 	+ "SELECT t1.Name as User,t2.Name as Target,Trust.TrustLevel "
-				 	+ "FROM Trust JOIN ("
-				 	+ "FinancialEntities as t1,"
-				 	+ "FinancialEntities as t2) "
-		 			+ "ON Trust.UserID=t1.UserID "
-		 			+ "AND Trust.TargetID=t2.UserID;";
-		 
-		 
+		 	 
 		 
 		 String creditHistoryTable = 
 				 "CREATE TABLE CreditHistory"
 				 	+ "("
 				 	+ "ItemID int NOT NULL AUTO_INCREMENT,"
-				 	+ "UserID int NOT NULL,"
+				 	+ "UserID varchar(36) NOT NULL,"
 				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart') NOT NULL,"
 				 	+ "ScoreValue double NOT NULL,"
 				 	+ "Parameter double NOT NULL DEFAULT " + dissipationFactor + ","
@@ -346,8 +365,8 @@ public final class SerenityLoans extends JavaPlugin {
 		 String membershipTable = 
 				 "CREATE TABLE Memberships"
 				 	+ "("
-				 	+ "UserID int NOT NULL,"
-				 	+ "MemberOf int NOT NULL,"
+				 	+ "UserID varchar(36) NOT NULL,"
+				 	+ "MemberOf varchar(36) NOT NULL,"
 				 	+ "JoinDate DATE NOT NULL,"
 					+ "CONSTRAINT uc_memberID PRIMARY KEY (UserID,MemberOf),"
 					+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
@@ -358,15 +377,15 @@ public final class SerenityLoans extends JavaPlugin {
 				 "CREATE TABLE Loans"
 				 	+ "("
 				 	+ "LoanID int NOT NULL AUTO_INCREMENT,"
-				 	+ "LenderID int NOT NULL,"
-				 	+ "BorrowerID int NOT NULL,"
+				 	+ "LenderID varchar(36) NOT NULL,"
+				 	+ "BorrowerID varchar(36) NOT NULL,"
 				 	+ "Terms int NOT NULL,"
 				 	+ "AutoPay ENUM('true','false') NOT NULL DEFAULT 'false',"
 					+ "Balance DECIMAL(9," + decimals + ") NOT NULL,"
 				 	+ "InterestBalance DECIMAL(9," + decimals + ") DEFAULT 0.0,"
 				 	+ "FeeBalance DECIMAL(9," + decimals + ") DEFAULT 0.0,"
-				 	+ "StartDate TIMESTAMP NOT NULL,"
-				 	+ "LastUpdate TIMESTAMP,"
+				 	+ "StartDate TIMESTAMP NOT NULL DEFAULT NOW(),"
+				 	+ "LastUpdate TIMESTAMP NULL,"
 				 	+ "Open ENUM('true', 'false') NOT NULL DEFAULT 'true',"
 				 	+ "PRIMARY KEY (LoanID),"
 				 	+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID),"
@@ -384,7 +403,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "Amount DECIMAL(9,"+ decimals + "),"
 				 	+ "Executed ENUM('true', 'false') NOT NULL DEFAULT 'false',"
 				 	+ "PRIMARY KEY (LoanEventID),"
-				 	+ "FOREIGN KEY (LoanID) REFERENCES FinancialEntities (UserID)"
+				 	+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
 				 	+ ");";
 		 
 		 String paymentStatementsTable = 
@@ -394,21 +413,21 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "LoanID int NOT NULL,"
 				 	+ "BillAmount DECIMAL(9," + decimals + ") NOT NULL,"
 				 	+ "Minimum DECIMAL(9," + decimals + ") NOT NULL,"
-				 	+ "StatementDate TIMESTAMP NOT NULL,"
-				 	+ "DueDate TIMESTAMP NOT NULL,"
+				 	+ "StatementDate TIMESTAMP DEFAULT 0,"
+				 	+ "DueDate TIMESTAMP DEFAULT 0,"
 				 	+ "BillAmountPaid DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "AdditionalPrincipal DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "AdditionalInterest DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "AdditionalFees DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "PRIMARY KEY (StatementID),"
-				 	+ "FOREIGN KEY (LoanID) REFERENCES FinancialEntities (UserID)"
+				 	+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
 				 	+ ");";
 		 
 		 String preparedOffersTable = 
 				 "CREATE TABLE PreparedOffers"
 				 	+ "("
 				 	+ "OfferID int NOT NULL AUTO_INCREMENT,"
-				 	+ "LenderID int NOT NULL,"
+				 	+ "LenderID varchar(36) NOT NULL,"
 				 	+ "OfferName varchar(255),"
 				 	+ "Value DECIMAL(9," + decimals + ") NOT NULL,"
 				 	+ "InterestRate DECIMAL(6,3) NOT NULL,"
@@ -429,9 +448,9 @@ public final class SerenityLoans extends JavaPlugin {
 		 String offersTable = 
 				 "CREATE TABLE Offers"
 				 	+ "("
-				 	+ "LenderID int NOT NULL,"
-				 	+ "BorrowerID int NOT NULL,"
-				 	+ "ExpirationDate TIMESTAMP NOT NULL,"
+				 	+ "LenderID varchar(36) NOT NULL,"
+				 	+ "BorrowerID varchar(36) NOT NULL,"
+				 	+ "ExpirationDate TIMESTAMP DEFAULT 0,"
 				 	+ "PreparedTerms int NOT NULL,"
 				 	+ "Sent ENUM('true','false') NOT NULL DEFAULT 'false',"
 				 	+ "CONSTRAINT uc_offerID PRIMARY KEY (LenderID,BorrowerID),"
@@ -453,29 +472,19 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 String loanView = 
 				 "CREATE VIEW loans_all AS "
-				 	+ "SELECT Loans.LoanID, Loans.LenderID, Loans.BorrowerID, t1.Name as LenderName, t2.Name as BorrowerName, Loans.StartDate, Loans.Balance, Loans.InterestBalance, Loans.FeeBalance, Loans.AutoPay, Loans.LastUpdate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
-				 	+ "FROM Loans JOIN ("
-				 	+ "FinancialEntities AS t1, "
-				 	+ "FinancialEntities AS t2, "
-				 	+ "PreparedOffers) "
-		 			+ "ON Loans.LenderID = t1.UserID "
-		 			+ "AND Loans.BorrowerID = t2.UserID "
-		 			+ "AND Loans.Terms = PreparedOffers.OfferID;";
+				 	+ "SELECT Loans.LoanID, Loans.LenderID, Loans.BorrowerID, Loans.StartDate, Loans.Balance, Loans.InterestBalance, Loans.FeeBalance, Loans.AutoPay, Loans.LastUpdate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
+				 	+ "FROM Loans JOIN (PreparedOffers) "
+		 			+ "ON Loans.Terms = PreparedOffers.OfferID;";
 		 
 		 String offerView = 
 				"CREATE VIEW offer_view AS "
-				 	+ "SELECT Offers.LenderID, Offers.BorrowerID, t1.Name as LenderName, t2.Name as BorrowerName, Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee " 
-				 	+ "FROM Offers JOIN ("
-				 	+ "FinancialEntities AS t1, "
-				 	+ "FinancialEntities AS t2, "
-				 	+ "PreparedOffers) "
-				 	+ "ON Offers.LenderID = t1.UserID "
-				 	+ "AND Offers.BorrowerID = t2.UserID "
-				 	+ "AND Offers.PreparedTerms = PreparedOffers.OfferID;";
+				 	+ "SELECT Offers.LenderID, Offers.BorrowerID,  Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee, PreparedOffers.LoanType " 
+				 	+ "FROM Offers JOIN (PreparedOffers) "
+				 	+ "ON Offers.PreparedTerms = PreparedOffers.OfferID;";
 		 
 		 String debtorView =
 				 "CREATE VIEW debtors AS "
-				 	+ "SELECT DISTINCT Name "
+				 	+ "SELECT DISTINCT UserID "
 				 	+ "From Loans JOIN FinancialEntities "
 				 	+ "ON Loans.BorrowerID=FinancialEntities.UserID;";
 		 
@@ -489,154 +498,189 @@ public final class SerenityLoans extends JavaPlugin {
 		 
 		 String writeVersion = "INSERT INTO Info VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
 
-		 String insertCentralBank = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES ('CentralBank', 'CreditUnion', ?, ?);";
-		 
 		 Statement statement = null;
 		 
 		 try {
 			statement = conn.createStatement();
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Statement created successfully.",getDescription().getName()));
+				logInfo("Statement created successfully.");
 			
 			statement.executeUpdate(financialEntityTable);
-			statement.executeUpdate(editFinancialEntities);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built FinancialEntities table successfully.",getDescription().getName()));
+				logInfo("Built FinancialEntities table successfully.");
+			
+			statement.executeUpdate(financialInstitutionsTable);
+			
+			if(debugLevel >=2)
+				logInfo("Built FinancialInstitutions table successfully.");
 			
 			statement.executeUpdate(trustTable);
-			statement.executeUpdate(trustView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Trust table successfully.",getDescription().getName()));
+				logInfo("Built Trust table successfully.");
 			
 			statement.executeUpdate(creditHistoryTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built CreditHistory table successfully.",getDescription().getName()));
+				logInfo("Built CreditHistory table successfully.");
 			
 			statement.executeUpdate(membershipTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Memberships table successfully.",getDescription().getName()));
+				logInfo("Built Memberships table successfully.");
 			
 			statement.executeUpdate(preparedOffersTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built PreparedOffers table successfully.",getDescription().getName()));
+				logInfo("Built PreparedOffers table successfully.");
 			
 			statement.executeUpdate(loanTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Loans table successfully.",getDescription().getName()));
+				logInfo("Built Loans table successfully.");
 			
 			statement.executeUpdate(loanEventsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built LoanEvents table successfully.",getDescription().getName()));
+				logInfo("Built LoanEvents table successfully.");
 			
 			statement.executeUpdate(paymentStatementsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built PaymentStatements table successfully.",getDescription().getName()));
+				logInfo("Built PaymentStatements table successfully.");
 			
 			statement.executeUpdate(offersTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Offers table successfully.",getDescription().getName()));
+				logInfo("Built Offers table successfully.");
 
 			statement.executeUpdate(signShopsTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built SignShops table successfully.",getDescription().getName()));
+				logInfo("Built SignShops table successfully.");
 			
 			statement.execute(loanView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Loans view successfully.",getDescription().getName()));
+				logInfo("Built Loans view successfully.");
 
 			statement.executeUpdate(offerView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Offers view successfully.",getDescription().getName()));
+				logInfo("Built Offers view successfully.");
 			
 			statement.executeUpdate(debtorView);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Debtors view successfully.",getDescription().getName()));
+				logInfo("Built Debtors view successfully.");
 		 
 			statement.executeUpdate(infoTable);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Built Info table successfully.",getDescription().getName()));
+				logInfo("Built Info table successfully.");
 		 
 			statement.executeUpdate(writeVersion);
 			
 			if(debugLevel >=2)
-				log.info(String.format("[%s] Wrote version info successfully.",getDescription().getName()));
-
-			PreparedStatement prep = conn.prepareStatement(insertCentralBank);
+				logInfo("Wrote version info successfully.");
 			
-			double centralBankCash = 0;
-			if(getConfig().contains("economy.central-bank-balance"))
-				centralBankCash = getConfig().getDouble("economy.central-bank-balance");
 			
-			int centralBankScore = 850;
-			if(getConfig().contains("trust.credit-score.score-range.max"))
-				centralBankScore = getConfig().getInt("trust.credit-score.score-range.max");
-			
-			prep.setDouble(1, centralBankCash);
-			
-			prep.setDouble(2, centralBankScore);
-			
-			int cbResult = prep.executeUpdate();
-			
-			if(debugLevel >= 1){
-				if (cbResult == 1)
-					log.info(String.format("[%s] Central bank entry added.", getDescription().getName()));
-				else
-					log.warning(String.format("[%s] Central bank entry failed.", getDescription().getName()));
-					
-			}
-			
-			playerManager.buildFinancialEntityInitialOffers("CentralBank");
 			
 		 } catch (SQLException e) {
 			if(debugLevel >=2)
-				log.severe(String.format("[%s] " + e.getMessage(), getDescription().getName()));
+				logFail(e.getMessage());
 			success = false;
 		 } finally {
 			 if(statement != null){statement.close();};
 		 }
 		 
 		 if(!success){
-			 log.severe(String.format("[%s] Unable to build database tables! Disabling...", getDescription().getName()));
+			 logFail("Unable to build database tables! Disabling...");
 			 getServer().getPluginManager().disablePlugin(this);
 			 return;
 		 }
 		 
 		 if(success && debugLevel >= 1)
-			 log.info(String.format("[%s] Database tables built successfully.", getDescription().getName()));
+			 logInfo("Database tables built successfully.");
 		 
 		 
+		 double centralBankCash = 0;
+		 if(getConfig().contains("economy.central-bank-balance"))
+			 centralBankCash = getConfig().getDouble("economy.central-bank-balance");
+			
+		 int centralBankScore = 850;
+		 if(getConfig().contains("trust.credit-score.score-range.max"))
+			 centralBankScore = getConfig().getInt("trust.credit-score.score-range.max");
+		 
+		 boolean cbResult = playerManager.createFinancialInstitution("CentralBank", null, PlayerType.CREDIT_UNION, centralBankCash, centralBankScore);
+		 
+		 if(debugLevel >= 1){
+			 if (cbResult)
+				 logInfo("Central bank entry added.");
+			 else
+				 logWarn("Central bank entry failed.");
+					
+			}
 	 }
 	 
 	 public static SerenityLoans getPlugin(){
 		 return plugin;
 	 }
 	    
-	    
-	 public FileConfiguration getConfig(){
-	 	return super.getConfig();
-	 }
-	 
+	    	 
 	 public Connection getConnection(){
 		 return conn;
 	 }
 	 
-	 public static EconomyManager getEcon(){
+	 public EconomyManager getEcon(){
 		 return econ;
+	 }
+	 
+	 public static void logInfo(String message){
+		 log.info(String.format("[%s] %s", "SerenityLoans", message));
+	 }
+	 
+	 public static void logWarn(String message){
+		 log.warning(String.format("[%s] %s", "SerenityLoans", message));
+	 }
+	 
+	 public static void logFail(String message){
+		 log.severe(String.format("[%s] %s", "SerenityLoans", message));
+	 }
+	 
+	 public void scheduleMessage(CommandSender sender, String message){
+			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, new String[]{message}));
+	 }
+	 
+	 public void scheduleMessage(CommandSender sender, String[] message){
+		 if(debugLevel >= 3)
+				logInfo(String.format("Entering %s method. %s", "scheduleMessage(CommandSender, String[])", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+			getServer().getScheduler().scheduleSyncDelayedTask(plugin, plugin.new MessageSender(sender, message));
+	 }
+	 
+	 
+	 private class MessageSender extends BukkitRunnable {
+		 
+		 CommandSender sendTo;
+		 String[] message;
+		 
+		 private MessageSender(CommandSender sendTo, String[] message){
+			 this.sendTo = sendTo;
+			 this.message = message;
+		 }
+		 
+		 public void run(){
+			 if(SerenityLoans.debugLevel >= 3)
+					SerenityLoans.logInfo(String.format("MessageSender run() method. %s", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+				
+			 
+			 sendTo.sendMessage(message);
+		 }
+		 
+		 
+		 
 	 }
 
 	 

@@ -41,7 +41,7 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans;
+package com.nwmogk.bukkit.loans.api;
 
 public enum PlayerType {
 	
@@ -60,5 +60,22 @@ public enum PlayerType {
 			return EMPLOYER;
 		
 		return PLAYER;
+	}
+	
+	public String toString(){
+		switch(this){
+		case PLAYER:
+			return "Player";
+		case BANK:
+			return "Bank";
+		case CREDIT_UNION:
+			return "CreditUnion";
+		case TOWN:
+			return "Town/Faction";
+		case EMPLOYER:
+			return "Employer";
+		}
+		
+		return null;
 	}
 }

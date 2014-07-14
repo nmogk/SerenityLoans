@@ -3,12 +3,12 @@
  *                               DESCRIPTION
  * ========================================================================
  * 
- * File: InsufficientCashException.java
+ * File: LoanState.java
  * Contributing Authors: Nathan W Mogk
  * 
- * This exception provides context for when an attempt is made to withdraw
- * cash from a FinancialEntity that does not have enough to complete the
- * operation.
+ * This class contains the information that defines the state of a loan.
+ * Objects of this class are immutable, so they will not change after 
+ * initial creation. This class may be redundant with the Loan class.
  * 
  * 
  * ========================================================================
@@ -40,40 +40,40 @@
  * 
  */
 
-package com.nwmogk.bukkit.loans.exception;
+package com.nwmogk.bukkit.loans.obsolete;
 
-import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import java.util.Date;
 
-public class InsufficientCashException extends Exception {
+import com.nwmogk.bukkit.loans.api.LoanInfo;
+import com.nwmogk.bukkit.loans.object.ImmutableOffer;
+import com.nwmogk.bukkit.loans.object.Loan;
 
-	private final FinancialEntity entity;
+/*
+ * May be redundant with the Loan class
+ */
+
+public class LoanState{
 	
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
+	public final double balance;
+	public final double interestBalance;
+	public final double feeBalance;
+	public final LoanInfo terms;
+	public final long startDate;
+	public final long lastUpdate;
 
-	public InsufficientCashException() {
-		entity = null;
-	}
-
-	public InsufficientCashException(String message) {
-		this(null, message);
-	}
-	
-	public InsufficientCashException(FinancialEntity entity){
-		this.entity = entity;
+	public LoanState(double balance, double interestBalance, double feeBalance, 
+			LoanInfo terms, Date startDate, Date lastUpdate) {
+		this.balance = balance;
+		this.interestBalance = interestBalance;
+		this.feeBalance = feeBalance;
+		this.terms = terms;
+		this.startDate = startDate.getTime();
+		this.lastUpdate = lastUpdate.getTime();
 	}
 	
-	public InsufficientCashException(FinancialEntity entity, String message){
-		super(message);
-		this.entity = entity;
+	public LoanState(Loan loan){
+		this(loan.getBalance(), loan.getInterestBalance(), loan.getFeesOutstanding(), 
+				new ImmutableOffer(loan), loan.getStartDate(), loan.getLastUpdate());
 	}
-	
-	public FinancialEntity getFinancialEntity(){
-		return entity;
-	}
-
-	
 
 }

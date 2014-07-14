@@ -8,52 +8,52 @@ commands:
   credit:
     description: This command allows credit card functionality
     usage: Use '/<command> help' for info.
-    permission: <plugin name>.credit
+    permission: serenityloans.credit
     permission-message: You do not have the required credit permissions!
   creditscore:
     description: This command allows for the checking of credit scores.
     usage: /<command> [player]
-    permission: <plugin name>.crcheck
+    permission: serenityloans.crcheck
     permission-message: You do not have <permission>!
   crunion:
     description: This command encodes the functionality for credit unions (banks).
     usage: Use '/<command> help' for info.
-    permission: <plugin name>.crunion
+    permission: serenityloans.crunion
     permission-message: You do not have permission to utilize credit unions!
   loan:
     description: This command allows loan functionality.
     usage: Use '/<command> help' for info.
-    permission: <plugin name>.loan
+    permission: serenityloans.loan
     permission-message: You do not have the required loan permissions!
   serenityloans:
     description: This command gives information on the SerenityLoans plugin and configuration.
     usage: Use '/<command> help' for info.
-    permission: <plugin name>.info
+    permission: serenityloans.info
     permission-message: You do not have <permission>!
   trust:
     description: This command implements the player trust system.
     usage: Use '/<command> help' for info.
-    permission: <plugin name>.trust
+    permission: serenityloans.trust
     permission-message: You do not have <permission>!
   sl-balance:
     description: This command allows players to check their asset balance.
     usage: /<command>
-    permission: <plugin name>.balance
+    permission: serenityloans.balance
     permission-message: You do not have <permission>!
   sl-cash:
     description: This command allows players to check their cash balance.
     usage: /<command>
-    permission: <plugin name>.balance
+    permission: serenityloans.balance
     permission-message: You do not have <permission>!
   sl-networth:
     description: This command allows players to check their net worth.
     usage: /<command>
-    permission: <plugin name>.balance
+    permission: serenityloans.balance
     permission-message: You do not have <permission>!
   sl-pay:
     description: This command allows players to pay other players.
     usage: /<command> [player] [amount]
-    permission: <plugin name>.pay
+    permission: serenityloans.pay
     permission-message: You do not have <permission>!
     
 permissions:

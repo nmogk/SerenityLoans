@@ -11,6 +11,15 @@
  * and checks if a particular entity is in the table. This class also
  * performs white-list and black-list checking of added players.
  * 
+ * This class also performs database calls on the FinancialInstitutions,
+ * Memberships, CreditHistory, and Trust tables. All methods of this class
+ * are thread-safe.
+ * 
+ * This class handles name and uuid lookups from the Mojang account service
+ * using evilmidget38's fetchers. These methods may block, so should not
+ * be run from the main thread. In addition, these methods rely on the
+ * caller to handle potential exceptions.
+ * 
  * 
  * ========================================================================
  *                            LICENSE INFORMATION
@@ -43,437 +52,567 @@
 
 package com.nwmogk.bukkit.loans;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.Charset;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.UUID;
 import java.util.Vector;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
-import com.google.common.io.Files;
-import com.nwmogk.bukkit.loans.object.FinancialEntity;
+import com.nwmogk.bukkit.evilmidget38.UUIDFetcher;
+import com.nwmogk.bukkit.evilmidget38.NameFetcher;
+import com.nwmogk.bukkit.loans.api.EconResult;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.PlayerType;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
+import com.nwmogk.bukkit.loans.object.FinancialPlayer;
 
 public class PlayerManager {
 	
 	private SerenityLoans plugin;
 	
+	// Each table that this class manages has a lock object.
+	private final Object financialEntitiesLock = new Object();
+	private final Object financialInstitutionsLock = new Object();
+	@SuppressWarnings("unused")
+	private final Object membershipsLock = new Object();
+	private final Object trustLock = new Object();
+	@SuppressWarnings("unused")
+	private final Object creditHistoryLock = new Object();
+	
+	/**
+	 * Creates a PlayerManager object with the specified plugin reference.
+	 * 
+	 * @param plugin SerenityLoans object with which this PlayerManager is associated.
+	 */
 	public PlayerManager(SerenityLoans plugin){
 		this.plugin = plugin;
 	}
 	
-	public FinancialEntity getFinancialEntity(String name){
-		
-		String entityNameSearch = "SELECT * from FinancialEntities WHERE Name=?;";
-		ResultSet result = null;
-		
-		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(entityNameSearch);
-			stmt.setString(1, name);
-			result = stmt.executeQuery();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return buildEntity(result);
-	}
 	
-	public FinancialEntity getFinancialEntity(int userID){
-		
-		String entityIDSearch = "SELECT * from FinancialEntities WHERE UserID="+ userID +";";
-		ResultSet result = null;
-		
-		try {
-			Statement stmt = plugin.conn.createStatement();
-			result = stmt.executeQuery(entityIDSearch);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return buildEntity(result);
-	}
 	
-	private FinancialEntity buildEntity(ResultSet successfulQuery){
-		if(successfulQuery == null)
-			return null;
-		
-		try {
-			if(!successfulQuery.next())
-				return null;
-			
-			int userID = successfulQuery.getInt("UserID");
-			String name = successfulQuery.getString("Name");
-			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
-			double cash = successfulQuery.getDouble("Cash");
-			int crScore = successfulQuery.getInt("CreditScore");
-			
-			int manager = successfulQuery.getInt("Manager");
-			manager = manager == 0? userID : manager;
-			
-			return new FinancialEntity(userID, name, pt, manager, cash, crScore);
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		return null;
-	}
-
-	public boolean inFinancialEntitiesTable(String entityName) {
-		String entityNameSearch = "SELECT Name from FinancialEntities WHERE Name=?;";
-		boolean result = false;
-		
-		try {
-			PreparedStatement stmt = plugin.getConnection().prepareStatement(entityNameSearch);
-			
-			stmt.setString(1, entityName);
-			
-			ResultSet answer = stmt.executeQuery();
-			
-			result = answer.next();
-
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-
-		return result;
-	}
-
 	/**
 	 * 
+	 * Attempts to add a Player corresponding to the given UUID to the 
+	 * FinancialEntities table. Will fail if given a UUID that does not
+	 * represent an online Player unless the UUID is already present
+	 * in the table. In this case, the method reports that the entity
+	 * exists. 
 	 * 
-	 * 
-	 * @param entityName
+	 * @param playerID UUID of the player to be added.
 	 * @return true if the entity is in the FinancialEntities table
-	 * by the end of the method.
+	 * by the end of the method, false otherwise.
 	 */
-	public boolean addToFinancialEntitiesTable(String playerName) {
-		return addToFinancialEntitiesTable(playerName, null);
-	}
-	
-	public void addToFinancialEntitiesTable(Player[] playerNames){
+	public boolean addPlayer(UUID playerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "addPlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		String update = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		PreparedStatement stmt = null;
-		
-		try {
-			stmt = plugin.getConnection().prepareStatement(update);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		}
-		
-		for(Player aPlayer : playerNames){
-			addToFinancialEntitiesTable(aPlayer.getName(), stmt);
-		}
-		
-	}
-	
-	
-	private boolean addToFinancialEntitiesTable(String playerName, PreparedStatement statement){
-		boolean white = false;
-		boolean black = false;
-		
-		if(inFinancialEntitiesTable(playerName)){
+		// Check to see if the entity is already in the table
+		if(inFinancialEntitiesTable(playerID)){
 			
 			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), playerName));
-			
-			
+				SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), playerID.toString()));
+
 			return true;
 		
 		}
 		
-		Player player = plugin.getServer().getPlayer(playerName);
+		// Check to ensure that the given ID represents an online player.
+		Player player = plugin.getServer().getPlayer(playerID);
 		if(player == null){
 			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Player %s is not online.", plugin.getDescription().getName(), playerName));
-
+				SerenityLoans.log.info(String.format("[%s] Player %s is not online.", plugin.getDescription().getName(), playerID.toString()));
+	
 			return false;
 		}
 		
-		if(plugin.getConfig().contains("options.use-whitelist"))
-			white = plugin.getConfig().getBoolean("options.use-whitelist");
-		else if(plugin.getConfig().contains("options.use-blacklist"))
-			black = plugin.getConfig().getBoolean("options.use-blacklist");
+		return addPlayers(new Player[]{player});
 		
-		if(white || black) {
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Using a white/black list.", plugin.getDescription().getName()));
-			
-			
-			Charset charset = Charset.forName("US-ASCII");
-			
-			String fname = white? "whitelist":"blacklist";
-			File list = new File(plugin.getDataFolder().getAbsolutePath() + fname + ".txt");
-			
-			LinkedList<String> names = new LinkedList<String>();
-				
-			try {
-				
-				if(!list.exists()){
-					
-					list.createNewFile();
-					return false;
-					
-				} else {
-				
-					BufferedReader reader = Files.newReader(list, charset);
-			
-					while(true){
-						String name = reader.readLine();
-						
-						if(name == null)
-							break;
-						
-						names.add(name);
-					}
-				
-				}
-		
-			} catch (FileNotFoundException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			} catch (IOException e) {
-				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-				e.printStackTrace();
-			}
-			
-			boolean nameFound = false;
-			
-			for(String candidate : names) {
-				nameFound |= playerName.equals(candidate);
-			}
-			
-			if(!(nameFound && white) && !(!nameFound && black))
-				return false;
-			
-		}
-		
-		
-		String update = "INSERT INTO FinancialEntities (Name, Type, Cash, CreditScore) VALUES (?,?,?,?);";
-		int rowsUpdated = 0;
-		
-		try {
-			
-			PreparedStatement stmt = statement == null? plugin.getConnection().prepareStatement(update) : statement;
-			
-			stmt.setString(1, playerName);
-			stmt.setString(2, "Player");
-			
-			double cash = 100;
-			int crScore = 465;
-			
-			if(plugin.getConfig().contains("economy.initial-money"))
-				cash = plugin.getConfig().getDouble("economy.initial-money");
-			if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
-				crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
-			
-			stmt.setDouble(3, cash);
-			stmt.setInt(4, crScore);
-			
-			rowsUpdated = stmt.executeUpdate();
-			
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			
-		}
-		
-		if(rowsUpdated != 1){
-			if(SerenityLoans.debugLevel >= 2)
-				SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), playerName));
-			
-			return false;
-		}
-		
-		buildFinancialEntityInitialOffers(playerName);
-		
-		if(SerenityLoans.debugLevel >= 2)
-			SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), playerName));
-		
-		
-		return true;
 	}
 
-	public void buildFinancialEntityInitialOffers(String playerName) {
 
-		// Collect config info
-		double value = 100;
-		double interestRate = 0.05;
+	/**
+	 * 
+	 * Attempts to add all Players given to the 
+	 * FinancialEntities table. 
+	 * 
+	 * @param players Array of the players to be added.
+	 * @return true if all players were added successfully, false otherwise.
+	 */
+	public boolean addPlayers(Player[] players){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "addPlayers(Player[])", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		double minPayment = 15;
-		double lateFee = 0;
-		double serviceFee = 0;
 		
-		long term = 2419200000L;
-		long compoundingPeriod = 604800000L;
-		long paymentTime = 604800000L;
-		long paymentFrequency = 2419200000L;
-		long gracePeriod  = 0L;
-		long serviceFeeFrequency =  0L;
-		String loanType = "'Bullet'";
+		boolean result = true;
 		
-		FileConfiguration config = plugin.getConfig();
-		
-		String valuePath = 		"loan.terms-constraints.principal-value.default";
-		String interestPath = 	"loan.terms-constraints.interest.default";
-		String compoundPath = 	"loan.terms-constraints.interest.compounding.default";
-		String minPath = 		"loan.terms-constraints.min-payment.default";
-		String termPath = 		"loan.terms-constraints.term.default";
-		String paytimePath = 	"loan.terms-constraints.payment-time.default";
-		String payfreqPath = 	"loan.terms-constraints.payment-frequency.default";
-		String latePath = 		"loan.terms-constraints.fees.late-fee.default";
-		String gracePath = 		"loan.terms-constraints.fees.grace-period.default";
-		String servicePath = 	"loan.terms-constraints.fees.service-fee.default";
-		String servfreqPath = 	"loan.terms-constraints.fees.service-fee-frequency.default";
+				
+		// Loop through all of the players given
+		for(Player aPlayer : players){
+			
+			// Check to see if the entity is already in the table
+			if(inFinancialEntitiesTable(aPlayer.getUniqueId())){
+				
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.log.info(String.format("[%s] Player %s is already in system.", plugin.getDescription().getName(), aPlayer.getName()));
 
-		if(config.contains(valuePath) && config.isDouble(valuePath))
-			value = Math.max(0, config.getDouble(valuePath));
+				continue;
+			
+			}
+						
+			String update = "INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?,?,?,?);";
+			int rowsUpdated = 0;
+			
+			try {
+				
+				PreparedStatement stmt = plugin.getConnection().prepareStatement(update);
+				
+				stmt.setString(1, aPlayer.getUniqueId().toString());
+				stmt.setString(2, "Player");
+				
+				double cash = 100;
+				int crScore = 465;
+				
+				// Collect configured defaults for initial values
+				if(plugin.getConfig().contains("economy.initial-money"))
+					cash = plugin.getConfig().getDouble("economy.initial-money");
+				if(plugin.getConfig().contains("trust.credit-score.no-history-score"))
+					crScore = plugin.getConfig().getInt("trust.credit-score.no-history-score");
+				
+				stmt.setDouble(3, cash);
+				stmt.setInt(4, crScore);
+				
+				synchronized(financialEntitiesLock){
+					rowsUpdated = stmt.executeUpdate();
+				}
+				
+				stmt.close();
+				
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+				
+			}
+			
+			// A single row should have been affected by the addition
+			if(rowsUpdated != 1){
+				if(SerenityLoans.debugLevel >= 2)
+					SerenityLoans.log.info(String.format("[%s] Adding player %s failed.", plugin.getDescription().getName(), aPlayer.getName()));
+				
+				result = false;
+			}
+			
+			// Add offers entries for this entity
+			plugin.offerManager.buildFinancialEntityInitialOffers(aPlayer.getUniqueId());
+			
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.log.info(String.format("[%s] Adding player %s succeeded.", plugin.getDescription().getName(), aPlayer.getName()));
+			
+			
+		}
+		
+		return result;
+	}
 
-		if(config.contains(interestPath) && config.isDouble(interestPath))
-			interestRate = Math.max(0, config.getDouble(interestPath));
+	/**
+	 * Attempts to create a FinancialInstitution with the given name and manager. The
+	 * initial cash of the Institution is set to 0, and the credit score is set to that
+	 * of the manager. The type of the Institution is assumed to be Credit Union.
+	 * The manager must be a player.
+	 * The method will give assign a UUID to the new FinancialInstitution and add it to
+	 * the FinancialEntities table. If a FinancialInstitution already exists, this 
+	 * method will return success if the manager is the same, or fail if the existing
+	 * FinancialInstitution is managed by another entity.
+	 * 
+	 * @param desiredName The name of the new FinancialInstitution. Must be unique.
+	 * @param manager The entity which manages this FinancialInstitution.
+	 * @return true if the FinancialInstitution exists in the table at the end of the method,
+	 * false otherwise.
+	 */
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		if(config.contains(minPath) && config.isDouble(minPath))
-			minPayment = Math.max(0, config.getDouble(minPath));
+		return createFinancialInstitution(desiredName, manager, PlayerType.CREDIT_UNION, 0.0, manager.getCreditScore());
+	}
+
+	/**
+	 * 
+	 * Attempts to create a FinancialInstitution with the given name, manager, entity type,
+	 * initial cash, credit score. The manager must be a player.
+	 * The method will give assign a UUID to the new FinancialInstitution and add it to
+	 * the FinancialEntities table. If a FinancialInstitution already exists, this 
+	 * method will return success if the manager is the same, or fail if the existing
+	 * FinancialInstitution is managed by another entity.
+	 * 
+	 * @param desiredName The name of the new FinancialInstitution. Must be unique.
+	 * @param manager The entity which manages this FinancialInstitution.
+	 * @param type Type of Institution. Must be one of PlayerType excluding "Player".
+	 * @param initialCash Initial account balance.
+	 * @param crScore Initial creadit score.
+	 * @return true if the FinancialInstitution exists in the table at the end of the method,
+	 * false otherwise.
+	 */
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity, PlayerType, double, int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		if(config.contains(latePath) && config.isDouble(latePath))
-			lateFee = Math.max(0, config.getDouble(latePath));
 		
-		if(config.contains(servicePath) && config.isDouble(servicePath))
-			serviceFee = Math.max(0, config.getDouble(servicePath));
+		if(desiredName.equalsIgnoreCase("CentralBank"));
+		// Manager must be a player (yeah yeah)
+		else if(manager == null || manager.getPlayerType() != PlayerType.PLAYER)
+			return false;
 		
-		if(config.contains(termPath) && config.isString(termPath)){
-			long temp = Conf.parseTime(config.getString(termPath));
-			term = temp == 0? term : temp;
+		// Institution must not be a player
+		if(type.equals(PlayerType.PLAYER))
+			return false;
+		
+		// Name check. Names must be unique
+		UUID existingId = getFinancialInstituteID(desiredName);
+		if(existingId != null){
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info("Institute with same name found.");
+			
+			FinancialInstitution currentHolder = getFinancialInstitution(existingId);
+			
+			if(currentHolder.getResponsibleParty().equals(manager.getUserID())){
+				if(SerenityLoans.debugLevel > 1)
+					SerenityLoans.log.info("Looks like the institute already exists.");
+				
+				return true;
+			} else {
+				if(SerenityLoans.debugLevel > 1)
+					SerenityLoans.log.info("Institute name taken.");
+				
+				
+				return false;
+			}
 		}
 		
-		if(config.contains(compoundPath) && config.isString(compoundPath)){
-			long temp = Conf.parseTime(config.getString(compoundPath));
-			compoundingPeriod = temp == 0? compoundingPeriod : temp;
-		}
 		
-		if(config.contains(paytimePath) && config.isString(paytimePath)){
-			long temp = Conf.parseTime(config.getString(paytimePath));
-			paymentTime = temp == 0? paymentTime : temp;
-		}
+		UUID instituteId = null;
 		
-		if(config.contains(payfreqPath) && config.isString(payfreqPath)){
-			long temp = Conf.parseTime(config.getString(payfreqPath));
-			paymentFrequency = temp == 0? paymentFrequency : temp;
-		}
+		// Pick an unoccupied UUID
+		do {
+			instituteId = UUID.randomUUID();
+		} while(inFinancialEntitiesTable(instituteId));
 		
-		if(config.contains(gracePath) && config.isString(gracePath))
-			gracePeriod = Conf.parseTime(config.getString(gracePath));
+		if(SerenityLoans.debugLevel > 1)
+			SerenityLoans.log.info(String.format("[%s] Free UUID found: %s", plugin.getDescription().getName(), instituteId.toString()));
 		
-		if(config.contains(servfreqPath) && config.isString(servfreqPath))
-			serviceFeeFrequency = Conf.parseTime(config.getString(servfreqPath));
+		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
+		String fInstituteString = "INSERT INTO FinancialInstitutions (BankID, Name, Manager) VALUES (?, ?, ?);";
 		
-		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
-		
-		String query1 = "SELECT OfferName FROM PreparedOffers WHERE LenderID=?";
-		String query2 = "INSERT INTO PreparedOffers (" + columns + ") VALUES (?, ?, " + value + ", " + interestRate + ", " + term + ", " + compoundingPeriod + ", " + gracePeriod + ", " + paymentTime + ", " + paymentFrequency + ", " + lateFee + ", " + minPayment + ", " + serviceFeeFrequency + ", " + serviceFee + ", " + loanType + ");";
+		boolean success = true;
 		
 		try {
+			PreparedStatement ps1 = plugin.conn.prepareStatement(fEntityString);
+			PreparedStatement ps2 = plugin.conn.prepareStatement(fInstituteString);
 			
-			// Collect info from FinancialEntities table
+			ps1.setString(1, instituteId.toString());
+			ps1.setString(2, type.toString());
 			
+			ps2.setString(1, instituteId.toString());
+			ps2.setString(2, desiredName);
+			ps2.setString(3, desiredName.equalsIgnoreCase("CentralBank")? instituteId.toString() : manager.getUserID().toString());
 			
-			int lenderID = getFinancialEntityID(playerName);
-			
-			if(lenderID == 0){
-				return;
+			// I should probably acquire both locks at the same time, but I don't think
+			// a problem is likely.
+			synchronized(financialEntitiesLock){
+				success &= ps1.executeUpdate() == 1;
 			}
 			
-			// build two PreparedOffers
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info(String.format("[%s] FinancialEntities written successfully.", plugin.getDescription().getName()));
 			
-			PreparedStatement stmt1 = plugin.conn.prepareStatement(query1);
 			
-			stmt1.setInt(1, lenderID);
-			
-			ResultSet existingOffers = stmt1.executeQuery();
-			
-			Set<String> searchSet = new HashSet<String>();
-			
-			while(existingOffers.next()){
-				searchSet.add(existingOffers.getString("OfferName"));
+			synchronized(financialInstitutionsLock){
+				success &= ps2.executeUpdate() == 1;
 			}
 			
-			PreparedStatement stmt2 = plugin.conn.prepareStatement(query2);
-			
-			stmt2.setInt(1, lenderID);
-			
-			
-			if(searchSet.size() == 0 || !searchSet.contains("default")){
-			
-			stmt2.setString(2, "default");
-			stmt2.executeUpdate();
-			}
-			
-			if(searchSet.size() == 0 || !searchSet.contains("prepared")){
-			stmt2.setString(2, "prepared");
-			
-			stmt2.executeUpdate();
-			}
-			
-			stmt1.close();
-			stmt2.close();
+			if(SerenityLoans.debugLevel > 1)
+				SerenityLoans.log.info(String.format("[%s] FinancialInstitutions written successfully.", plugin.getDescription().getName()));
 			
 			
+			ps1.close();
+			ps2.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
-
+		
+		// Populate the default offer tables.
+		plugin.offerManager.buildFinancialEntityInitialOffers(instituteId);
+		
+		return success;
+	}
+	
+	/**
+	 * This method adds the given amount to the specified
+	 * entity. It returns the success of the method. If the
+	 * amount given is negative, then the method will return
+	 * false. This method locks the FinancialEntities table
+	 * for the entire execution to ensure memory consistency.
+	 * 
+	 * @param entityId
+	 * @param amount
+	 * @return
+	 */
+	public EconResult depositCash(UUID entityId, double amount){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "depositCash(UUID, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		synchronized(financialEntitiesLock){
+			
+			FinancialEntity entity = getFinancialEntityAdd(entityId);
+			
+			if(entity == null)
+				return new EconResult(0, 0, false, "Entity is not recognized.");
+			
+			String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%s;", entity.getCash() + amount, entityId.toString());
+			
+			try {
+				Statement stmt = plugin.conn.createStatement();
 				
+				if(stmt.executeUpdate(updateSQL) == 1)
+					return new EconResult(amount, entity.getCash() + amount, true, null);
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(e.getMessage());
+				e.printStackTrace();
+			}
+		}
+		
+		return new EconResult(0, 0, false, "Problem updating database.");
 	}
 
 	/**
-	 * Reads the FinancialEntities table, and returns the UserID associated
-	 * with the given name or 0, if the name is not present. 
+	 * This method takes an name of a FinancialEntity and locates the appropriate uuid.
+	 * This method performs the call with a Callable object running in a separate 
+	 * thread. This method will block, and should be used with appropriate caution. 
+	 * A check is first performed to see if the given name represents a FinancialInstitution,
+	 * in which case, no unexpected behavior should result. This method will time out
+	 * according to the configuration settings.
+	 * 
+	 * @param entityName The name of the entity to search for.
+	 * @return A uuid corresponding to the given entity name.
+	 * @throws InterruptedException 
+	 * @throws ExecutionException When the Callable thread encounters an execution issue.
+	 * @throws TimeoutException When the timeout has been reached without a response.
+	 */
+	public UUID entityIdLookup(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityIdLookup(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		// First perform the FinancialIstitution search
+		UUID result = getFinancialInstituteID(entityName);
+		
+		if(result != null)
+			return result;
+		
+		// Use evilmidget38's Fetcher class
+		Callable<Map<String,UUID>> fetcher = new UUIDFetcher(Arrays.asList(entityName));
+		Future<Map<String,UUID>> answer = plugin.threads.submit(fetcher);
+		
+		// Will either get the answer or throw an exception.
+		// No need to return a special value.
+		result = answer.get(Conf.getLookupTimeout(), TimeUnit.MILLISECONDS).get(entityName);
+		
+		return result;
+	}
+
+	/**
+	 * This method takes a UUID that represents a financial entity and attempts to find a name.
+	 * It first checks the list of FinancialInstitutions, and then it checks the online
+	 * Player list. If neither of these searches return a value, then a call to the Mojang
+	 * account service ensues. his method performs the call with a Callable object running in 
+	 * a separate thread. This method will block, and should be used with appropriate caution.
+	 * This method will time out according to the configuration settings.
+	 * 
+	 * @param entityID UUID of the entity to search for.
+	 * @return The name associated with this UUID.
+	 * @throws InterruptedException
+	 * @throws ExecutionException When the Callable thread encounters an execution issue.
+	 * @throws TimeoutException When the timeout has been reached without a response.
+	 */
+	public String entityNameLookup(UUID entityID) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityNameLookup(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		// First search FinancialInstitutions
+		FinancialInstitution bank = getFinancialInstitution(entityID);
+		if(bank != null)
+			return bank.getName();
+		
+		// Then search for online players
+		Player player = plugin.getServer().getPlayer(entityID);
+		
+		if(player != null)
+			return player.getName();
+		
+		// Having exhausted the fast calls, use evilmidget38's Fetcher class
+		Callable<Map<UUID,String>> fetcher = new NameFetcher(Arrays.asList(entityID));
+		Future<Map<UUID,String>> answer = plugin.threads.submit(fetcher);
+		
+		// Will give answer or throw exception
+		String result = answer.get(Conf.getLookupTimeout(), TimeUnit.MILLISECONDS).get(entityID);
+		
+		return result;
+	}
+
+	/**
+	 * This is a convenience method that performs the same function as entityNameLookup(UUID),
+	 * but takes a FinancialEntity instead of a raw UUID. This method can be marginally
+	 * faster than the other in the event that the FinancialEntity is a FinancialInstitution,
+	 * since there is no SQL call to perform the first check.
+	 * 
+	 * @param entity FinancialEntity to search for.
+	 * @return The name associated with this FinancialEntity.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	public String entityNameLookup(FinancialEntity entity) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "entityNameLookup(FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		if(entity instanceof FinancialInstitution)
+			return ((FinancialInstitution) entity).getName();
+		return entityNameLookup(entity.getUserID());
+	}
+
+	/**
+	 * This method returns a FinancialEntity object given the UUID of the entity. If no entity
+	 * with that UUID exists in the table, it returns null; Note that all FinancialEntities are
+	 * immutable.
+	 * 
+	 * @param userID UUID used in the search.
+	 * @return The FinancialEntity object represented by the UUID, or null.
+	 */
+	public FinancialEntity getFinancialEntity(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntity(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		return buildEntity(queryFinancialEntitiesTable(userID));
+	}
+	
+	/**
+	 * This method returns a FinancialEntity object given the name of the entity. If no entity
+	 * with that name exists, it returns null; Note that all FinancialEntities are
+	 * immutable. This method relies on a name lookup which can be potentially blocking, and
+	 * so should be used with caution.
+	 * 
+	 * @param name FinancialEntity name.
+	 * @return FinancialEntity object represented by the name.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	@Deprecated
+	public FinancialEntity getFinancialEntity(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntity(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		return getFinancialEntity(entityIdLookup(name));
+	}
+
+	/**
+	 * This method returns a FinancialEntity object given the UUID of the entity. If no entity
+	 * with that UUID exists in the table, it attempts to add the entity as a player. If that
+	 * still fails, it returns null; Note that all FinancialEntities are
+	 * immutable.
+	 * 
+	 * @param userID UUID used in the search.
+	 * @return The FinancialEntity object represented by the UUID, or null.
+	 */
+	public FinancialEntity getFinancialEntityAdd(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntityAdd(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		FinancialEntity result = getFinancialEntity(userID);
+		
+		if(result == null){
+			if(!plugin.playerManager.addPlayer(userID)){
+						
+				return null;
+			}
+			
+			result = plugin.playerManager.getFinancialEntity(userID);
+		}
+		
+		return result;
+	}
+
+
+
+	/**
+	 * This method returns a FinancialEntity object given the name of the entity. If no entity
+	 * with that name exists, it attempts to add the entity as a player. If that
+	 * still fails, it returns null; Note that all FinancialEntities are
+	 * immutable. This method relies on a name lookup which can be potentially blocking, and
+	 * so should be used with caution.
+	 * 
+	 * @param name FinancialEntity name.
+	 * @return FinancialEntity object represented by the name.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	@Deprecated
+	public FinancialEntity getFinancialEntityAdd(String name) throws InterruptedException, ExecutionException, TimeoutException{
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntityAdd(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		return getFinancialEntityAdd(entityIdLookup(name));
+	}
+
+
+
+	/**
+	 * Reads the FinancialInstitutions table, and returns the UUID associated
+	 * with the given name or null, if the name is not present. 
 	 * 
 	 * @param entityName
-	 * @return
+	 * @return UUID of the FinancialInstitution with the given name or null.
 	 */
-	public int getFinancialEntityID(String entityName) {
+	public UUID getFinancialInstituteID(String entityName) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstituteID(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		String query = "SELECT UserID from FinancialEntities WHERE Name=?;";
-		int result = 0;
+		String query = "SELECT BankID from FinancialInstitutions WHERE Name=?;";
+		String idString = null;
+		UUID result = null;
 		
 		try {
 			PreparedStatement stmt = plugin.getConnection().prepareStatement(query);
 			
 			stmt.setString(1, entityName);
 			
-			ResultSet candidates = stmt.executeQuery();
+			synchronized(financialInstitutionsLock){
+				ResultSet candidates = stmt.executeQuery();
 			
-			if(!candidates.next()){
-				
-				if(SerenityLoans.debugLevel >=2){
-					SerenityLoans.log.info(String.format("[%s] FinancialEntityID for " + entityName + " failed. Entity not found.", plugin.getDescription().getName()));
+			
+				if(!candidates.next()){
+					
+					if(SerenityLoans.debugLevel >=2){
+						SerenityLoans.log.info(String.format("[%s] FinancialEntityID search for " + entityName + " failed. Institution not found.", plugin.getDescription().getName()));
+					}
+					
+					stmt.close();
+					return result;
+					
 				}
 				
-				return result;
-				
+				idString = candidates.getString("BankID");
 			}
-			
-			result = candidates.getInt("UserID");
 			
 			stmt.close();
 		} catch (SQLException e) {
@@ -481,10 +620,135 @@ public class PlayerManager {
 			e.printStackTrace();
 		}
 		
+		result = UUID.fromString(idString);
+		
 		if(SerenityLoans.debugLevel >=2){
 			SerenityLoans.log.info(String.format("[%s] FinancialEntityID for " + entityName + "=" + result, plugin.getDescription().getName()));
 		}
 
+		return result;
+	}
+	
+	/**
+	 * Reads the FinancialInstitutions table and returns a FinancialInstitution object
+	 * representing the given ID or null if no entry exists. Note that FinancialInstitution
+	 * objects are immutable.
+	 * 
+	 * @param bankId UUID of the relevant FinancialInstitution
+	 * @return FinancialInstitution object representing the entry or null.
+	 */
+	public FinancialInstitution getFinancialInstitution(UUID bankId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		FinancialEntity result = buildEntity(queryFinancialEntitiesTable(bankId));
+		if(result != null && result instanceof FinancialInstitution)
+			return (FinancialInstitution) result;
+		return null;
+	}
+	
+	/**
+	 * Reads the FinancialInstitutions table and returns a FinancialInstitution object
+	 * representing the given name or null if no entry exists. Note that FinancialInstitution
+	 * objects are immutable.
+	 * 
+	 * @param bankName Name of the relevant FinancialInstitution
+	 * @return FinancialInstitution object representing the entry or null.
+	 */
+	public FinancialInstitution getFinancialInstitution(String bankName){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		return getFinancialInstitution(getFinancialInstituteID(bankName));
+	}
+
+	/**
+	 * This method takes a UUID of a player and returns a Vector of UUIDs representing
+	 * the Entities that this user manages. If the user does not manage any entities, then
+	 * it returns null. Note that a manager must be a player. 
+	 * 
+	 * @param playerID UUID of player to check.
+	 * @return A vector of UUIDs of managed entities or null.
+	 */
+	public Vector<UUID> getManagedEntities(UUID playerID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getManagedEntities(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		Vector<UUID> results = new Vector<UUID>();
+		
+		String query = "SELECT BankID FROM FinancialInstitutions WHERE Manager=?;";
+		
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(query);
+			
+			stmt.setString(1, playerID.toString());
+			
+			synchronized(financialInstitutionsLock){
+				ResultSet hits = stmt.executeQuery();
+				
+				while(hits.next()){
+					results.add(UUID.fromString(hits.getString("BankID")));
+				}
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		if(results.size() == 0)
+			return null;
+		
+		return results;
+	}
+
+	/**
+	 * This method returns an OfflinePlayer object given a FinancialEntity
+	 * UUID. This method ensures that a real player is given. If the
+	 * input UUID is a FinancialInstitution, then the manager will be
+	 * returned. If the given UUID is not in the FinancialEntities table,
+	 * or cannot be found in the server's player cache, then it returns
+	 * null. Note this will return null for valid UUIDs that represent
+	 * players that have never played on the server. This method will not
+	 * handle large numbers of calls well, as it fetches the offline player
+	 * list from the server and searches it by brute-force each time it is
+	 * called.
+	 * 
+	 * @param financialEntityID
+	 * @return OfflinePlayer object corresponding to the input ID or manager thereof, or null.
+	 */
+	public OfflinePlayer getOfflinePlayer(UUID financialEntityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getOfflinePlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		FinancialEntity entity = getFinancialEntity(financialEntityID);
+		
+		if(entity == null)
+			return null;
+		
+		UUID playerID = entity.getUserID();
+		
+		// This only checks for management one level deep.
+		// Cannot have institutions that manage other institutions
+		if(entity instanceof FinancialInstitution)
+			playerID = ((FinancialInstitution)entity).getResponsibleParty();
+		
+		// TODO look for ways to improve
+		
+		// Only finds OfflinePlayers who have played on the server
+		OfflinePlayer[] allPlayers = plugin.getServer().getOfflinePlayers();
+		
+		OfflinePlayer result = null;
+		
+		// Currently does a brute-force linear approach. Not appropriate
+		// for large number of calls.
+		for(OfflinePlayer op : allPlayers){
+			if(op.getUniqueId().equals(playerID)){
+				result = op;
+				break;
+			}
+		}
+		
+		// Bukkit claims this is inefficient, but it would be convenient.
+		//return plugin.getServer().getOfflinePlayer(playerID);
+		
 		return result;
 	}
 
@@ -498,86 +762,342 @@ public class PlayerManager {
 	 * is offline, this method returns null.
 	 * 
 	 * @param financialEntityID
-	 * @return
+	 * @return Player corresponding to the input ID or manager thereof, or null.
 	 */
-	public Player getPlayer(int financialEntityID) {
-		if(financialEntityID <= 0)
+	public Player getPlayer(UUID financialEntityID) {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPlayer(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		FinancialEntity entity = getFinancialEntity(financialEntityID);
+		
+		if(entity == null)
 			return null;
 		
-		// This is injection safe since the input is guaranteed to be an int.
-		String queryString = "SELECT Manager from FinancialEntities WHERE UserID="+ financialEntityID +";";
-		int newID = financialEntityID;
-		String userName = "";
+		UUID playerID = entity.getUserID();
+		
+		if(entity instanceof FinancialInstitution)
+			playerID = ((FinancialInstitution)entity).getResponsibleParty();
+		
+		return plugin.getServer().getPlayer(playerID);
+		
+	}
+	
+	/**
+	 * Checks if the given UUID represents an entry in the FinancialEntities table.
+	 * 
+	 * @param entityID UUID to check
+	 * @return true if the entry was found, false otherwise.
+	 */
+	public boolean inFinancialEntitiesTable(UUID entityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialEntitiesTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		ResultSet result = queryFinancialEntitiesTable(entityID);
+		boolean answer = false;
 		
 		try {
-			Statement stmt = plugin.getConnection().createStatement();
+			answer = result.next();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return answer;
+	}
+
+	/**
+	 * Checks if the given name represents an entry in the FinancialEntities table.
+	 * This method depends on a blocking name lookup, and should be used with
+	 * caution.
+	 * 
+	 * @param entityName
+	 * @return true if the entry was found, false otherwise.
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 * @throws TimeoutException
+	 */
+	@Deprecated
+	public boolean inFinancialEntitiesTable(String entityName) throws InterruptedException, ExecutionException, TimeoutException {
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialEntitiesTable(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		return inFinancialEntitiesTable(entityIdLookup(entityName));
+	}
+
+	/**
+	 * Checks if the given UUID represents an entry in the FinancialInstitutions
+	 * table.
+	 * 
+	 * @param entityID UUID to check.
+	 * @return true if the entry was found, false otherwise.
+	 */
+	public boolean inFinancialInstitutionsTable(UUID entityID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "inFinancialInstitutionsTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		ResultSet result = queryFinancialInstitutionsTable(entityID);
+		boolean answer = false;
+		
+		try {
+			answer = result.next();
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return answer;
+	}
+
+	/**
+	 * This method checks is the first user is ignoring the second input user.
+	 * If there is no entry for this user pair, then it returns false.
+	 * 
+	 * @param userId User to check ignore status.
+	 * @param targetId Potentially ignored target.
+	 * @return true if user is ignoring target, false otherwise.
+	 */
+	public boolean isIgnoring(UUID userId, UUID targetId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "isIgnoring(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		String ignoreQuery = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(ignoreQuery);
 			
-			ResultSet validResults = stmt.executeQuery(queryString);
+			ps.setString(1, userId.toString());
+			ps.setString(2, targetId.toString());
 			
-			if(!validResults.next()){
-				stmt.close();
-				return null;
+			synchronized(trustLock){
+				ResultSet ignoreResult = ps.executeQuery();
+				
+				if(ignoreResult.next() && Boolean.valueOf(ignoreResult.getString("IgnoreOffers"))){
+					ps.close();
+					return true;
+				}
+				
+				else
+					ps.close();
 			}
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return false;
+	}
+
+	/**
+	 * Toggles the state of the first user ignoring offers from the target user.
+	 * If an entry does not already exist in the Trust table, one is created.
+	 * The method returns the new state ignore state, as if the isIgnoring(...)
+	 * method was called after the change.
+	 * 
+	 * @param playerId User to set ignore status.
+	 * @param targetId Target of ignore status.
+	 * @return true if user is now ignoring target, false otherwise.
+	 */
+	public boolean toggleIgnore(UUID playerId, UUID targetId){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "toggleIgnore(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		String querySQL = "SELECT IgnoreOffers FROM Trust WHERE UserID=? AND TargetID=?;";
+		
+		// Default if there isn't an entry already
+		boolean setToIgnore = true;
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(querySQL);
 			
-			int potentialManager = validResults.getInt("Manager");
-			newID = potentialManager + (1-Integer.signum(potentialManager)) * financialEntityID;
+			ps.setString(1, playerId.toString());
+			ps.setString(2, targetId.toString());
 			
-			String otherQueryString = "SELECT Name from FinancialEntities WHERE UserID=" + newID + ";";
+			synchronized(trustLock){
 			
-			validResults = stmt.executeQuery(otherQueryString);
+				ResultSet currentTrust = ps.executeQuery();
+				
+				String updateSQL;
+				
+				if(currentTrust.next()){
+					// Already an entry
+					
+					// Switches current state
+					setToIgnore = !Boolean.parseBoolean(currentTrust.getString("IgnoreOffers"));
+					
+					String ignoreString = setToIgnore? "'true'" : "'false'";
+					updateSQL = String.format("UPDATE Trust SET IgnoreOffers=%s WHERE UserID=? AND TargetID=?;",  ignoreString);
+					
+				} else {
+					// Need to create an entry
+					updateSQL = "INSERT INTO Trust (UserID, TargetID, IgnoreOffers) VALUES (?, ?, 'true');";
+				}
+				
+				PreparedStatement stmt = plugin.conn.prepareStatement(updateSQL);
+				
+				stmt.setString(1, playerId.toString());
+				stmt.setString(2, targetId.toString());
+				
+				stmt.executeUpdate();
+				
+				ps.close();
+				stmt.close();
+			}
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return setToIgnore;
+		
+	}
+	
+	/**
+	 * This method subtracts the given amount to the specified
+	 * entity. It returns the success of the method. If the
+	 * amount given is negative, then the method will return
+	 * false. This method locks the FinancialEntities table
+	 * for the entire execution to ensure memory consistency.
+	 * 
+	 * @param entityId
+	 * @param amount
+	 * @return
+	 */
+	public EconResult withdrawCash(UUID entityId, double amount){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "withdrawCash(UUID, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		if(amount < 0)
+			return new EconResult(0, 0, false, "Amount query is negative!");
+		
+		synchronized(financialEntitiesLock){
 			
-			if(!validResults.next())
+			FinancialEntity entity = getFinancialEntityAdd(entityId);
+			
+			if(entity == null)
+				return new EconResult(0, 0, false, "Entity is not recognized.");
+			
+			if(amount > entity.getCash())
+				return new EconResult(0, entity.getCash(), false, "Entity does not have sufficient funds.");
+						
+			String updateSQL = String.format("UPDATE FinancialEntities SET Cash=%f WHERE UserID=%s;", entity.getCash() - amount, entityId.toString());
+			
+			try {
+				Statement stmt = plugin.conn.createStatement();
+				
+				if(stmt.executeUpdate(updateSQL) == 1)
+					return new EconResult(amount, entity.getCash() - amount, true, null);
+			} catch (SQLException e) {
+				SerenityLoans.log.severe(e.getMessage());
+				e.printStackTrace();
+			}
+		}
+		
+		return new EconResult(0, 0, false, "Problem updating database.");
+	}
+
+	/*
+	 * Performs entity construction, given a ResultSet of the desired entry
+	 * in the FinancialEntities table. If the result is not a player, it attempts 
+	 * to find the corresponding entry in the FinancialInstitutions table. If one is found, then a 
+	 * FinancialInstitution object is created, if not, then it returns null.
+	 * A Player type will produce a FinancialPlayer object.
+	 */
+	private FinancialEntity buildEntity(ResultSet successfulQuery){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildEntity(ResultSet)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		
+		if(successfulQuery == null)
+			return null;
+		
+		try {
+			if(!successfulQuery.next())
 				return null;
 			
-			userName = validResults.getString("Name");
+			// Collect FinancialEntity information.
+			String userString = successfulQuery.getString("UserID");
+			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
+			double cash = successfulQuery.getDouble("Cash");
+			int crScore = successfulQuery.getInt("CreditScore");
 			
-			stmt.close();
+			UUID userID = UUID.fromString(userString);
+			
+			// Make FinancialPlayer object if that's what it is.
+			if(pt.equals(PlayerType.PLAYER))
+				return new FinancialPlayer(userID, pt, cash, crScore);
+			
+			// Get FinancialInstitution info if it exists.
+			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
+				
+			if(instituteQuery == null || !instituteQuery.next())
+				return null;
+				
+			String name = instituteQuery.getString("Name");
+			String managerString = instituteQuery.getString("Manager");
+			
+			UUID managerID = UUID.fromString(managerString);
+			
+			// Make FinancialInstitution object.
+			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
 			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
 		}
 		
-		
-		
-		return plugin.getServer().getPlayer(userName);
+		return null;
 	}
-	
-	public Vector<Integer> getManagedEntities(int playerID){
-		Vector<Integer> results = new Vector<Integer>();
+
+	/*
+	 * Performs a SQL query on the FinancialEntities table for the given UUID
+	 * are returns a result set containing every column of that entry. The
+	 * ResultSet may be empty if it was not found.
+	 */
+	private ResultSet queryFinancialEntitiesTable(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "queryFinancialEntitiesTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
-		String query = "SELECT UserID FROM FinancialEntities WHERE Manager=?;";
+		if(userID==null)
+			return null;
+		
+		String entitySearch = "SELECT * from FinancialEntities WHERE UserID=?;";
+		ResultSet result = null;
 		
 		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(query);
-			
-			stmt.setInt(1, playerID);
-			
-			ResultSet hits = stmt.executeQuery();
-			
-			while(hits.next()){
-				results.add(hits.getInt("UserID"));
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			synchronized(financialEntitiesLock){
+				result = stmt.executeQuery();
 			}
-			
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-		
+			e.printStackTrace();
 		}
 		
-		return results;
+		return result;
 	}
-	
-	public FinancialEntity getFinancialEntityRetryOnce(String name){
+
+	/*
+	 * Performs a SQL query on the FinancialInstitutions table for the given UUID
+	 * are returns a result set containing every column of that entry. The
+	 * ResultSet may be empty if it was not found.
+	 */
+	private ResultSet queryFinancialInstitutionsTable(UUID userID){
+		if(SerenityLoans.debugLevel >= 3)
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "queryFinancialInstitutionsTable(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+		if(userID==null)
+			return null;
 		
-		FinancialEntity result = getFinancialEntity(name);
+		String entitySearch = "SELECT * from FinancialInstitutions WHERE BankID=?;";
+		ResultSet result = null;
 		
-		if(result == null){
-			if(!plugin.playerManager.addToFinancialEntitiesTable(name)){
-						
-				return null;
+		try {
+			PreparedStatement stmt = plugin.conn.prepareStatement(entitySearch);
+			stmt.setString(1, userID.toString());
+			synchronized(financialInstitutionsLock){
+				result = stmt.executeQuery();
 			}
-			
-			result = plugin.playerManager.getFinancialEntity(name);
+		} catch (SQLException e) {
+			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
 		}
 		
 		return result;

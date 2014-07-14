@@ -41,18 +41,25 @@
 
 package com.nwmogk.bukkit.loans.object;
 
+import java.sql.Timestamp;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.commons.lang.ArrayUtils;
 
 import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.EconomyManager;
-import com.nwmogk.bukkit.loans.LoanInfo;
-import com.nwmogk.bukkit.loans.LoanType;
 import com.nwmogk.bukkit.loans.SerenityLoans;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.api.LoanInfo;
+import com.nwmogk.bukkit.loans.api.LoanType;
 
 public final class ImmutableOffer implements LoanInfo {
 	
 	private final FinancialEntity lender;
 	private final FinancialEntity borrower;
+	
+	private final int termsID;
 	
 	private final double value;
 	private final double interestRate;
@@ -67,6 +74,8 @@ public final class ImmutableOffer implements LoanInfo {
 	private final long paymentTime;
 	private final long paymentFrequency;
 	private final long serviceFeeFrequency;
+	
+	private final Timestamp expDate;
 		
 	private LoanType loanType;
 
@@ -85,9 +94,11 @@ public final class ImmutableOffer implements LoanInfo {
 		paymentFrequency = loan.getPaymentFrequency();
 		serviceFeeFrequency = loan.getServiceFeeFrequency();
 		loanType = loan.getLoanType();
+		expDate = null;
+		termsID = loan.getTermsId();
 	}
 	
-	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType){
+	public ImmutableOffer(FinancialEntity lender, FinancialEntity borrower, double value, double interestRate, double lateFee, double minPayment, double serviceFee, long term, long compoundingPeriod, long gracePeriod, long paymentTime, long paymentFrequency, long serviceFeeFrequency, LoanType loanType, Timestamp expDate, int termsID){
 		this.lender = lender;
 		this.borrower = borrower;
 		this.value = value;
@@ -102,16 +113,18 @@ public final class ImmutableOffer implements LoanInfo {
 		this.paymentFrequency = paymentFrequency;
 		this.serviceFeeFrequency = serviceFeeFrequency;
 		this.loanType = loanType;
+		this.expDate = expDate;
+		this.termsID = termsID;
 	}
 	
 	
-	public String[] toString(SerenityLoans plugin){
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException{
 		
-		EconomyManager econ = SerenityLoans.getEcon();
+		EconomyManager econ = plugin.getEcon();
 		
 		String[] result =  
-			{String.format("    Lender: %s", lender.getName()),
-			 String.format("    Borrower: %s", borrower.getName()),
+			{String.format("    Lender: %s", plugin.playerManager.entityNameLookup(lender)),
+			 String.format("    Borrower: %s",  plugin.playerManager.entityNameLookup(borrower)),
 			 String.format("    Loan value: %s", econ.format(value)),
 			 String.format("    Interest rate: %s (%s)",  econ.formatPercent(interestRate), Conf.getIntReportingString()),
 			 String.format("    Minimum payment: %s", econ.format(minPayment)),
@@ -164,4 +177,8 @@ public final class ImmutableOffer implements LoanInfo {
 	public double getServiceFee() {return serviceFee;}
 
 	public LoanType getLoanType() {return loanType;}
+	
+	public Timestamp getExpirationDate() {return expDate;}
+	
+	public int getPreparedTermsId(){return termsID;}
 }

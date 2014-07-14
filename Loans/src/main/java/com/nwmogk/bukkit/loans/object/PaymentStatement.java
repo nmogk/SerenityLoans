@@ -46,6 +46,8 @@ package com.nwmogk.bukkit.loans.object;
 
 import java.sql.Timestamp;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import com.nwmogk.bukkit.loans.SerenityLoans;
 
@@ -102,15 +104,15 @@ public final class PaymentStatement {
 		return minPayment;
 	}
 	
-	public String[] toString(SerenityLoans plugin){
+	public String[] toString(SerenityLoans plugin) throws InterruptedException, ExecutionException, TimeoutException{
 		
 		String[] result = 
 			{
 				String.format("    Loan: %s", plugin.loanManager.getLoan(loanID).getShortDescription(plugin, true)),
-				String.format("    Payment Remaining: %s", SerenityLoans.econ.format(getPaymentRemaining())),
+				String.format("    Payment Remaining: %s", plugin.econ.format(getPaymentRemaining())),
 				String.format("    Due date: %F", new Date(dueDate.getTime())),
 				String.format("    Statement Date: %F", new Date(statementDate.getTime())),
-				String.format("    %s", paid >= minPayment? "Original balance: " + SerenityLoans.econ.format(billAmount) : "Please pay at least " + SerenityLoans.econ.format(minPayment) + ".")
+				String.format("    %s", paid >= minPayment? "Original balance: " + plugin.econ.format(billAmount) : "Please pay at least " + plugin.econ.format(minPayment) + ".")
 			};
 		
 		return result;
