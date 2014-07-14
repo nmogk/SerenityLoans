@@ -1,6 +1,6 @@
 name: SerenityLoans
 main: com.nwmogk.bukkit.loans.SerenityLoans
-version: 0.0.1
+version: 0.0.2
 
 #softdepend: [Vault]
 

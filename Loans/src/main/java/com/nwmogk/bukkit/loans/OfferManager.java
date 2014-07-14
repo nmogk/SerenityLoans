@@ -77,6 +77,16 @@ public class OfferManager {
 		this.plugin = plugin;
 	}
 	
+	/**
+	 * This method inserts the entries for the two prepared offers
+	 * that each FinancialEntity possesses. The two offers have the
+	 * names 'prepared' and 'default'. This method first detects if
+	 * the offers have already been created. It populates the offers
+	 * with information in the configuration file.
+	 * 
+	 * @param playerID UUID of the entity to build tables for. UUID
+	 * need not represent a FinancialEntity.
+	 */
 	public void buildFinancialEntityInitialOffers(UUID playerID) {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildFinancialEntityInitialOffers(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -111,6 +121,7 @@ public class OfferManager {
 		String servicePath = 	"loan.terms-constraints.fees.service-fee.default";
 		String servfreqPath = 	"loan.terms-constraints.fees.service-fee-frequency.default";
 	
+		// Set values from settings
 		if(config.contains(valuePath) && config.isDouble(valuePath))
 			value = Math.max(0, config.getDouble(valuePath));
 	
@@ -152,6 +163,9 @@ public class OfferManager {
 		if(config.contains(servfreqPath) && config.isString(servfreqPath))
 			serviceFeeFrequency = Conf.parseTime(config.getString(servfreqPath));
 		
+		if(SerenityLoans.debugLevel >= 2)
+			SerenityLoans.logInfo("Default terms loaded from config.");
+		
 		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
 		
 		String query1 = "SELECT OfferName FROM PreparedOffers WHERE LenderID=?";
@@ -171,6 +185,7 @@ public class OfferManager {
 				
 				Set<String> searchSet = new HashSet<String>();
 				
+				// Add current offers to the search set
 				while(existingOffers.next()){
 					searchSet.add(existingOffers.getString("OfferName"));
 				}
@@ -178,17 +193,23 @@ public class OfferManager {
 				
 				stmt2.setString(1, playerID.toString());
 				
-				
+				// Only add offers if they don't already exist.
 				if(searchSet.size() == 0 || !searchSet.contains("default")){
 				
-				stmt2.setString(2, "default");
-				stmt2.executeUpdate();
+					if(SerenityLoans.debugLevel >= 2)
+						SerenityLoans.logInfo(String.format("Adding \'default\' prepared offer for %s.", playerID.toString()));
+					
+					stmt2.setString(2, "default");
+					stmt2.executeUpdate();
 				}
 				
 				if(searchSet.size() == 0 || !searchSet.contains("prepared")){
-				stmt2.setString(2, "prepared");
-				
-				stmt2.executeUpdate();
+					
+					if(SerenityLoans.debugLevel >= 2)
+						SerenityLoans.logInfo(String.format("Adding \'prepared\' prepared offer for %s.", playerID.toString()));
+					
+					stmt2.setString(2, "prepared");
+					stmt2.executeUpdate();
 				}
 			
 			}
@@ -202,21 +223,49 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 	
-				
+		if(SerenityLoans.debugLevel >= 4)
+			SerenityLoans.logInfo(String.format("Exiting %s method. %s", "buildFinancialEntityInitialOffers(UUID)",  "Thread: " + Thread.currentThread().getId() + "."));
+			
 	}
 	
+	/**
+	 * This method attempts to create an offer from the given lender to
+	 * the given borrower with the given expiration date. The lenderId
+	 * and the offer name specify which terms should be associated with
+	 * the offer. This method copies the preparedTerms to a new entry
+	 * so changes to the player's default and prepared offers will not
+	 * affect the state of the offer. The possible exit values are
+	 * IGNORED, SUCCESS, OVERWRITE_FAIL, and UNKNOWN.
+	 * 
+	 * @param lenderID ID of the lender (sender) of the offer.
+	 * @param borrowerID ID of the target.
+	 * @param preparedOfferName Name of the offer to copy, either 'prepared' or 'default'.
+	 * @param offerExpiry Timestamp representing the date and time of the offer expiration.
+	 * @return OfferExitStatus with the result of the offer write attempt.
+	 */
 	public OfferExitStatus createOffer(UUID lenderID, UUID borrowerID, String preparedOfferName, Timestamp offerExpiry){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createOffer(UUID, UUID, String, Timestamp)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		
-		if(plugin.playerManager.isIgnoring(borrowerID, lenderID))
+		// Check for ignoring status first
+		if(plugin.playerManager.isIgnoring(borrowerID, lenderID)){
+			
+			if(SerenityLoans.debugLevel >= 2)
+				SerenityLoans.logInfo(String.format("Offers from %s are being ignored by %s.", lenderID.toString(), borrowerID.toString()));
+			
 			return OfferExitStatus.IGNORED;
+		}
 		
+		// To shorten subsequent strings
 		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
 		String copyColumns = "copy.Value, copy.InterestRate, copy.Term, copy.CompoundingPeriod, copy.GracePeriod, copy.PaymentTime, copy.PaymentFrequency, copy.LateFee, copy.MinPayment, copy.ServiceFeeFrequency, copy.ServiceFee, copy.LoanType";
 		
-		
+		// Four major tasks in this method
+		// - Copy the relevant prepared offer to a new PreparedOffer entry which will be
+		// permanently associated with the offer and the loan it represents.
+		// - Get the offerID of the copy
+		// - Find and remove any existing offers between the lender and borrower (2 SQL statements)
+		// - Insert the new Offer (string for this defined later)
 		String offerCopy = String.format("INSERT INTO PreparedOffers (%s) SELECT ?, 'inprogress', %s FROM PreparedOffers copy WHERE LenderID=? AND OfferName=?;", columns, copyColumns);
 		String offerQuery = "SELECT OfferID from PreparedOffers WHERE LenderID=? AND OfferName='inprogress';";
 		String offerNameUpdate = "UPDATE PreparedOffers SET OfferName='' WHERE LenderID=? AND OfferName='inprogress';";
@@ -231,38 +280,43 @@ public class OfferManager {
 			offerTermsCopier.setString(2, lenderID.toString());
 			offerTermsCopier.setString(3, preparedOfferName);
 			
+			int offerId;
 			
 			synchronized(preparedLock){
 				int output = offerTermsCopier.executeUpdate();
 				
+				offerTermsCopier.close();
+				
 				if(output != 1)
 					return OfferExitStatus.UNKNOWN;
 				
-			}
 			
-			
-			PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
-			
-			offerIdFinder.setString(1, lenderID.toString());
-			
-			ResultSet newOfferId = null;
-			
-			synchronized(preparedLock){
+				PreparedStatement offerIdFinder = plugin.conn.prepareStatement(offerQuery);
+				
+				offerIdFinder.setString(1, lenderID.toString());
+				
+				ResultSet newOfferId = null;
+				
+				
 				newOfferId = offerIdFinder.executeQuery();
-			}
+				
+				offerIdFinder.close();
+				
+				if(!newOfferId.next()){
+					return OfferExitStatus.UNKNOWN;
+				}
+				
+				offerId = newOfferId.getInt(1);
+				
+				PreparedStatement renameOffer = plugin.conn.prepareStatement(offerNameUpdate);
+				
+				renameOffer.setString(1, lenderID.toString());
 			
-			if(!newOfferId.next()){
-				return OfferExitStatus.UNKNOWN;
-			}
 			
-			int offerId = newOfferId.getInt(1);
-			
-			PreparedStatement renameOffer = plugin.conn.prepareStatement(offerNameUpdate);
-			
-			renameOffer.setString(1, lenderID.toString());
-			
-			synchronized(preparedLock){
-				int output = renameOffer.executeUpdate();
+				output = renameOffer.executeUpdate();
+				
+				renameOffer.close();
+				
 			
 				if(output != 1)
 					return OfferExitStatus.UNKNOWN;
@@ -304,9 +358,6 @@ public class OfferManager {
 					return OfferExitStatus.UNKNOWN;
 			}
 			
-			offerTermsCopier.close();
-			offerIdFinder.close();
-			renameOffer.close();
 			deleteOldOfferSQL.close();
 			checkDeletedSQL.close();
 		} catch (SQLException e) {

@@ -2,10 +2,10 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.nwmogk.bukkit</groupId>
   <artifactId>SerenityLoans</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.2-SNAPSHOT</version>
   <name>SerenityLoan Plugin</name>
   <url>http://dev.bukkit.org/bukkit-plugins/serenityloans/</url>
-  <description>A Bukkit plugin that provides functionality for loans and a full-fleged banking system.</description>
+  <description>A Bukkit plugin that provides functionality for loans and a full-fledged banking system.</description>
   <licenses>
 		<license>
 			<name>Apache License, Version 2.0</name>
