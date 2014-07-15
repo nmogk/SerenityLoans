@@ -1812,7 +1812,6 @@ public class LoanHandler implements CommandExecutor{
 			}
 		});
 		
-		// TODO Implement
 		return true;
 	}
 
