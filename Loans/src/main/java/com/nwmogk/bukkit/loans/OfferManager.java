@@ -804,13 +804,32 @@ public class OfferManager {
 	}
 	
 	/**
-	 * Removes an offer from the offers table.
+	 * Removes an offer from the Offers table. This method
+	 * will also delete the underlying item from the PreparedOffers table.
+	 * If this is not desired (for example, processing the offer), then
+	 * use removeOffer(lenderId, borrowerId, false) instead.
 	 * 
 	 * @param lenderId
 	 * @param borrowerId
 	 * @return
 	 */
 	public boolean removeOffer(UUID lenderId, UUID borrowerId){
+		return removeOffer(lenderId, borrowerId, true);
+	}
+
+	/**
+	 * 
+	 * Removes an offer from the Offers table according to the given 
+	 * lender and borrower. The boolean parameter controls whether or
+	 * not to remove the PreparedOffer entry representing the terms.
+	 * The return value is the success of the method.
+	 * 
+	 * @param lenderId
+	 * @param borrowerId
+	 * @param cleanPrepared
+	 * @return
+	 */
+	public boolean removeOffer(UUID lenderId, UUID borrowerId, boolean cleanPrepared){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "removeOffer(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
@@ -819,6 +838,28 @@ public class OfferManager {
 		int exit = -1;
 		
 		try {
+			
+			Statement stmt = null;
+			int offerId;
+			String deletePrepared = null;
+			
+			if(cleanPrepared){
+				stmt = plugin.conn.createStatement();
+				ResultSet offerResult;
+				
+				synchronized(preparedLock){
+					offerResult = stmt.executeQuery(selectOfferNumber);
+				}
+				
+				offerResult.next();
+				
+				offerId = offerResult.getInt(1);
+				deletePrepared = String.format("DELETE FROM PreparedOffers WHERE OfferID=%d;", offerId);
+				
+			}
+			
+			
+			
 			PreparedStatement ps = plugin.conn.prepareStatement(update);
 			
 			ps.setString(1, lenderId.toString());
@@ -826,6 +867,15 @@ public class OfferManager {
 			
 			synchronized(offerTableLock){
 				exit = ps.executeUpdate();
+			}
+			
+			if(cleanPrepared){
+				
+				synchronized(preparedLock){
+					exit *= stmt.executeUpdate(deletePrepared);
+				}
+				
+				stmt.close();
 			}
 			
 			ps.close();

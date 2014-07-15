@@ -344,7 +344,7 @@ public class LoanManager {
 					return false;
 			}
 			
-			plugin.offerManager.removeOffer(lenderID, borrowerID);
+			plugin.offerManager.removeOffer(lenderID, borrowerID, false);
 			
 			
 			Statement search = plugin.conn.createStatement();
