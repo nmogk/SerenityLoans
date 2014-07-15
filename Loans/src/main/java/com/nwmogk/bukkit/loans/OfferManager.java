@@ -50,12 +50,12 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.ParsePosition;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Vector;
 
 import org.bukkit.configuration.file.FileConfiguration;
 
@@ -67,7 +67,7 @@ import com.nwmogk.bukkit.loans.object.ImmutableOffer;
 public class OfferManager {
 	
 	private SerenityLoans plugin;
-	// TODO make thread-safe, + comments
+
 	public enum OfferExitStatus{SUCCESS, IGNORED, UNKNOWN, OVERWRITE_FAIL};
 	
 	private Object offerTableLock = new Object();
@@ -843,6 +843,8 @@ public class OfferManager {
 			int offerId;
 			String deletePrepared = null;
 			
+			
+			// Get ID of prepared offer if instructed
 			if(cleanPrepared){
 				stmt = plugin.conn.createStatement();
 				ResultSet offerResult;
@@ -859,7 +861,7 @@ public class OfferManager {
 			}
 			
 			
-			
+			// Delete the offer
 			PreparedStatement ps = plugin.conn.prepareStatement(update);
 			
 			ps.setString(1, lenderId.toString());
@@ -869,6 +871,7 @@ public class OfferManager {
 				exit = ps.executeUpdate();
 			}
 			
+			// Delete the prepared offer now
 			if(cleanPrepared){
 				
 				synchronized(preparedLock){
@@ -893,9 +896,26 @@ public class OfferManager {
 		
 	}
 	
+	/**
+	 * This method takes a lenderId, a boolean representing which of the prepared offers
+	 * should be written to. The argument string should be in the form of a parameter
+	 * name followed by an equals sign followed by the desired parameter value, properly
+	 * formatted. There must be no spaces in the argument. The method will return false
+	 * in the event of improperly formatted input, including parameter values that do
+	 * not parse correctly. Values that are outside of the allowed configured range
+	 * will throw an InvalidLoanTermsException, which contains a message detailing the
+	 * problem with the value.
+	 * 
+	 * @param lenderId
+	 * @param isDefault
+	 * @param argument
+	 * @return
+	 * @throws InvalidLoanTermsException
+	 */
 	public boolean setTerms(UUID lenderId, boolean isDefault, String argument) throws InvalidLoanTermsException{
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "setTerms(UUID, boolean, String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
+		
 		
 		String[] parsedArg = argument.split("=");
 		
@@ -909,325 +929,331 @@ public class OfferManager {
 		
 		try{
 			
-		if(parsedArg[0].equalsIgnoreCase("Value")){
-			updateColumn = "Value";
 			
-			double minValue = 0.0;
-			double maxValue = Double.MAX_VALUE;
-			
-			String minValuePath = "loan.terms-constraints.principal-value.min";
-			String maxValuePath = "loan.terms-constraints.principal-value.max";
-			
-			if(config.contains(minValuePath) && config.isDouble(minValuePath))
-				minValue = Math.max(0, config.getDouble(minValuePath));
-			if(config.contains(maxValuePath) && config.isDouble(maxValuePath))
-				maxValue = Math.max(minValue, config.getDouble(maxValuePath));
-			
-			Double value = Double.parseDouble(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("Value below configured minimum of %s", plugin.econ.format(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("Value above configured minimum of %s", plugin.econ.format(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("InterestRate")){
-			updateColumn = "InterestRate";
-			
-			double minValue = 0.0;
-			double maxValue = Double.MAX_VALUE;
-			
-			String minValuePath = "loan.terms-constraints.interest.minrate";
-			String maxValuePath = "loan.terms-constraints.interest.maxrate";
-			
-			if(config.contains(minValuePath) && config.isDouble(minValuePath))
-				minValue = Math.max(0, config.getDouble(minValuePath));
-			if(config.contains(maxValuePath) && config.isDouble(maxValuePath))
-				maxValue = Math.max(minValue, config.getDouble(maxValuePath));
-			
-			DecimalFormat parser = new DecimalFormat();
-			Number perc = parser.parse(parsedArg[1], new ParsePosition(0));
-
-			if(perc == null)
-				return false;
-			
-			Double value = perc.doubleValue();
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("InterestRate below configured minimum of %s", plugin.econ.formatPercent(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("InterestRate above configured minimum of %s", plugin.econ.formatPercent(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("Term")){
-			updateColumn = "Term";
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minValuePath = "loan.terms-constraints.term.min";
-			String maxValuePath = "loan.terms-constraints.term.max";
-			
-			if(config.contains(minValuePath))
-				minValue = Conf.parseTime(config.getString(minValuePath));
-			if(plugin.getConfig().contains(maxValuePath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxValuePath)));
-			
-			Long value = Conf.parseTime(parsedArg[1]);
-			if(value == 0)
-				return false;
-
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("Term below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("Term above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("CompoundingPeriod")){
-			updateColumn = "CompoundingPeriod";
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.interest.compounding.min-time";
-			String maxPath = "loan.terms-constraints.interest.compounding.max-time";
-			
-			if(config.contains(minPath))
-				minValue = Conf.parseTime(config.getString(minPath));
-			if(config.contains(maxPath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
-			
-			Long value = Conf.parseTime(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("CompoundingPeriod below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("CompoundingPeriod above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			boolean allow = true;
-			String contCompoundPath = "loan.terms-constraints.interest.compounding.allow-continuous";
-			
-			if(config.contains(contCompoundPath) && config.isBoolean(contCompoundPath))
-				allow = config.getBoolean(contCompoundPath);
-			if(value == 0 && !allow)
-				throw new InvalidLoanTermsException("Administrator does not allow continuously compounding interest.");
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("GracePeriod")){
-			updateColumn = "GracePeriod";
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.fees.grace-period.min";
-			String maxPath = "loan.terms-constraints.fees.grace-period.max";
-			
-			if(config.contains(minPath))
-				minValue = Conf.parseTime(config.getString(minPath));
-			if(config.contains(maxPath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
-					
-			Long value = Conf.parseTime(parsedArg[1]);
-
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("GracePeriod below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("GracePeriod above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("PaymentTime")){
-			updateColumn = "PaymentTime";
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.payment-time.min";
-			String maxPath = "loan.terms-constraints.payment-time.max";
-			
-			if(config.contains(minPath))
-				minValue = Conf.parseTime(config.getString(minPath));
-			if(config.contains(maxPath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
-			
-			Long value = Conf.parseTime(parsedArg[1]);
-			if(value == 0)
-				return false;
-
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("PaymentTime below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("PaymentTime above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("PaymentFrequency")){
-			updateColumn = "PaymentFrequency";
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.payment-frequency.min";
-			String maxPath = "loan.terms-constraints.payment-frequency.max";
-			
-			if(config.contains(minPath))
-				minValue = Conf.parseTime(config.getString(minPath));
-			if(config.contains(maxPath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
-			
-			Long value = Conf.parseTime(parsedArg[1]);
-			if(value == 0)
-				return false;
-
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("PaymentFrequency below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("PaymentFrequency above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("LateFee")){
-			updateColumn = "LateFee";
-			
-			boolean allow = true;
-			String allowPath = "loan.terms-constraints.fees.late-fee.allow-change";
-			
-			if(config.contains(allowPath) && config.isBoolean(allowPath))
-				allow = config.getBoolean(allowPath);
-			if(!allow)
-				throw new InvalidLoanTermsException("Administrator does not allow changes to the late fee.");
-			
-			double minValue = 0.0;
-			double maxValue = Double.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.fees.late-fee.min";
-			String maxPath = "loan.terms-constraints.fees.late-fee.max";
-			
-			if(config.contains(minPath) && config.isDouble(minPath))
-				minValue = Math.max(0, config.getDouble(minPath));
-			if(config.contains(maxPath) && config.isDouble(maxPath))
-				maxValue = Math.max(minValue, config.getDouble(maxPath));
-			
-			Double value = Double.parseDouble(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("LateFee below configured minimum of %s", plugin.econ.format(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("LateFee above configured minimum of %s", plugin.econ.format(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("MinPayment")){
-			updateColumn = "MinPayment";
-			
-			double minValue = 0.0;
-			double maxValue = Double.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.min-payment.min";
-			String maxPath = "loan.terms-constraints.min-payment.max";
-			
-			boolean percentageRule = false;
-			String rulePath = "loan.terms-constraints.min-payment.percent-rule";
-			if(config.contains(rulePath) && config.isBoolean(rulePath))
-				percentageRule = config.getBoolean(rulePath);
-			
-			
-			if(config.contains(minPath) && config.isDouble(minPath))
-				minValue = Math.max(0, config.getDouble(minPath));
-			if(config.contains(maxPath) && config.isDouble(maxPath))
-				maxValue = Math.max(minValue, config.getDouble(maxPath));
-			
-			Double value = Double.parseDouble(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("MinPayment below configured minimum of %s", percentageRule? plugin.econ.formatPercent(minValue) : plugin.econ.format(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("MinPayment above configured minimum of %s", percentageRule? plugin.econ.formatPercent(maxValue) : plugin.econ.format(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("ServiceFeeFrequency")){
-			updateColumn = "ServiceFeeFrequency";
-			
-			boolean allow = true;
-			String allowPath = "loan.terms-constraints.fees.service-fee.allow-change";
-			
-			if(config.contains(allowPath) && config.isBoolean(allowPath))
-				allow = config.getBoolean(allowPath);
-			if(!allow)
-				throw new InvalidLoanTermsException("Administrator does not allow changes to the service fee.");
-			
-			long minValue = 0l;
-			long maxValue = Long.MAX_VALUE;
-			
-			String minPath = "loan.terms-constraints.fees.service-fee-frequency.min";
-			String maxPath = "loan.terms-constraints.fees.service-fee-frequency.max";
-			
-			if(config.contains(minPath))
-				minValue = Conf.parseTime(config.getString(minPath));
-			if(config.contains(maxPath))
-				maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
-			
-			Long value = Conf.parseTime(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFeeFrequency below configured minimum of %s", Conf.buildTimeString(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFeeFrequency above configured minimum of %s", Conf.buildTimeString(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("ServiceFee")){
-			updateColumn = "ServiceFee";
-			
-			boolean allow = true;
-			String allowPath = "loan.terms-constraints.fees.service-fee.allow-change";
-			
-			if(config.contains(allowPath) && config.isBoolean(allowPath))
-				allow = config.getBoolean(allowPath);
-			if(!allow)
-				throw new InvalidLoanTermsException("Administrator does not allow changes to the service fee.");
-			
-			double minValue = 0.0;
-			double maxValue = Double.MAX_VALUE;
-
-			String minPath = "loan.terms-constraints.fees.service-fee.min";
-			String maxPath = "loan.terms-constraints.fees.service-fee.max";
-			
-			if(config.contains(minPath) && config.isDouble(minPath))
-				minValue = Math.max(0, config.getDouble(minPath));
-			if(config.contains(maxPath) && config.isDouble(maxPath))
-				maxValue = Math.max(minValue, config.getDouble(maxPath));
-			
-			Double value = Double.parseDouble(parsedArg[1]);
-			
-			if(value < minValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFee below configured minimum of %s", plugin.econ.format(minValue)));
-			if(value > maxValue)
-				throw new InvalidLoanTermsException(String.format("ServiceFee above configured minimum of %s", plugin.econ.format(maxValue)));
-			
-			objective = value.toString();
-			
-		} else if(parsedArg[0].equalsIgnoreCase("LoanType")){
-			updateColumn = "LoanType";
-
-			String s  = parsedArg[1];
-			if(s.equalsIgnoreCase("Amortizing") || s.equalsIgnoreCase("InterestOnly") || s.equalsIgnoreCase("FixedFee") || s.equalsIgnoreCase("Bullet") || s.equalsIgnoreCase("Credit") || s.equalsIgnoreCase("Gift") || s.equalsIgnoreCase("Bond") || s.equalsIgnoreCase("Deposit") || s.equalsIgnoreCase("Salary"))
-				objective = "'" + s + "'";
-			else
-				return false;
-			
-		} else
-			return false;
-		
-		
+			// The following statements parse the input
+			// The basic form is as follows:
+			// * Set default (generous) minimum and maximum allowed configuration values
+			// * Read the configured minimum and maximum values from the config values
+			// * Process actual minimum and maximum values
+			// * Parse parameter value from string
+			// * Set column name string and value update string.
+			if(parsedArg[0].equalsIgnoreCase("Value")){
+				updateColumn = "Value";
+				
+				double minValue = 0.0;
+				double maxValue = Double.MAX_VALUE;
+				
+				String minValuePath = "loan.terms-constraints.principal-value.min";
+				String maxValuePath = "loan.terms-constraints.principal-value.max";
+				
+				if(config.contains(minValuePath) && config.isDouble(minValuePath))
+					minValue = Math.max(0, config.getDouble(minValuePath));
+				if(config.contains(maxValuePath) && config.isDouble(maxValuePath))
+					maxValue = Math.max(minValue, config.getDouble(maxValuePath));
+				
+				Double value = Double.parseDouble(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("Value below configured minimum of %s", plugin.econ.format(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("Value above configured minimum of %s", plugin.econ.format(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("InterestRate") || parsedArg[0].equalsIgnoreCase("Interest") || parsedArg[0].equalsIgnoreCase("Int")){
+				updateColumn = "InterestRate";
+				
+				double minValue = 0.0;
+				double maxValue = Double.MAX_VALUE;
+				
+				String minValuePath = "loan.terms-constraints.interest.minrate";
+				String maxValuePath = "loan.terms-constraints.interest.maxrate";
+				
+				if(config.contains(minValuePath) && config.isDouble(minValuePath))
+					minValue = Math.max(0, config.getDouble(minValuePath));
+				if(config.contains(maxValuePath) && config.isDouble(maxValuePath))
+					maxValue = Math.max(minValue, config.getDouble(maxValuePath));
+				
+				DecimalFormat parser = new DecimalFormat();
+				Number perc = parser.parse(parsedArg[1], new ParsePosition(0));
 	
+				if(perc == null)
+					return false;
+				
+				Double value = perc.doubleValue();
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("InterestRate below configured minimum of %s", plugin.econ.formatPercent(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("InterestRate above configured minimum of %s", plugin.econ.formatPercent(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("Term")){
+				updateColumn = "Term";
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minValuePath = "loan.terms-constraints.term.min";
+				String maxValuePath = "loan.terms-constraints.term.max";
+				
+				if(config.contains(minValuePath))
+					minValue = Conf.parseTime(config.getString(minValuePath));
+				if(plugin.getConfig().contains(maxValuePath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxValuePath)));
+				
+				Long value = Conf.parseTime(parsedArg[1]);
+				if(value == 0)
+					return false;
+	
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("Term below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("Term above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("CompoundingPeriod")){
+				updateColumn = "CompoundingPeriod";
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.interest.compounding.min-time";
+				String maxPath = "loan.terms-constraints.interest.compounding.max-time";
+				
+				if(config.contains(minPath))
+					minValue = Conf.parseTime(config.getString(minPath));
+				if(config.contains(maxPath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
+				
+				Long value = Conf.parseTime(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("CompoundingPeriod below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("CompoundingPeriod above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				boolean allow = true;
+				String contCompoundPath = "loan.terms-constraints.interest.compounding.allow-continuous";
+				
+				if(config.contains(contCompoundPath) && config.isBoolean(contCompoundPath))
+					allow = config.getBoolean(contCompoundPath);
+				if(value == 0 && !allow)
+					throw new InvalidLoanTermsException("Administrator does not allow continuously compounding interest.");
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("GracePeriod")){
+				updateColumn = "GracePeriod";
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.fees.grace-period.min";
+				String maxPath = "loan.terms-constraints.fees.grace-period.max";
+				
+				if(config.contains(minPath))
+					minValue = Conf.parseTime(config.getString(minPath));
+				if(config.contains(maxPath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
+						
+				Long value = Conf.parseTime(parsedArg[1]);
+	
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("GracePeriod below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("GracePeriod above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("PaymentTime") || parsedArg[0].equalsIgnoreCase("paytime")){
+				updateColumn = "PaymentTime";
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.payment-time.min";
+				String maxPath = "loan.terms-constraints.payment-time.max";
+				
+				if(config.contains(minPath))
+					minValue = Conf.parseTime(config.getString(minPath));
+				if(config.contains(maxPath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
+				
+				Long value = Conf.parseTime(parsedArg[1]);
+				if(value == 0)
+					return false;
+	
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("PaymentTime below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("PaymentTime above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("PaymentFrequency")){
+				updateColumn = "PaymentFrequency";
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.payment-frequency.min";
+				String maxPath = "loan.terms-constraints.payment-frequency.max";
+				
+				if(config.contains(minPath))
+					minValue = Conf.parseTime(config.getString(minPath));
+				if(config.contains(maxPath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
+				
+				Long value = Conf.parseTime(parsedArg[1]);
+				if(value == 0)
+					return false;
+	
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("PaymentFrequency below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("PaymentFrequency above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("LateFee")){
+				updateColumn = "LateFee";
+				
+				boolean allow = true;
+				String allowPath = "loan.terms-constraints.fees.late-fee.allow-change";
+				
+				if(config.contains(allowPath) && config.isBoolean(allowPath))
+					allow = config.getBoolean(allowPath);
+				if(!allow)
+					throw new InvalidLoanTermsException("Administrator does not allow changes to the late fee.");
+				
+				double minValue = 0.0;
+				double maxValue = Double.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.fees.late-fee.min";
+				String maxPath = "loan.terms-constraints.fees.late-fee.max";
+				
+				if(config.contains(minPath) && config.isDouble(minPath))
+					minValue = Math.max(0, config.getDouble(minPath));
+				if(config.contains(maxPath) && config.isDouble(maxPath))
+					maxValue = Math.max(minValue, config.getDouble(maxPath));
+				
+				Double value = Double.parseDouble(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("LateFee below configured minimum of %s", plugin.econ.format(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("LateFee above configured minimum of %s", plugin.econ.format(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("MinPayment") || parsedArg[0].equalsIgnoreCase("minimumpayment")){
+				updateColumn = "MinPayment";
+				
+				double minValue = 0.0;
+				double maxValue = Double.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.min-payment.min";
+				String maxPath = "loan.terms-constraints.min-payment.max";
+				
+				boolean percentageRule = false;
+				String rulePath = "loan.terms-constraints.min-payment.percent-rule";
+				if(config.contains(rulePath) && config.isBoolean(rulePath))
+					percentageRule = config.getBoolean(rulePath);
+				
+				
+				if(config.contains(minPath) && config.isDouble(minPath))
+					minValue = Math.max(0, config.getDouble(minPath));
+				if(config.contains(maxPath) && config.isDouble(maxPath))
+					maxValue = Math.max(minValue, config.getDouble(maxPath));
+				
+				Double value = Double.parseDouble(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("MinPayment below configured minimum of %s", percentageRule? plugin.econ.formatPercent(minValue) : plugin.econ.format(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("MinPayment above configured minimum of %s", percentageRule? plugin.econ.formatPercent(maxValue) : plugin.econ.format(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("ServiceFeeFrequency")){
+				updateColumn = "ServiceFeeFrequency";
+				
+				boolean allow = true;
+				String allowPath = "loan.terms-constraints.fees.service-fee.allow-change";
+				
+				if(config.contains(allowPath) && config.isBoolean(allowPath))
+					allow = config.getBoolean(allowPath);
+				if(!allow)
+					throw new InvalidLoanTermsException("Administrator does not allow changes to the service fee.");
+				
+				long minValue = 0l;
+				long maxValue = Long.MAX_VALUE;
+				
+				String minPath = "loan.terms-constraints.fees.service-fee-frequency.min";
+				String maxPath = "loan.terms-constraints.fees.service-fee-frequency.max";
+				
+				if(config.contains(minPath))
+					minValue = Conf.parseTime(config.getString(minPath));
+				if(config.contains(maxPath))
+					maxValue = Math.max(minValue, Conf.parseTime(config.getString(maxPath)));
+				
+				Long value = Conf.parseTime(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("ServiceFeeFrequency below configured minimum of %s", Conf.buildTimeString(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("ServiceFeeFrequency above configured minimum of %s", Conf.buildTimeString(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("ServiceFee")){
+				updateColumn = "ServiceFee";
+				
+				boolean allow = true;
+				String allowPath = "loan.terms-constraints.fees.service-fee.allow-change";
+				
+				if(config.contains(allowPath) && config.isBoolean(allowPath))
+					allow = config.getBoolean(allowPath);
+				if(!allow)
+					throw new InvalidLoanTermsException("Administrator does not allow changes to the service fee.");
+				
+				double minValue = 0.0;
+				double maxValue = Double.MAX_VALUE;
+	
+				String minPath = "loan.terms-constraints.fees.service-fee.min";
+				String maxPath = "loan.terms-constraints.fees.service-fee.max";
+				
+				if(config.contains(minPath) && config.isDouble(minPath))
+					minValue = Math.max(0, config.getDouble(minPath));
+				if(config.contains(maxPath) && config.isDouble(maxPath))
+					maxValue = Math.max(minValue, config.getDouble(maxPath));
+				
+				Double value = Double.parseDouble(parsedArg[1]);
+				
+				if(value < minValue)
+					throw new InvalidLoanTermsException(String.format("ServiceFee below configured minimum of %s", plugin.econ.format(minValue)));
+				if(value > maxValue)
+					throw new InvalidLoanTermsException(String.format("ServiceFee above configured minimum of %s", plugin.econ.format(maxValue)));
+				
+				objective = value.toString();
+				
+			} else if(parsedArg[0].equalsIgnoreCase("LoanType")){
+				updateColumn = "LoanType";
+	
+				String s  = parsedArg[1];
+				if(s.equalsIgnoreCase("Amortizing") || s.equalsIgnoreCase("InterestOnly") || s.equalsIgnoreCase("FixedFee") || s.equalsIgnoreCase("Bullet") || s.equalsIgnoreCase("Credit") || s.equalsIgnoreCase("Gift") || s.equalsIgnoreCase("Bond") || s.equalsIgnoreCase("Deposit") || s.equalsIgnoreCase("Salary"))
+					objective = "'" + s + "'";
+				else
+					return false;
+				
+			} else
+				return false;
 		
-		
+
+		// Improperly formatted values will return false
 		} catch(NumberFormatException e){
 			// This will catch improperly formatted input
 			return false;
@@ -1236,6 +1262,9 @@ public class OfferManager {
 		if(objective == null)
 			return false;
 		
+		// Because the values can be formatted very differently, we must insert them
+		// as strings. This is insecure except with the very careful preparation in
+		// the preceeding code. DO NOT COPY WITHOUT THINKING ABOUT SECURITY!
 		String updateSQL = String.format("UPDATE PreparedOffers SET %s=%s WHERE LenderID=? AND OfferName='%s';", updateColumn, objective,  isDefault? "default":"prepared" );
 		
 		
@@ -1263,13 +1292,16 @@ public class OfferManager {
 		return false;
 	}
 	
-	public void updateAll(){
+	/**
+	 * Updates all of the existing offers and removes offers which have expired.
+	 */
+	public synchronized void updateAll(){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "updateAll()", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		
+		// Selects only offers which are expired
 		String query = "SELECT LenderID, BorrowerID FROM Offers WHERE ExpirationDate < NOW();";
-		HashMap<UUID, UUID> expiredOffers = new HashMap<UUID, UUID>();
+		LinkedList<Vector<UUID>> expOffers = new LinkedList<Vector<UUID>>();
 		
 		try {
 			Statement stmt = plugin.conn.createStatement();
@@ -1280,10 +1312,15 @@ public class OfferManager {
 				rs = stmt.executeQuery(query);
 			}
 			
+			// Put offers into a list
+			// A vector is used to hold the pair
 			while(rs.next()){
 				UUID lenderId = UUID.fromString(rs.getString("LenderID"));
 				UUID borrowerId = UUID.fromString(rs.getString("BorrowerID"));
-				expiredOffers.put(lenderId, borrowerId);
+				Vector<UUID> thePair = new Vector<UUID>(2);
+				thePair.add(lenderId);
+				thePair.add(borrowerId);
+				expOffers.add(thePair);
 			}
 			
 		} catch (SQLException e) {
@@ -1291,9 +1328,10 @@ public class OfferManager {
 			e.printStackTrace();
 		}
 		
-		for(UUID lenderId : expiredOffers.keySet()){
+		for(Vector<UUID> parties : expOffers){
 			
-			removeOffer(lenderId, expiredOffers.get(lenderId));
+			// Remove the offer and the associated terms
+			removeOffer(parties.firstElement(), parties.lastElement());
 			
 			try {
 				Thread.sleep((int)Math.floor(Math.random() * 200));
