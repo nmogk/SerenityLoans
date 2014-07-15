@@ -73,6 +73,11 @@ public class OfferManager {
 	private Object offerTableLock = new Object();
 	private Object preparedLock = new Object();
 	
+	// To shorten subsequent strings
+	private String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
+	private String copyColumns = "copy.Value, copy.InterestRate, copy.Term, copy.CompoundingPeriod, copy.GracePeriod, copy.PaymentTime, copy.PaymentFrequency, copy.LateFee, copy.MinPayment, copy.ServiceFeeFrequency, copy.ServiceFee, copy.LoanType";
+			
+	
 	public OfferManager(SerenityLoans plugin){
 		this.plugin = plugin;
 	}
@@ -256,9 +261,6 @@ public class OfferManager {
 			return OfferExitStatus.IGNORED;
 		}
 		
-		// To shorten subsequent strings
-		String columns = "LenderID, OfferName, Value, InterestRate, Term, CompoundingPeriod, GracePeriod, PaymentTime, PaymentFrequency, LateFee, MinPayment, ServiceFeeFrequency, ServiceFee, LoanType";
-		String copyColumns = "copy.Value, copy.InterestRate, copy.Term, copy.CompoundingPeriod, copy.GracePeriod, copy.PaymentTime, copy.PaymentFrequency, copy.LateFee, copy.MinPayment, copy.ServiceFeeFrequency, copy.ServiceFee, copy.LoanType";
 		
 		// Four major tasks in this method
 		// - Copy the relevant prepared offer to a new PreparedOffer entry which will be
@@ -394,6 +396,38 @@ public class OfferManager {
 		
 		
 		return OfferExitStatus.SUCCESS;
+	}
+	
+	/**
+	 * This method copies the default prepared offer to the working prepared
+	 * offer of the given lender. Returns the success status of the method.
+	 * 
+	 * @param lenderId
+	 * @return
+	 */
+	public boolean copyOffer(UUID lenderId){
+		String deleteOffer = String.format("DELETE FROM PreparedOffers WHERE LenderID='%s' AND OfferName='prepared';", lenderId.toString());
+		String copyOffer = String.format("INSERT INTO PreparedOffers (colums) SELECT '%s', copyColumns FROM PreparedOffers copy WHERE LenderID='%s' AND OfferName='default';", lenderId.toString(), lenderId.toString());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			int result;
+			
+			synchronized(preparedLock){
+				result = stmt.executeUpdate(deleteOffer);
+				result *= stmt.executeUpdate(copyOffer);
+			}
+			
+			stmt.close();
+			return result == 1;
+			
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return false;
+	
 	}
 	
 	/**
