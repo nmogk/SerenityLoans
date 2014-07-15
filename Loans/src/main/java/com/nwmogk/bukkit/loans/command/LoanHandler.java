@@ -748,7 +748,7 @@ public class LoanHandler implements CommandExecutor{
 					"",
 					"This command sets the autopay feature for the given loan. "+
 					"Autopay will attempt to pay payment statements from the "+
-					"loan when they are due, with no interraction from the "+
+					"loan when they are due, with no interaction from the "+
 					"borrower. If the whole bill cannot be paid, then it will "+
 					"pay the minimum payment."
 			});
@@ -1725,11 +1725,11 @@ public class LoanHandler implements CommandExecutor{
 	 * 
 	 * This command sets the autopay feature for the given loan.
 	 * Autopay will attempt to pay payment statements from the
-	 * loan when they are due, with no interraction from the
+	 * loan when they are due, with no interaction from the
 	 * borrower. If the whole bill cannot be paid, then it will
 	 * pay the minimum payment.
 	 */
-	private boolean setAutoPay(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
+	private boolean setAutoPay(final CommandSender sender, final FinancialEntity borrower, final String alias, final String[] args) {
 		
 		// Check perms			
 		if(!sender.hasPermission("serenityloans.loan.borrow")) {
@@ -1743,8 +1743,77 @@ public class LoanHandler implements CommandExecutor{
 			return true;
 		}
 		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				String lenderName = args[1];
+				
+				FinancialEntity lender = null;
+				try {
+					lender = plugin.playerManager.getFinancialEntity(args[1]);
+				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					return;
+				}
+				
+				if(lender == null) {
+					plugin.scheduleMessage(sender, prfx + " Lender entity not found.");
+					return;
+				}
+				
+				LoanSpec loanSelection = parseLoanArguments(borrower, lender, sender.getName(), args, false);
+				
+				if(loanSelection.errMessage != null){
+					plugin.scheduleMessage(sender, Conf.parseMacros(loanSelection.errMessage, new String[]{"$$c"}, new String[]{"/" + alias + " forgive"}));
+					
+					if(!loanSelection.multipleValues)
+						return;
+				}
+				
+				if(loanSelection.multipleValues){
+					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
+					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					for(int i = 0; i < allLoans.length ; i++){
+						try {
+							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+						} catch (InterruptedException | ExecutionException | TimeoutException e) {
+							// TODO add message to configuration
+							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							continue;
+						}
+					}
+					
+					return;
+				}
+				
+				if(loanSelection.remainingArgs.length == 0){
+					plugin.scheduleMessage(sender, "Final argument of 'on' or 'off' must be specified");
+					return;
+				}
+				
+				String setting = loanSelection.remainingArgs[0];
+				
+				boolean valueToSet = false;
+				
+				if(setting.equalsIgnoreCase("on") || setting.equalsIgnoreCase("true"))
+					valueToSet = true;
+				else if (! setting.equalsIgnoreCase("off") && ! setting.equalsIgnoreCase("false")){
+					plugin.scheduleMessage(sender, "Setting not recognized.");
+					return;
+				}
+				
+				if(plugin.loanManager.setAutoPay(loanSelection.result.getLoanID(), valueToSet))
+					plugin.scheduleMessage(sender, String.format("Auto pay successfully set to %b.", valueToSet));
+				else
+					plugin.scheduleMessage(sender, "Setting not applied!");
+				
+			}
+		});
+		
 		// TODO Implement
-		return false;
+		return true;
 	}
 
 	/*
