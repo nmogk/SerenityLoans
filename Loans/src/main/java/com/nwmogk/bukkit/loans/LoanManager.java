@@ -532,6 +532,29 @@ public class LoanManager {
 		return null;
 	}
 	
+	public boolean setAutoPay(int loanId, boolean valueToSet){
+		String updateSql = String.format("UPDATE Loans SET AutoPay='%s' WHERE LoanID=%d;", Boolean.toString(valueToSet), loanId);
+	
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			int result;
+			
+			synchronized(loanTableLock){
+				result = stmt.executeUpdate(updateSql);
+			}
+			
+			stmt.close();
+			
+			return result == 1;
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return false;
+	}
+	
 	public boolean setLender(int loanId, UUID newLenderId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "setLender(int, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
