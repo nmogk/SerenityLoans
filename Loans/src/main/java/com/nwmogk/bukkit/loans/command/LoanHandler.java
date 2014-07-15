@@ -169,14 +169,14 @@ public class LoanHandler implements CommandExecutor{
 		else if (subCommand.equalsIgnoreCase("setautopay"))
 			return setAutoPay(sender, entity, alias + " " + subCommand, args);
 			
-		else if (subCommand.equalsIgnoreCase("statement")) {
+		else if (subCommand.equalsIgnoreCase("statement")) 
 			return viewStatement(sender, entity, alias + " " + subCommand, args);
 			
-		} 
-		
+		else if (subCommand.equalsIgnoreCase("copyoffer") || subCommand.equalsIgnoreCase("copy"))
+			return copyOffer(sender, entity, alias + " " + subCommand, args);
+			
 		return false;
 	}
-	
 	
 	/*
 	 * Command: /loan accept <lender>
@@ -335,6 +335,29 @@ public class LoanHandler implements CommandExecutor{
 			oldLend.sendMessage(prfx + " Loan sale succeeded!");
 		if(borrower != null)
 			borrower.sendMessage(prfx + " Your loan has been sold to another lender!");
+		
+		return true;
+	}
+
+	/*
+	 * Command: /loan copy[offer]
+	 * 
+	 * Permissions: serenityloans.loan.lend
+	 * 
+	 * Copies the default offering to the main offering. Will overwrite any existing values.
+	 */
+	private boolean copyOffer(CommandSender sender, FinancialEntity entity, String alias, String[] args) {
+	
+		// Check perms			
+		if(!sender.hasPermission("serenityloans.loan.lend")) {
+			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
+			return true;
+		}
+		
+		if(plugin.offerManager.copyOffer(entity.getUserID()))
+			sender.sendMessage(prfx + " Default offer copied successfully.");
+		else
+			sender.sendMessage(prfx + " Copy not successful.");
 		
 		return true;
 	}
@@ -741,9 +764,17 @@ public class LoanHandler implements CommandExecutor{
 					"This command checks for an outstanding payment statement "+
 					"on the given loan and displays the result to the caller."
 			});
-		} else {
+		} else if (subCommand.equalsIgnoreCase("copyoffer") || subCommand.equalsIgnoreCase("copy")) {
+			sender.sendMessage(new String[]{
+					"Command: /loan copy[offer]",
+					"",
+					"Permissions: serenityloans.loan.lend",
+					"",
+					"Copies the default offering to the main offering. Will overwrite any existing values."
+			});
+		} else
 			return false;
-		}
+		
 		
 		//TODO implement command documentation
 	
