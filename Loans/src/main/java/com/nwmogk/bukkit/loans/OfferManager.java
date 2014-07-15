@@ -587,6 +587,16 @@ public class OfferManager {
 		return list;
 	}
 	
+	/**
+	 * Builds an ImmutableOffer object which has the given name and belongs to 
+	 * the given lender. The immutable offer has a null borrower and expiration
+	 * date, as that information is only available on a full offer. Will
+	 * return null if there was a problem or the offer cannot be found.
+	 * 
+	 * @param lenderId
+	 * @param offerName
+	 * @return
+	 */
 	public ImmutableOffer getPreparedOffer(UUID lenderId, String offerName){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPreparedOffer(UUID, String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -643,6 +653,16 @@ public class OfferManager {
 		return offer;
 	}
 	
+	/**
+	 * Returns an ImmutableOffer from the given offerId. It includes the
+	 * given lender and borrower for completeness. The expiration date will
+	 * be null. Will return null if the offer cannot be found.
+	 * 
+	 * @param offerId
+	 * @param lender
+	 * @param borrower
+	 * @return
+	 */
 	public ImmutableOffer getPreparedOffer(int offerId, FinancialEntity lender, FinancialEntity borrower){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPreparedOffer(int, FinancialEntity, FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -693,7 +713,14 @@ public class OfferManager {
 		return offer;
 	}
 	
-
+	/**
+	 * This method takes the termsId and returns the value of
+	 * the loan represented by the terms. If there is a problem
+	 * then the result will be -1.
+	 * 
+	 * @param preparedTermsId
+	 * @return
+	 */
 	public double getTermsValue(int preparedTermsId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getTermsValue(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -730,6 +757,14 @@ public class OfferManager {
 		
 	}
 	
+	/**
+	 * This method marks an offer as having been sent to the potential borrower.
+	 * It returns the success of the call.
+	 * 
+	 * @param lenderId
+	 * @param borrowerId
+	 * @return
+	 */
 	public boolean registerOfferSend(UUID lenderId, UUID borrowerId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "registerOfferSend(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -768,11 +803,19 @@ public class OfferManager {
 		return false;
 	}
 	
+	/**
+	 * Removes an offer from the offers table.
+	 * 
+	 * @param lenderId
+	 * @param borrowerId
+	 * @return
+	 */
 	public boolean removeOffer(UUID lenderId, UUID borrowerId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "removeOffer(UUID, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
 		String update = "DELETE FROM Offers WHERE LenderID=? AND BorrowerID=?;";
+		String selectOfferNumber = String.format("SELECT PreparedTerms FROM Offers WHERE LenderID='%s' AND BorrowerID='%s';", lenderId.toString(), borrowerId.toString());
 		int exit = -1;
 		
 		try {
