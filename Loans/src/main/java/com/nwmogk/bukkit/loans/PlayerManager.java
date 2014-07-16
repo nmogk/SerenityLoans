@@ -505,7 +505,11 @@ public class PlayerManager {
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
-			ResultSet rs = stmt.executeQuery(gottaCatchEmAll);
+			ResultSet rs = null;
+			
+			synchronized(financialEntitiesLock){
+				rs = stmt.executeQuery(gottaCatchEmAll);
+			}
 			
 			stmt.close();
 			
@@ -906,6 +910,36 @@ public class PlayerManager {
 			}
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			e.printStackTrace();
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Updates the credit score of the given entity to the given value.
+	 * Does not perform any input validation. Returns the success of
+	 * the update.
+	 * 
+	 * @param fe
+	 * @param score
+	 * @return
+	 */
+	public boolean setCreditScore(FinancialEntity fe, double score){
+		String update = String.format("UPDATE FinancialEntities SET CreditScore=%f WHERE UserID='%s';", score, fe.getUserID().toString());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			int result;
+			
+			synchronized(financialEntitiesLock){
+				result = stmt.executeUpdate(update);
+			}
+			
+			return result == 1;
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
 			e.printStackTrace();
 		}
 		
