@@ -139,7 +139,7 @@ options:
     # Available styles: queue, email (not implemented)
     audit-style: queue
   logging: 
-    debug-level: 4
+    debug-level: 2
 #    log-events: true
   
   # These settings control the display of a usage disclaimer
@@ -220,6 +220,11 @@ bankruptcy:
   enabled: true
   dissipation-factor: 0.8
 trust: 
+  
+  # These settings control the credit score algorithm behavior. The algorithm
+  # is based on an exponential moving average. The default values are set up
+  # to approximate the range of scores seen in a FICO score (most common in US).
+  # Be sure to understand how the algorithm works before adjusting values.
   credit-score: 
     enabled: true
     dissipation-factor: 0.08
@@ -235,6 +240,7 @@ trust:
     credit-utilization-goal: 0.5
     overpayment-penalty-factor: 0.25
     bankrupt-score: 300
+    pre-approved-score: 630
   trust-list: 
     enabled: true
     # Mode can be either single or multiple. Single only allows a simple

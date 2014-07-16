@@ -300,5 +300,97 @@ public class Conf {
 		
 		return result;
 	}
+	
+	
+	public enum CreditScoreSettings {ALPHA, RANGE_MIN, RANGE_MAX, SUBPRIME, NO_HISTORY, INACTIVITY, TAU, CREDIT_LIMIT, BANKRUPT, SIG_FIGS, UTIL_GOAL, PRE_APPROVED, OVERPAYMENT_PENALTY};
 
+	public double getCreditScoreSettings(CreditScoreSettings type){
+		
+		double rangeMax = 850;
+		String rangeMaxPath = "trust.credit-score.score-range.max";
+		
+		double rangeMin = 300;
+		String rangeMinPath = "trust.credit-score.score-range.min";
+		
+		if(config.contains(rangeMaxPath) && config.isDouble(rangeMaxPath))
+			rangeMax = config.getDouble(rangeMaxPath);
+		
+		if(config.contains(rangeMinPath) && config.isDouble(rangeMinPath))
+			rangeMin = Math.min(config.getDouble(rangeMinPath), rangeMax);
+		
+		double max = 0;
+		double min = 0;
+		String path = null;
+		
+		switch(type){
+		case ALPHA:
+		case CREDIT_LIMIT:
+		case OVERPAYMENT_PENALTY:
+		case UTIL_GOAL:
+		case INACTIVITY:
+			max = 1;
+			min = 0;
+			break;
+		case BANKRUPT:
+		case NO_HISTORY:
+		case PRE_APPROVED:
+		case RANGE_MAX:
+		case RANGE_MIN:
+		case SUBPRIME:
+			max = rangeMax;
+			min = rangeMin;
+			break;
+		case TAU:
+		case SIG_FIGS:
+			max = Double.MAX_VALUE;
+			min = 0;
+			break;
+		}
+		
+		switch(type){
+		case ALPHA: // Exponential "forgetfullness" factor
+			path = "trust.credit-score.dissipation-factor";
+			break;
+		case BANKRUPT: // Score given for a bankruptcy
+			path = "trust.credit-score.bankrupt-score";
+			break;
+		case CREDIT_LIMIT: // Credit limit reached factor
+			path = "trust.credit-score.credit-limit-reached-factor";
+			break;
+		case INACTIVITY: // Inactivity score
+			path = "trust.credit-score.account-inactivity-factor";
+			break;
+		case NO_HISTORY: // No history score
+			path = "trust.credit-score.no-history-score";
+			break;
+		case OVERPAYMENT_PENALTY: // Overpayment penalty factor
+			path = "trust.credit-score.overpayment-penalty-factor";
+			break;
+		case PRE_APPROVED: // Pre approved no history score
+			path = "trust.credit-score.pre-approved-score";
+			break;
+		case RANGE_MAX: // Maximum score
+			return rangeMax;
+		case RANGE_MIN: // Minimum score
+			return rangeMin;
+		case SIG_FIGS: // Number of significant figures to report
+			path = "trust.credit-score.sig-figs-reported";
+			break;
+		case SUBPRIME: // Subprime score
+			path = "trust.credit-score.subprime-limit";
+			break;
+		case TAU: // Time for each deduction for inactivity
+			path = "trust.credit-score.account-inactivity-time";
+			break;
+		case UTIL_GOAL: // Credit utilization goal factor
+			path = "trust.credit-score.credit-utilization-goal";
+			break;
+		}
+		
+		if(config.contains(path) && config.isDouble(path))
+			return Math.min(Math.max(min, config.getDouble(path)), max);
+		
+			
+		return 0.0;
+	}
 }
