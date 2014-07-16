@@ -59,6 +59,10 @@ import java.util.LinkedList;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.nwmogk.bukkit.loans.Conf.CreditScoreSettings;
+import com.nwmogk.bukkit.loans.api.CreditEvent;
+import com.nwmogk.bukkit.loans.api.CreditEventFactory;
+import com.nwmogk.bukkit.loans.api.CreditEventType;
 import com.nwmogk.bukkit.loans.api.Loanable;
 import com.nwmogk.bukkit.loans.exception.ConfigurationException;
 import com.nwmogk.bukkit.loans.object.CreditCard;
@@ -75,7 +79,7 @@ public class CreditHistory {
 	/**
 	 * This enum defines all of the types of credit events that the credit history records
 	 */
-	public enum CreditEventType{LOANOPEN, LOANCLOSE, PAID_BALANCE, PAID_MINIMUM, MISSED_PAYMENT, LOAN_UTILIZATION, INACTIVITY, CREDIT_UTILIZATION, CREDIT_LIMIT, BANKRUPT, LOAN_MODIFY};
+//	public enum CreditEventType{LOANOPEN, LOANCLOSE, PAID_BALANCE, PAID_MINIMUM, MISSED_PAYMENT, LOAN_UTILIZATION, INACTIVITY, CREDIT_UTILIZATION, CREDIT_LIMIT, BANKRUPT, LOAN_MODIFY};
 
 	/*
 	 * This class encapsulates all of the information associated with a credit
@@ -87,14 +91,14 @@ public class CreditHistory {
 	 * credit score in the score field. The toString() method for CreditEvent reflects
 	 * the significance or not of the score field.
 	 */
-	private class CreditEvent{
+	private class GenericCreditEvent{
 		
 		Loanable loan;
 		double score;
 		Date date;
 		CreditEventType type;
 			
-		CreditEvent(CreditEventType type, Date date, double score, Loanable loan){
+		GenericCreditEvent(CreditEventType type, Date date, double score, Loanable loan){
 			this.loan = loan;
 			this.score = score;
 			this.date = date;
@@ -128,9 +132,6 @@ public class CreditHistory {
 			case LOAN_MODIFY:
 				result += "Loan modification;";
 				break;
-			case LOAN_UTILIZATION:
-				result += "Loan utilization result on loan " + System.identityHashCode(loan) + ". Score adjustment: " + score + ";";
-				break;
 			case MISSED_PAYMENT:
 				result += "Missed a payment on loan " + System.identityHashCode(loan) + ". Score adjustment: " + score + ";";
 				break;
@@ -147,22 +148,136 @@ public class CreditHistory {
 		}
 	}
 	
+	private class Eventerator implements CreditEventFactory{
+
+		private CreditEvent noChange = new CreditEvent(){
+			public double getUpdateScore(double currentScore) {return currentScore;}
+			public double getDissipationFactor() {return 0;}
+		};
+		
+		private abstract class AbstractCreditEvent implements CreditEvent {
+			public double getDissipationFactor(){return alpha;}
+		}
+		
+		private PaymentStatement ps = null;
+		private Loan theLoan = null;
+		
+		public Eventerator(){}
+		
+		public Eventerator(PaymentStatement ps){this.ps = ps;}
+		
+		public Eventerator(Loan theLoan){this.theLoan = theLoan;}
+		
+		public Eventerator(PaymentStatement ps, Loan theLoan){this.ps = ps; this.theLoan = theLoan;}
+
+		public CreditEvent getCreditEvent(CreditEventType type) {
+			
+			switch(type){
+			
+			case BANKRUPT:
+				return new CreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.BANKRUPT));
+					}
+					
+					public double getDissipationFactor(){return 1;}
+				};
+				
+			case CREDIT_LIMIT:
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return Conf.getCreditScoreSettings(CreditScoreSettings.CREDIT_LIMIT) * currentScore;
+					}
+				};
+				
+			case CREDIT_UTILIZATION:
+				if(ps == null)
+					return null;
+				
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return currentScore * (1 - Conf.getCreditScoreSettings(CreditScoreSettings.UTIL_LIMIT) * Math.abs(ps.getActualPaid()/ps.getBillAmount() - Conf.getCreditScoreSettings(CreditScoreSettings.UTIL_GOAL)));
+					}
+				};
+				
+			case INACTIVITY:
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return Math.max(normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.NO_HISTORY)), Conf.getCreditScoreSettings(CreditScoreSettings.INACTIVITY) * currentScore);
+					}			
+				};
+				
+			case MISSED_PAYMENT:
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {return 0;}
+				};
+				
+			case PAID_BALANCE:
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {return 1;}
+				};
+				
+			case PAID_MINIMUM:
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.SUBPRIME));
+					}
+				};
+				
+			case FINAL_PAYMENT:
+				if(theLoan == null)
+					return null;
+			
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return (1 - currentScore) * ((double) (new Date().getTime() - theLoan.getStartTime().getTime()) ) / ((double)theLoan.getTerm()) + currentScore;
+					}
+				};
+				
+			case OVERPAYMENT:
+				if(ps == null || theLoan == null)
+					return null;
+				
+				return new AbstractCreditEvent(){
+					public double getUpdateScore(double currentScore) {
+						return Math.min(1, Conf.getCreditScoreSettings(CreditScoreSettings.OVERPAYMENT_PENALTY) * currentScore * (ps.getActualPaid() - ps.getBillAmount())/theLoan.getValue());
+					}
+				};
+				
+			case LOANCLOSE:
+			case LOANOPEN:
+			case LOAN_MODIFY:
+			default:
+				return noChange;
+			
+			}
+			
+		}
+		
+	}
+	
 	private double score;
-	private LinkedList<CreditEvent> history;
+	private LinkedList<GenericCreditEvent> history;
+	
+	private double scoreMax;
+	private double scoreMin;
+	
+	private double alpha;
 	
 	/**
 	 * This method is the default constructor for a CreditHistory object. It
 	 * initializes the list array and applies a default credit score.
 	 */
-	public CreditHistory(){
-		history = new LinkedList<CreditEvent>();
+	public CreditHistory(SerenityLoans plugin){
+		history = new LinkedList<GenericCreditEvent>();
 		
-		plug = SerenityLoans.getPlugin();
+		plug = plugin;
 		
 		// Gather parameters from config file
-		double configScore = plug.getConfig().getDouble("trust.credit-score.no-history-score");
-		double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
+		double configScore = Conf.getCreditScoreSettings(CreditScoreSettings.NO_HISTORY);
+		scoreMax = Conf.getCreditScoreSettings(CreditScoreSettings.RANGE_MAX);
+		scoreMin = Conf.getCreditScoreSettings(CreditScoreSettings.RANGE_MIN);
+		alpha = Conf.getCreditScoreSettings(CreditScoreSettings.ALPHA);
 		
 		// Sanitize inputs
 		if(scoreMax <= scoreMin)
@@ -285,7 +400,7 @@ public class CreditHistory {
 		// Change score to bankruptcy score
 		score = (configScore - scoreMin)/(scoreMax - scoreMin);
 		
-		history.add(new CreditEvent(CreditEventType.BANKRUPT, new Date(), score, null));
+		history.add(new GenericCreditEvent(CreditEventType.BANKRUPT, new Date(), score, null));
 		
 	}
 
@@ -296,7 +411,7 @@ public class CreditHistory {
 	 */
 	public void recordBorrow(Loanable loan){
 		recordInactivity();
-		history.add(new CreditEvent(CreditEventType.LOANOPEN, new Date(), score, loan));
+		history.add(new GenericCreditEvent(CreditEventType.LOANOPEN, new Date(), score, loan));
 	}
 	
 	/**
@@ -310,7 +425,7 @@ public class CreditHistory {
 	 */
 	public void recordLoanModification(LoanState oldLoan, LoanState newLoan){
 		// TODO do something with the old and new loans
-		history.add(new CreditEvent(CreditEventType.LOAN_MODIFY, new Date(), score, null));
+		history.add(new GenericCreditEvent(CreditEventType.LOAN_MODIFY, new Date(), score, null));
 	}
 	
 	/**
@@ -406,7 +521,7 @@ public class CreditHistory {
 		// If the bill has been paid
 		if(amount >= bill.getBillAmount()){
 			// Record in history
-			history.add(new CreditEvent(CreditEventType.PAID_BALANCE, new Date(), 1.0, theLoan));
+			history.add(new GenericCreditEvent(CreditEventType.PAID_BALANCE, new Date(), 1.0, theLoan));
 			
 			// Penalty for paying too much too soon
 			// i.e. You should actually hold your loan for a while
@@ -427,7 +542,7 @@ public class CreditHistory {
 			// If not credit card
 			else {
 				// Apply score for paying too much
-				history.add(new CreditEvent(CreditEventType.LOAN_UTILIZATION, new Date(), newScoreItem, theLoan));	
+				history.add(new GenericCreditEvent(CreditEventType.OVERPAYMENT, new Date(), newScoreItem, theLoan));	
 				updateScore(newScoreItem);
 			}
 				
@@ -460,24 +575,24 @@ public class CreditHistory {
 			double newScoreItem = percentComplete * (1 - newRange) + newRange;
 			
 			// Add to history and update
-			history.add(new CreditEvent(CreditEventType.PAID_MINIMUM, new Date(), newScoreItem, theLoan));
+			history.add(new GenericCreditEvent(CreditEventType.PAID_MINIMUM, new Date(), newScoreItem, theLoan));
 			updateScore(newScoreItem);
 		}
 		// Payment missed completely
 		else {
-			history.add(new CreditEvent(CreditEventType.MISSED_PAYMENT, new Date(), 0.0, theLoan));
+			history.add(new GenericCreditEvent(CreditEventType.MISSED_PAYMENT, new Date(), 0.0, theLoan));
 			updateScore(0);
 		}
 		
 		// Finally, apply credit card score adjustments
 		if(theLoan instanceof CreditCard){
 			// Credit utilization
-			history.add(new CreditEvent(CreditEventType.CREDIT_UTILIZATION, new Date(), creditUtil, theLoan));
+			history.add(new GenericCreditEvent(CreditEventType.CREDIT_UTILIZATION, new Date(), creditUtil, theLoan));
 			updateScore(creditUtil);
 			
 			// Credit limit penalty (if applicable)
 			if(creditLimitReached){
-				history.add(new CreditEvent(CreditEventType.CREDIT_LIMIT, new Date(), creditLimit, theLoan));
+				history.add(new GenericCreditEvent(CreditEventType.CREDIT_LIMIT, new Date(), creditLimit, theLoan));
 				updateScore(creditLimit);
 			}
 			
@@ -509,7 +624,7 @@ public class CreditHistory {
 		double newScoreItem = score * Math.min(1.0, 1 - penalty * amount/loan.getValue());
 
 		// Update
-		history.add(new CreditEvent(CreditEventType.LOAN_UTILIZATION, new Date(), newScoreItem, loan));
+		history.add(new GenericCreditEvent(CreditEventType.OVERPAYMENT, new Date(), newScoreItem, loan));
 		updateScore(newScoreItem);
 	}
 	
@@ -523,7 +638,7 @@ public class CreditHistory {
 	public void recordPayoff(Loanable loan){
 		// Still have to update for inactivity
 		recordInactivity();
-		history.add(new CreditEvent(CreditEventType.LOANCLOSE, new Date(), score, loan));
+		history.add(new GenericCreditEvent(CreditEventType.LOANCLOSE, new Date(), score, loan));
 	}
 
 	/**
@@ -577,7 +692,7 @@ public class CreditHistory {
 			// Score decays exponentially towards having no score (up or down)
 			double newScoreItem = penalty * score + (1 - penalty) * noCreditScore;
 			
-			history.add(new CreditEvent(CreditEventType.INACTIVITY, new Date(), newScoreItem, null));
+			history.add(new GenericCreditEvent(CreditEventType.INACTIVITY, new Date(), newScoreItem, null));
 			
 			// Score is updated every iteration
 			updateScore(newScoreItem);
@@ -606,6 +721,8 @@ public class CreditHistory {
 		score = newScoreItem * alpha + (1 - alpha) * score;
 	}
 	
-	
+	private double normalizeScore(double rawScore){
+		return (rawScore - scoreMin)/(scoreMax - scoreMin);
+	}
 
 }
