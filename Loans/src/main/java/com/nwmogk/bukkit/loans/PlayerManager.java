@@ -491,6 +491,32 @@ public class PlayerManager {
 			return ((FinancialInstitution) entity).getName();
 		return entityNameLookup(entity.getUserID());
 	}
+	
+	/**
+	 * Returns an array which contains all of the financial entities stored in
+	 * the system. If there is a problem reading the SQL table, then it will
+	 * return null.
+	 *  
+	 * @return
+	 */
+	public FinancialEntity[] getFinancialEntities(){
+		String gottaCatchEmAll = "SELECT * FROM FinancialEntities;";
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(gottaCatchEmAll);
+			
+			stmt.close();
+			
+			return buildEntity(rs);
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
 
 	/**
 	 * This method returns a FinancialEntity object given the UUID of the entity. If no entity
@@ -503,7 +529,7 @@ public class PlayerManager {
 	public FinancialEntity getFinancialEntity(UUID userID){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialEntity(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
-		return buildEntity(queryFinancialEntitiesTable(userID));
+		return buildEntity(queryFinancialEntitiesTable(userID))[0];
 	}
 	
 	/**
@@ -640,7 +666,7 @@ public class PlayerManager {
 	public FinancialInstitution getFinancialInstitution(UUID bankId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
-		FinancialEntity result = buildEntity(queryFinancialEntitiesTable(bankId));
+		FinancialEntity result = buildEntity(queryFinancialEntitiesTable(bankId))[0];
 		if(result != null && result instanceof FinancialInstitution)
 			return (FinancialInstitution) result;
 		return null;
@@ -1001,49 +1027,61 @@ public class PlayerManager {
 	 * FinancialInstitution object is created, if not, then it returns null.
 	 * A Player type will produce a FinancialPlayer object.
 	 */
-	private FinancialEntity buildEntity(ResultSet successfulQuery){
+	private FinancialEntity[] buildEntity(ResultSet successfulQuery){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildEntity(ResultSet)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		if(successfulQuery == null)
 			return null;
 		
+		Vector<FinancialEntity> resultVector = new Vector<FinancialEntity>();
+		
 		try {
-			if(!successfulQuery.next())
+			if(!successfulQuery.isBeforeFirst())
 				return null;
 			
-			// Collect FinancialEntity information.
-			String userString = successfulQuery.getString("UserID");
-			PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
-			double cash = successfulQuery.getDouble("Cash");
-			int crScore = successfulQuery.getInt("CreditScore");
-			
-			UUID userID = UUID.fromString(userString);
-			
-			// Make FinancialPlayer object if that's what it is.
-			if(pt.equals(PlayerType.PLAYER))
-				return new FinancialPlayer(userID, pt, cash, crScore);
-			
-			// Get FinancialInstitution info if it exists.
-			ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
+			while(successfulQuery.next()){
 				
-			if(instituteQuery == null || !instituteQuery.next())
-				return null;
+			
+				// Collect FinancialEntity information.
+				String userString = successfulQuery.getString("UserID");
+				PlayerType pt = PlayerType.getFromString(successfulQuery.getString("Type"));
+				double cash = successfulQuery.getDouble("Cash");
+				int crScore = successfulQuery.getInt("CreditScore");
 				
-			String name = instituteQuery.getString("Name");
-			String managerString = instituteQuery.getString("Manager");
+				UUID userID = UUID.fromString(userString);
+				
+				// Make FinancialPlayer object if that's what it is.
+				if(pt.equals(PlayerType.PLAYER)){
+					resultVector.add(new FinancialPlayer(userID, pt, cash, crScore));
+					continue;
+				}
+				
+				// Get FinancialInstitution info if it exists.
+				ResultSet instituteQuery = queryFinancialInstitutionsTable(userID);
+					
+				if(instituteQuery == null || !instituteQuery.next())
+					continue;
+					
+				String name = instituteQuery.getString("Name");
+				String managerString = instituteQuery.getString("Manager");
+				
+				UUID managerID = UUID.fromString(managerString);
+				
+				// Make FinancialInstitution object.
+				resultVector.add(new FinancialInstitution(userID, name, pt, managerID, cash, crScore));
 			
-			UUID managerID = UUID.fromString(managerString);
-			
-			// Make FinancialInstitution object.
-			return new FinancialInstitution(userID, name, pt, managerID, cash, crScore);
+			}
 			
 		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+			SerenityLoans.logFail(e.getMessage());
 			e.printStackTrace();
 		}
 		
-		return null;
+		if(resultVector.size() == 0)
+			return null;
+		
+		return (FinancialEntity[]) resultVector.toArray();
 	}
 
 	/*
