@@ -1103,6 +1103,7 @@ public class LoanManager {
 		 *  credit utilization   	==> updateScore = (1 - utlization limit * abs((statement balance)/(credit limit) - credit utilization goal)) * current score
 		 *  final loan payment		==> updateScore = (1 - current score)(time taken)/term + current score
 		 *  overpayment penalty		==> updateScore = min(1, 1 - overpayment penalty * ( (amount paid - statement balance)/value)) * current score
+		 *  bankruptcy				==> newScore = bankruptcy score
 		 */
 		
 		/*
