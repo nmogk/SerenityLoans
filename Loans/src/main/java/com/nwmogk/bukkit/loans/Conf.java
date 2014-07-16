@@ -302,7 +302,7 @@ public class Conf {
 	}
 	
 	
-	public enum CreditScoreSettings {ALPHA, RANGE_MIN, RANGE_MAX, SUBPRIME, NO_HISTORY, INACTIVITY, TAU, CREDIT_LIMIT, BANKRUPT, SIG_FIGS, UTIL_GOAL, PRE_APPROVED, OVERPAYMENT_PENALTY};
+	public enum CreditScoreSettings {UTIL_LIMIT, ALPHA, RANGE_MIN, RANGE_MAX, SUBPRIME, NO_HISTORY, INACTIVITY, TAU, CREDIT_LIMIT, BANKRUPT, SIG_FIGS, UTIL_GOAL, PRE_APPROVED, OVERPAYMENT_PENALTY};
 
 	public double getCreditScoreSettings(CreditScoreSettings type){
 		
@@ -328,6 +328,7 @@ public class Conf {
 		case OVERPAYMENT_PENALTY:
 		case UTIL_GOAL:
 		case INACTIVITY:
+		case UTIL_LIMIT:
 			max = 1;
 			min = 0;
 			break;
@@ -381,10 +382,15 @@ public class Conf {
 			break;
 		case TAU: // Time for each deduction for inactivity
 			path = "trust.credit-score.account-inactivity-time";
+			if(config.contains(path) && config.isString(path))
+				return Math.min(Math.max(min, parseTime(config.getString(path))), max);
+			
 			break;
 		case UTIL_GOAL: // Credit utilization goal factor
 			path = "trust.credit-score.credit-utilization-goal";
 			break;
+		case UTIL_LIMIT:
+			path = "trust.credit-score.credit-utilization-limit";
 		}
 		
 		if(config.contains(path) && config.isDouble(path))

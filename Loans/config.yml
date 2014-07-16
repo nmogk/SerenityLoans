@@ -238,6 +238,7 @@ trust:
     credit-limit-reached-factor: 0.6
     sig-figs-reported: 3
     credit-utilization-goal: 0.5
+    credit-utilization-limit: 0.18
     overpayment-penalty-factor: 0.25
     bankrupt-score: 300
     pre-approved-score: 630
