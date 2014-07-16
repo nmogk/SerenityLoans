@@ -53,10 +53,10 @@ public final class FinancialPlayer implements FinancialEntity {
 	private final UUID userID;
 	//private final Timestamp ts;
 	private final double cash;
-	private final int creditScore;
+	private final double creditScore;
 	private final PlayerType pt;
 	
-	public FinancialPlayer(UUID userID,  PlayerType type,  double money, int crScore){
+	public FinancialPlayer(UUID userID,  PlayerType type,  double money, double crScore){
 		this.userID = userID;
 		pt = type;
 		cash = money;
@@ -67,7 +67,7 @@ public final class FinancialPlayer implements FinancialEntity {
 
 	public double getCash() {return cash;}
 
-	public int getCreditScore() {return creditScore;}
+	public double getCreditScore() {return creditScore;}
 
 	public PlayerType getPlayerType() {return pt;}
 	

@@ -262,9 +262,9 @@ public class PlayerManager {
 	 * @return true if the FinancialInstitution exists in the table at the end of the method,
 	 * false otherwise.
 	 */
-	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, int crScore){
+	public boolean createFinancialInstitution(String desiredName, FinancialEntity manager, PlayerType type, double initialCash, double crScore){
 		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity, PlayerType, double, int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
+			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createFinancialInstitution(String, FinancialEntity, PlayerType, double, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		
 		
 		if(desiredName.equalsIgnoreCase("CentralBank"));
@@ -309,7 +309,7 @@ public class PlayerManager {
 		if(SerenityLoans.debugLevel > 1)
 			SerenityLoans.log.info(String.format("[%s] Free UUID found: %s", plugin.getDescription().getName(), instituteId.toString()));
 		
-		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %d);", initialCash, crScore);		
+		String fEntityString = String.format("INSERT INTO FinancialEntities (UserID, Type, Cash, CreditScore) VALUES (?, ?, %f, %f);", initialCash, crScore);		
 		String fInstituteString = "INSERT INTO FinancialInstitutions (BankID, Name, Manager) VALUES (?, ?, ?);";
 		
 		boolean success = true;

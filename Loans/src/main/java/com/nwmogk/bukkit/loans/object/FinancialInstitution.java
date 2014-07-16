@@ -57,10 +57,10 @@ public final class FinancialInstitution implements FinancialEntity {
 	private final String name;
 	private final UUID managerID; 
 	private final double cash;
-	private final int creditScore;
+	private final double creditScore;
 	private final PlayerType pt;
 	
-	public FinancialInstitution(UUID userID, String name, PlayerType type, UUID managerID, double money, int crScore){
+	public FinancialInstitution(UUID userID, String name, PlayerType type, UUID managerID, double money, double crScore){
 		this.userID = userID;
 		this.name = name;
 		pt = type;
@@ -77,7 +77,7 @@ public final class FinancialInstitution implements FinancialEntity {
 
 	public UUID getResponsibleParty() {return managerID;}
 	
-	public int getCreditScore() {return creditScore;}
+	public double getCreditScore() {return creditScore;}
 
 	public PlayerType getPlayerType() {return pt;}
 	

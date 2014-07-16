@@ -50,7 +50,7 @@ public interface FinancialEntity extends Cloneable{
 
 	public double getCash();
 	
-	public int getCreditScore();
+	public double getCreditScore();
 
 	public PlayerType getPlayerType();
 	
