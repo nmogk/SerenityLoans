@@ -389,6 +389,10 @@ public class CreditHistory {
 		return result;
 	}
 	
+	public CreditEvent getInactivityEvent(){
+		return new Eventerator().getCreditEvent(CreditEventType.INACTIVITY);
+	}
+	
 	/**
 	 * This method returns a string stating whether the credit score is "good"
 	 * or "bad." In the terms of finance, this translates to "Prime" and "Subprime."
@@ -523,7 +527,7 @@ public class CreditHistory {
 	 */
 	public void recordPayment(PaymentStatement bill, double amount){
 		// Update for inactivity
-		recordInactivity();
+//		recordInactivity();
 		
 		// Nothing to do otherwise
 		if(bill == null || amount < 0){
@@ -531,40 +535,40 @@ public class CreditHistory {
 		}
 		
 		// Parameters for CreditCard transactions to be stored for later
-		double creditUtil = 0;
-		double creditLimit = 0;
-		boolean creditLimitReached = false;
+//		double creditUtil = 0;
+//		double creditLimit = 0;
+//		boolean creditLimitReached = false;
 		Loan theLoan = plugin.loanManager.getLoan(bill.getLoanID());
 		
-		// These things must be calculated first before the current credit score
-		// has been updated.
-		if(theLoan instanceof CreditCard){
-			
-			// What is the ideal credit utilization. There will be a small penalty
-			// for under or over-utilizing
-			double utilizationGoal = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-utilization-goal");
-			
-			// Input sanitization
-			if(utilizationGoal > 1 || utilizationGoal < 0)
-				throw new ConfigurationException("Utilization goal must be between 0 and 1.");
-			
-			// Calculate credit utilization score with current credit score
-			creditUtil = score * (1.0 - Math.abs(bill.getBillAmount()/theLoan.getValue() - utilizationGoal));
-			
-			// Calculate if the credit limit has been reached
-			creditLimitReached = bill.getBillAmount() == theLoan.getValue();
-			if(creditLimitReached){
-				// Penalty is specified in config file
-				double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-limit-reached-factor");
-				
-				// Sanitize inputs
-				if(penalty > 1 || penalty < 0)
-					throw new ConfigurationException("Credit limit reached factor must be between 0 and 1.");
-				
-				// Calculate penalty with current score
-				creditLimit = penalty * score;
-			}
-		}
+//		// These things must be calculated first before the current credit score
+//		// has been updated.
+//		if(theLoan instanceof CreditCard){
+//			
+//			// What is the ideal credit utilization. There will be a small penalty
+//			// for under or over-utilizing
+//			double utilizationGoal = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-utilization-goal");
+//			
+//			// Input sanitization
+//			if(utilizationGoal > 1 || utilizationGoal < 0)
+//				throw new ConfigurationException("Utilization goal must be between 0 and 1.");
+//			
+//			// Calculate credit utilization score with current credit score
+//			creditUtil = score * (1.0 - Math.abs(bill.getBillAmount()/theLoan.getValue() - utilizationGoal));
+//			
+//			// Calculate if the credit limit has been reached
+//			creditLimitReached = bill.getBillAmount() == theLoan.getValue();
+//			if(creditLimitReached){
+//				// Penalty is specified in config file
+//				double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-limit-reached-factor");
+//				
+//				// Sanitize inputs
+//				if(penalty > 1 || penalty < 0)
+//					throw new ConfigurationException("Credit limit reached factor must be between 0 and 1.");
+//				
+//				// Calculate penalty with current score
+//				creditLimit = penalty * score;
+//			}
+//		}
 		
 		// If the bill has been paid
 		if(amount >= bill.getBillAmount()){
@@ -633,18 +637,18 @@ public class CreditHistory {
 		}
 		
 		// Finally, apply credit card score adjustments
-		if(theLoan instanceof CreditCard){
-			// Credit utilization
-			history.add(new GenericCreditEvent(CreditEventType.CREDIT_UTILIZATION, new Date(), creditUtil, theLoan));
-			updateScore(creditUtil);
-			
-			// Credit limit penalty (if applicable)
-			if(creditLimitReached){
-				history.add(new GenericCreditEvent(CreditEventType.CREDIT_LIMIT, new Date(), creditLimit, theLoan));
-				updateScore(creditLimit);
-			}
-			
-		}
+//		if(theLoan instanceof CreditCard){
+//			// Credit utilization
+//			history.add(new GenericCreditEvent(CreditEventType.CREDIT_UTILIZATION, new Date(), creditUtil, theLoan));
+//			updateScore(creditUtil);
+//			
+//			// Credit limit penalty (if applicable)
+//			if(creditLimitReached){
+//				history.add(new GenericCreditEvent(CreditEventType.CREDIT_LIMIT, new Date(), creditLimit, theLoan));
+//				updateScore(creditLimit);
+//			}
+//			
+//		}
 	}
 	
 	/**
