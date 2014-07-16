@@ -66,6 +66,7 @@ import com.nwmogk.bukkit.loans.Conf.CreditScoreSettings;
 import com.nwmogk.bukkit.loans.api.CreditEvent;
 import com.nwmogk.bukkit.loans.api.CreditEventFactory;
 import com.nwmogk.bukkit.loans.api.CreditEventType;
+import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.Loanable;
 import com.nwmogk.bukkit.loans.exception.ConfigurationException;
 import com.nwmogk.bukkit.loans.object.CreditCard;
@@ -321,16 +322,19 @@ public class CreditHistory {
 		
 		
 		
-		// Sanitize inputs
-		if(scoreMax <= scoreMin)
-			throw new ConfigurationException("Credit score range invalid! max <= min");
-
 
 	}
 	
 	private void migrateScores(double lastScoreMax, double lastScoreMin) {
-		// TODO Auto-generated method stub
+		FinancialEntity[] list = plugin.playerManager.getFinancialEntities();
 		
+		for(FinancialEntity fe : list){
+			double oldScore = fe.getCreditScore();
+			double normScore = (oldScore - lastScoreMin)/(lastScoreMax - lastScoreMin);
+			double newScore = normScore * (scoreMax - scoreMin) + scoreMin;
+			
+			plugin.playerManager.setCreditScore(fe, newScore);
+		}
 	}
 
 	/**
