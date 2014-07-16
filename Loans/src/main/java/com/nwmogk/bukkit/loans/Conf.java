@@ -304,7 +304,7 @@ public class Conf {
 	
 	public enum CreditScoreSettings {UTIL_LIMIT, ALPHA, RANGE_MIN, RANGE_MAX, SUBPRIME, NO_HISTORY, INACTIVITY, TAU, CREDIT_LIMIT, BANKRUPT, SIG_FIGS, UTIL_GOAL, PRE_APPROVED, OVERPAYMENT_PENALTY};
 
-	public double getCreditScoreSettings(CreditScoreSettings type){
+	public static double getCreditScoreSettings(CreditScoreSettings type){
 		
 		double rangeMax = 850;
 		String rangeMaxPath = "trust.credit-score.score-range.max";
