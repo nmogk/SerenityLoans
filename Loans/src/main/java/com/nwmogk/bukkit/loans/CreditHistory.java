@@ -53,6 +53,9 @@
 
 package com.nwmogk.bukkit.loans;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.LinkedList;
@@ -74,7 +77,7 @@ import com.nwmogk.bukkit.loans.obsolete.LoanState;
 public class CreditHistory {
 	
 
-	SerenityLoans plug;
+	SerenityLoans plugin;
 	
 	/**
 	 * This enum defines all of the types of credit events that the credit history records
@@ -271,24 +274,65 @@ public class CreditHistory {
 	public CreditHistory(SerenityLoans plugin){
 		history = new LinkedList<GenericCreditEvent>();
 		
-		plug = plugin;
+		this.plugin = plugin;
+		
+		
+		String getInfo = "SELECT CRscore_max, CRscore_min FROM Info;";
+		double lastScoreMax = 0;
+		double lastScoreMin = 0;
+		
+		try {
+			Statement stmt = this.plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(getInfo);
+			
+			if(rs.next()){
+				lastScoreMax = rs.getDouble(1);
+				lastScoreMin = rs.getDouble(2);
+			}
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
 		
 		// Gather parameters from config file
-		double configScore = Conf.getCreditScoreSettings(CreditScoreSettings.NO_HISTORY);
+		score = normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.NO_HISTORY));
 		scoreMax = Conf.getCreditScoreSettings(CreditScoreSettings.RANGE_MAX);
 		scoreMin = Conf.getCreditScoreSettings(CreditScoreSettings.RANGE_MIN);
 		alpha = Conf.getCreditScoreSettings(CreditScoreSettings.ALPHA);
 		
+		if(lastScoreMax == 0 && lastScoreMin == 0){
+			
+			String writeScoreSQL = String.format("UPDATE Info SET CRscore_max=%f, CRscore_min=%f;", scoreMax, scoreMin);
+			
+			try {
+				Statement stmt = this.plugin.conn.createStatement();
+				stmt.executeUpdate(writeScoreSQL);
+				stmt.close();
+			} catch (SQLException e) {
+				SerenityLoans.logFail(e.getMessage());
+				e.printStackTrace();
+			}
+	
+		} else if (lastScoreMax != scoreMax || lastScoreMin != scoreMin)
+			migrateScores(lastScoreMax, lastScoreMin);
+		
+		
+		
 		// Sanitize inputs
 		if(scoreMax <= scoreMin)
 			throw new ConfigurationException("Credit score range invalid! max <= min");
-		if(configScore > scoreMax || configScore < scoreMin)
-			throw new ConfigurationException("Initial credit score not within range.");
-		
-		// Set the score based on the inputs from the config file
-		score = (configScore - scoreMin)/(scoreMax - scoreMin);
+
+
 	}
 	
+	private void migrateScores(double lastScoreMax, double lastScoreMin) {
+		// TODO Auto-generated method stub
+		
+	}
+
 	/**
 	 * This method returns a numeric representation of the credit score. The credit
 	 * score is stored internally as a double between the values of 0 and 1. The 
@@ -307,9 +351,9 @@ public class CreditHistory {
 		recordInactivity();
 		
 		// Gather parameters from config file
-		double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
-		double precision = plug.getConfig().getDouble("trust.credit-score.sig-figs-reported");
+		double scoreMax = plugin.getConfig().getDouble("trust.credit-score.score-range.max");
+		double scoreMin = plugin.getConfig().getDouble("trust.credit-score.score-range.min");
+		double precision = plugin.getConfig().getDouble("trust.credit-score.sig-figs-reported");
 		
 		// Sanitize inputs
 		if(scoreMax <= scoreMin)
@@ -486,7 +530,7 @@ public class CreditHistory {
 		double creditUtil = 0;
 		double creditLimit = 0;
 		boolean creditLimitReached = false;
-		Loan theLoan = plug.loanManager.getLoan(bill.getLoanID());
+		Loan theLoan = plugin.loanManager.getLoan(bill.getLoanID());
 		
 		// These things must be calculated first before the current credit score
 		// has been updated.
