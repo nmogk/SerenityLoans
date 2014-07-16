@@ -315,8 +315,9 @@ public class Conf {
 		if(config.contains(rangeMaxPath) && config.isDouble(rangeMaxPath))
 			rangeMax = config.getDouble(rangeMaxPath);
 		
+		// min score must be at least 1 below max score
 		if(config.contains(rangeMinPath) && config.isDouble(rangeMinPath))
-			rangeMin = Math.min(config.getDouble(rangeMinPath), rangeMax);
+			rangeMin = Math.min(config.getDouble(rangeMinPath), rangeMax - 1);
 		
 		double max = 0;
 		double min = 0;
