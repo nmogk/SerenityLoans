@@ -70,7 +70,7 @@ public final class SerenityLoans extends JavaPlugin {
 	
     // Incrementing these numbers will force a rebuild of the database.
     public static final int dbMajorVersion = 0;
-    public static final int dbMinorVersion = 6;
+    public static final int dbMinorVersion = 7;
     
     private static SerenityLoans plugin;
 	
@@ -317,7 +317,7 @@ public final class SerenityLoans extends JavaPlugin {
 					+ "UserID varchar(36) NOT NULL,"
 					+ "Type ENUM('Player','Bank','CreditUnion','Town/Faction','Employer') NOT NULL DEFAULT 'Player',"
 					+ "Cash DECIMAL(10," + decimals +"),"
-					+ "CreditScore int DEFAULT "+ defaultCreditScore + ","
+					+ "CreditScore double DEFAULT "+ defaultCreditScore + ","
 					+ "LastSystemUse TIMESTAMP NOT NULL DEFAULT NOW() ON UPDATE NOW(),"
 					+ "PRIMARY KEY (UserID)"
 					+ ");";
@@ -353,7 +353,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "("
 				 	+ "ItemID int NOT NULL AUTO_INCREMENT,"
 				 	+ "UserID varchar(36) NOT NULL,"
-				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart') NOT NULL,"
+				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified') NOT NULL,"
 				 	+ "ScoreValue double NOT NULL,"
 				 	+ "Parameter double NOT NULL DEFAULT " + dissipationFactor + ","
 				 	+ "Notes TEXT,"
@@ -493,6 +493,8 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "("
 				 	+ "DBmajor int NOT NULL,"
 				 	+ "DBminor int NOT NULL,"
+				 	+ "CRscore_max double,"
+				 	+ "CRscore_min double,"
 				 	+ "CONSTRAINT uc_relationID PRIMARY KEY (DBmajor,DBminor)"
 				 	+ ");";
 		 
