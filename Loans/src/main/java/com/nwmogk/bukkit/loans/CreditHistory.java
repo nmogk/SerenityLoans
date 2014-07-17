@@ -2,6 +2,7 @@
  * ========================================================================
  *                               DESCRIPTION
  * ========================================================================
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: CreditHistory.java
  * Contributing Authors: Nathan W Mogk
