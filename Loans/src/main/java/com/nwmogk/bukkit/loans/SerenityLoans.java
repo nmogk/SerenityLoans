@@ -355,7 +355,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "("
 				 	+ "ItemID int NOT NULL AUTO_INCREMENT,"
 				 	+ "UserID varchar(36) NOT NULL,"
-				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified') NOT NULL,"
+				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified', 'CreditUtilization', 'Overpayment') NOT NULL,"
 				 	+ "ScoreValue double NOT NULL,"
 				 	+ "Parameter double NOT NULL DEFAULT " + dissipationFactor + ","
 				 	+ "Notes TEXT,"
