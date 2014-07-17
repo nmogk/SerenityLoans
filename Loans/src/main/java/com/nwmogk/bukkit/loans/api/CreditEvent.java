@@ -5,4 +5,6 @@ public interface CreditEvent {
 	public double getUpdateScore(double currentScore);
 
 	public double getDissipationFactor();
+	
+	public CreditEventType getType();
 }
