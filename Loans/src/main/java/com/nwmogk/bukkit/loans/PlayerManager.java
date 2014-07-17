@@ -689,6 +689,37 @@ public class PlayerManager {
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getFinancialInstitution(String)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : ""));
 		return getFinancialInstitution(getFinancialInstituteID(bankName));
 	}
+	
+	/**
+	 * Returns an array of FinancialInstitutions that represents all of 
+	 * the FinancialInstitutions in the system, or null if there is a 
+	 * problem during lookup. This will include all FinancialInstitutions
+	 * and not just banks.
+	 * 
+	 * @return
+	 */
+	public FinancialInstitution[] getFinancialInstitutions(){
+		String sql = "SELECT FinancialEntities.UserID, FinancialEntities.Type, FinancialEntities.Cash, FinancialEntities.CreditScore FROM FinancialEntities JOIN FinancialInstitutions ON FinancialInstitutions.BankID=FinancialEntities.UserID;";
+	
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = null;
+			
+			// Technically uses FinancialInstitutions as well, but I don't want
+			// to try to obtain both locks with simple lock objects.
+			synchronized(financialEntitiesLock){
+				rs = stmt.executeQuery(sql);
+			}
+			
+			return (FinancialInstitution[]) buildEntity(rs);
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
 
 	/**
 	 * This method takes a UUID of a player and returns a Vector of UUIDs representing
