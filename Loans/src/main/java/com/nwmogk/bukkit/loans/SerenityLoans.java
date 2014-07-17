@@ -82,6 +82,7 @@ public final class SerenityLoans extends JavaPlugin {
     public EconomyManager econ;
 	public LoanManager loanManager;
 	public OfferManager offerManager;
+	public CreditHistory historyManager;
 	
 	public ExecutorService threads;
     
@@ -198,6 +199,7 @@ public final class SerenityLoans extends JavaPlugin {
         }
 		
 		loanManager = new LoanManager(this);
+		historyManager = new CreditHistory(this);
 //        setupPermissions();
 //        setupChat();
 		
