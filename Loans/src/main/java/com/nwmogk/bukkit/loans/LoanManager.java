@@ -1168,12 +1168,16 @@ public class LoanManager {
 		if(plugin.getConfig().contains(rulePath) && plugin.getConfig().isBoolean(rulePath))
 			percentageRule = plugin.getConfig().getBoolean(rulePath);
 	
-		double statementAmount = Math.min(theLoan.getCloseValue() , le.amount) + theLoan.getFeesOutstanding() + ps.getPaymentRemaining();
+		double feeAmount = theLoan.getFeesOutstanding() + (ps != null? ps.getFeesRemaining() : 0.0);
+		double intAmount = theLoan.getInterestBalance() + (ps != null? ps.getInterestRemaining() : 0.0);
+		double principalAmount = le.amount - theLoan.getInterestBalance() + (ps != null? ps.getPrincipalRemaining() : 0.0);
+		
+		double statementAmount = feeAmount + intAmount + principalAmount;
 		double minPayment = theLoan.getMinPayment() * (percentageRule? le.amount : 1);
 		
 		Timestamp due = new Timestamp(le.time.getTime() + theLoan.getPaymentTime());
 		
-		String insertSQL = String.format("INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate) VALUES (%d, $f, $f, ?, ?);", le.loan, statementAmount, minPayment);
+		String insertSQL = String.format("INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate, AmountPrincipal, AmountInterest, AmountFees) VALUES (%d, %f, %f, ?, ?, %f, %f, %f);", le.loan, statementAmount, minPayment, principalAmount, intAmount, feeAmount);
 	
 		try {
 			
