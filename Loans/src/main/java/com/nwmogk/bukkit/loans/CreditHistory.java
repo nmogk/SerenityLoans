@@ -56,9 +56,11 @@ package com.nwmogk.bukkit.loans;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.List;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -78,7 +80,9 @@ import com.nwmogk.bukkit.loans.obsolete.LoanState;
 public class CreditHistory {
 	
 
-	SerenityLoans plugin;
+	private SerenityLoans plugin;
+	
+	private Object creditHistoryLock = new Object();
 	
 	/**
 	 * This enum defines all of the types of credit events that the credit history records
@@ -154,13 +158,13 @@ public class CreditHistory {
 	
 	private class Eventerator implements CreditEventFactory{
 
-		private CreditEvent noChange = new CreditEvent(){
-			public double getUpdateScore(double currentScore) {return currentScore;}
-			public double getDissipationFactor() {return 0;}
-		};
-		
 		private abstract class AbstractCreditEvent implements CreditEvent {
+			private CreditEventType type;
+			
+			public AbstractCreditEvent(CreditEventType type){this.type = type;}
+			
 			public double getDissipationFactor(){return alpha;}
+			public CreditEventType getType(){return type;}
 		}
 		
 		private PaymentStatement ps = null;
@@ -179,7 +183,7 @@ public class CreditHistory {
 			switch(type){
 			
 			case BANKRUPT:
-				return new CreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.BANKRUPT));
 					}
@@ -188,7 +192,7 @@ public class CreditHistory {
 				};
 				
 			case CREDIT_LIMIT:
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return Conf.getCreditScoreSettings(CreditScoreSettings.CREDIT_LIMIT) * currentScore;
 					}
@@ -198,31 +202,31 @@ public class CreditHistory {
 				if(ps == null)
 					return null;
 				
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return currentScore * (1 - Conf.getCreditScoreSettings(CreditScoreSettings.UTIL_LIMIT) * Math.abs(ps.getActualPaid()/ps.getBillAmount() - Conf.getCreditScoreSettings(CreditScoreSettings.UTIL_GOAL)));
 					}
 				};
 				
 			case INACTIVITY:
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return Math.max(normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.NO_HISTORY)), Conf.getCreditScoreSettings(CreditScoreSettings.INACTIVITY) * currentScore);
 					}			
 				};
 				
 			case MISSED_PAYMENT:
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {return 0;}
 				};
 				
 			case PAID_BALANCE:
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {return 1;}
 				};
 				
 			case PAID_MINIMUM:
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return normalizeScore(Conf.getCreditScoreSettings(CreditScoreSettings.SUBPRIME));
 					}
@@ -232,7 +236,7 @@ public class CreditHistory {
 				if(theLoan == null)
 					return null;
 			
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return (1 - currentScore) * ((double) (new Date().getTime() - theLoan.getStartTime().getTime()) ) / ((double)theLoan.getTerm()) + currentScore;
 					}
@@ -242,7 +246,7 @@ public class CreditHistory {
 				if(ps == null || theLoan == null)
 					return null;
 				
-				return new AbstractCreditEvent(){
+				return new AbstractCreditEvent(type){
 					public double getUpdateScore(double currentScore) {
 						return Math.min(1, Conf.getCreditScoreSettings(CreditScoreSettings.OVERPAYMENT_PENALTY) * currentScore * (ps.getActualPaid() - ps.getBillAmount())/theLoan.getValue());
 					}
@@ -252,7 +256,10 @@ public class CreditHistory {
 			case LOANOPEN:
 			case LOAN_MODIFY:
 			default:
-				return noChange;
+				return new AbstractCreditEvent(type){
+					public double getUpdateScore(double currentScore) {return currentScore;}
+					public double getDissipationFactor() {return 0;}
+				};
 			
 			}
 			
@@ -507,134 +514,199 @@ public class CreditHistory {
 	 * @param bill
 	 */
 	public void recordPayment(PaymentStatement bill){
-		if(bill == null){
-			recordInactivity();
+		if(bill == null)
 			return;
-		}
-		recordPayment(bill, bill.getActualPaid());
-	}
-	
-	/**
-	 * 
-	 * This method records a payment made to a loan. This method may generate
-	 * several different CreditEvent types including those that represent payment
-	 * in full, partial payment, or no payment. In addition to the payment events
-	 * it will also produce credit score events relating to credit utilization
-	 * and credit limit. 
-	 * 
-	 * @param bill
-	 * @param amount
-	 */
-	public void recordPayment(PaymentStatement bill, double amount){
-		// Update for inactivity
-//		recordInactivity();
 		
-		// Nothing to do otherwise
-		if(bill == null || amount < 0){
-			return;
-		}
+		// Possibilities: overpayment, final payment, partial payment, missed payment, full payment
+		// Outline:
+		//      1) determine case
+		//	    2) write CreditHistory entry
+		//		3) Update score
 		
-		// Parameters for CreditCard transactions to be stored for later
-//		double creditUtil = 0;
-//		double creditLimit = 0;
-//		boolean creditLimitReached = false;
-		Loan theLoan = plugin.loanManager.getLoan(bill.getLoanID());
+		LinkedList<CreditEvent> eventsList = new LinkedList<CreditEvent>();
+		Eventerator evtr = new Eventerator(bill, plugin.loanManager.getLoan(bill.getLoanID()));
 		
-//		// These things must be calculated first before the current credit score
-//		// has been updated.
-//		if(theLoan instanceof CreditCard){
-//			
-//			// What is the ideal credit utilization. There will be a small penalty
-//			// for under or over-utilizing
-//			double utilizationGoal = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-utilization-goal");
-//			
-//			// Input sanitization
-//			if(utilizationGoal > 1 || utilizationGoal < 0)
-//				throw new ConfigurationException("Utilization goal must be between 0 and 1.");
-//			
-//			// Calculate credit utilization score with current credit score
-//			creditUtil = score * (1.0 - Math.abs(bill.getBillAmount()/theLoan.getValue() - utilizationGoal));
-//			
-//			// Calculate if the credit limit has been reached
-//			creditLimitReached = bill.getBillAmount() == theLoan.getValue();
-//			if(creditLimitReached){
-//				// Penalty is specified in config file
-//				double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-limit-reached-factor");
-//				
-//				// Sanitize inputs
-//				if(penalty > 1 || penalty < 0)
-//					throw new ConfigurationException("Credit limit reached factor must be between 0 and 1.");
-//				
-//				// Calculate penalty with current score
-//				creditLimit = penalty * score;
-//			}
-//		}
+		FinancialEntity borrower = plugin.loanManager.getLoan(bill.getLoanID()).getBorrower();
+		String historySQL = String.format("SELECT EventTime FROM CreditHistory WHERE UserID='%s' ORDER BY EventTime DESC;", borrower.getUserID().toString());
 		
-		// If the bill has been paid
-		if(amount >= bill.getBillAmount()){
-			// Record in history
-			history.add(new GenericCreditEvent(CreditEventType.PAID_BALANCE, new Date(), 1.0, theLoan));
+		try {
+			Statement stmt = plugin.conn.createStatement();
 			
-			// Penalty for paying too much too soon
-			// i.e. You should actually hold your loan for a while
-			double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.overpayment-penalty-factor");
+			ResultSet rs = null;
+			synchronized(creditHistoryLock){
+				rs = stmt.executeQuery(historySQL);
+			}
 			
-			// Sanitize inputs
-			if(penalty > 1 || penalty < 0)
-				throw new ConfigurationException("Overpayment penalty factor must be between 0 and 1.");
-			
-			// Calculate score adjustment for overpayment penalty
-			// This will only be applied for non-credit card accounts
-			double newScoreItem = score * Math.min(1.0, 1 - penalty * (bill.getActualPaid() - bill.getBillAmount())/theLoan.getValue());
-			
-			// Apply score for paying in full
-			updateScore(1.0);
-			
-			if(theLoan instanceof CreditCard || newScoreItem == 1);
-			// If not credit card
-			else {
-				// Apply score for paying too much
-				history.add(new GenericCreditEvent(CreditEventType.OVERPAYMENT, new Date(), newScoreItem, theLoan));	
-				updateScore(newScoreItem);
+			if(rs.next()){
+				Timestamp ts = rs.getTimestamp(1);
+				
+				long timeAgo = new Date().getTime() - ts.getTime();
+				
+				int numWeeks = (int) Math.floor(((double)timeAgo) / Conf.getCreditScoreSettings(CreditScoreSettings.TAU));
+				
+				for(int i = 0; i < numWeeks; i++)
+					eventsList.add(evtr.getCreditEvent(CreditEventType.INACTIVITY));
 			}
 				
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
 		}
-		// If some has been paid
-		else if(amount >= theLoan.getMinPayment()){
 		
-			JavaPlugin plug = SerenityLoans.getPlugin();
+		CreditEvent event = null;
+		double currentScore = updateScore(borrower, eventsList);
+		
+		if(bill.getActualPaid() > bill.getBillAmount())
+			event = evtr.getCreditEvent(CreditEventType.OVERPAYMENT);
+		else if (bill.getActualPaid() == bill.getBillAmount())
+			event = evtr.getCreditEvent(CreditEventType.PAID_BALANCE);
+		else if(bill.getActualPaid() >= bill.getMinimumPayment())
+			event = evtr.getCreditEvent(CreditEventType.PAID_MINIMUM);
+		else
+			event = evtr.getCreditEvent(CreditEventType.MISSED_PAYMENT);
+		
+		eventsList.clear();
+		eventsList.add(event);
+		
+		String insertSQL = String.format("INSERT INTO CreditHistory (UserID, EventType, ScoreValue, Parameter) VALUES ('%s', '%s', %f, %f)", borrower.getUserID().toString(), event.getType().toString(), event.getUpdateScore(currentScore), event.getDissipationFactor());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
 			
-			// Parameters from config file
-			double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-			double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
-			double configScore = plug.getConfig().getDouble("trust.credit-history.subprime-limit");
+			stmt.executeUpdate(insertSQL);
 			
-			// Sanitize inputs
-			if(scoreMax <= scoreMin)
-				throw new ConfigurationException("Credit score range invalid! max <= min");
-			if(configScore > scoreMax || configScore < scoreMin)
-				throw new ConfigurationException("Prime score not within range.");
-			
-			// Convert the configuration values to internal values
-			// This value is the subprime limit internal representation
-			// The title is a little misleading
-			double newRange = (configScore - scoreMin)/(scoreMax - scoreMin);
-			
-			// Find percentage of bill paid after minimum payment
-			double percentComplete = (bill.getActualPaid() - theLoan.getMinPayment())/(bill.getBillAmount() - theLoan.getMinPayment());
-			
-			// Convert to new range
-			double newScoreItem = percentComplete * (1 - newRange) + newRange;
-			
-			// Add to history and update
-			history.add(new GenericCreditEvent(CreditEventType.PAID_MINIMUM, new Date(), newScoreItem, theLoan));
-			updateScore(newScoreItem);
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
 		}
-		// Payment missed completely
-		else {
-			history.add(new GenericCreditEvent(CreditEventType.MISSED_PAYMENT, new Date(), 0.0, theLoan));
-			updateScore(0);
-		}
+		
+		updateScore(borrower, eventsList);
+	
+	}
+	
+//	/**
+//	 * 
+//	 * This method records a payment made to a loan. This method may generate
+//	 * several different CreditEvent types including those that represent payment
+//	 * in full, partial payment, or no payment. In addition to the payment events
+//	 * it will also produce credit score events relating to credit utilization
+//	 * and credit limit. 
+//	 * 
+//	 * @param bill
+//	 * @param amount
+//	 */
+//	public void recordPayment(PaymentStatement bill, double amount){
+//		// Update for inactivity
+////		recordInactivity();
+//		
+//		// Nothing to do otherwise
+//		if(bill == null || amount < 0){
+//			return;
+//		}
+//		
+//		// Parameters for CreditCard transactions to be stored for later
+////		double creditUtil = 0;
+////		double creditLimit = 0;
+////		boolean creditLimitReached = false;
+//		Loan theLoan = plugin.loanManager.getLoan(bill.getLoanID());
+//		
+////		// These things must be calculated first before the current credit score
+////		// has been updated.
+////		if(theLoan instanceof CreditCard){
+////			
+////			// What is the ideal credit utilization. There will be a small penalty
+////			// for under or over-utilizing
+////			double utilizationGoal = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-utilization-goal");
+////			
+////			// Input sanitization
+////			if(utilizationGoal > 1 || utilizationGoal < 0)
+////				throw new ConfigurationException("Utilization goal must be between 0 and 1.");
+////			
+////			// Calculate credit utilization score with current credit score
+////			creditUtil = score * (1.0 - Math.abs(bill.getBillAmount()/theLoan.getValue() - utilizationGoal));
+////			
+////			// Calculate if the credit limit has been reached
+////			creditLimitReached = bill.getBillAmount() == theLoan.getValue();
+////			if(creditLimitReached){
+////				// Penalty is specified in config file
+////				double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.credit-limit-reached-factor");
+////				
+////				// Sanitize inputs
+////				if(penalty > 1 || penalty < 0)
+////					throw new ConfigurationException("Credit limit reached factor must be between 0 and 1.");
+////				
+////				// Calculate penalty with current score
+////				creditLimit = penalty * score;
+////			}
+////		}
+//		
+//		// If the bill has been paid
+//		if(amount >= bill.getBillAmount()){
+//			// Record in history
+//			history.add(new GenericCreditEvent(CreditEventType.PAID_BALANCE, new Date(), 1.0, theLoan));
+//			
+//			// Penalty for paying too much too soon
+//			// i.e. You should actually hold your loan for a while
+//			double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.overpayment-penalty-factor");
+//			
+//			// Sanitize inputs
+//			if(penalty > 1 || penalty < 0)
+//				throw new ConfigurationException("Overpayment penalty factor must be between 0 and 1.");
+//			
+//			// Calculate score adjustment for overpayment penalty
+//			// This will only be applied for non-credit card accounts
+//			double newScoreItem = score * Math.min(1.0, 1 - penalty * (bill.getActualPaid() - bill.getBillAmount())/theLoan.getValue());
+//			
+//			// Apply score for paying in full
+//			updateScore(1.0);
+//			
+////			if(theLoan instanceof CreditCard || newScoreItem == 1);
+////			// If not credit card
+////			else {
+////				// Apply score for paying too much
+////				history.add(new GenericCreditEvent(CreditEventType.OVERPAYMENT, new Date(), newScoreItem, theLoan));	
+////				updateScore(newScoreItem);
+////			}
+//				
+//		}
+//		// If some has been paid
+//		else if(amount >= theLoan.getMinPayment()){
+//		
+//			JavaPlugin plug = SerenityLoans.getPlugin();
+//			
+//			// Parameters from config file
+//			double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
+//			double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
+//			double configScore = plug.getConfig().getDouble("trust.credit-history.subprime-limit");
+//			
+//			// Sanitize inputs
+//			if(scoreMax <= scoreMin)
+//				throw new ConfigurationException("Credit score range invalid! max <= min");
+//			if(configScore > scoreMax || configScore < scoreMin)
+//				throw new ConfigurationException("Prime score not within range.");
+//			
+//			// Convert the configuration values to internal values
+//			// This value is the subprime limit internal representation
+//			// The title is a little misleading
+//			double newRange = (configScore - scoreMin)/(scoreMax - scoreMin);
+//			
+//			// Find percentage of bill paid after minimum payment
+//			double percentComplete = (bill.getActualPaid() - theLoan.getMinPayment())/(bill.getBillAmount() - theLoan.getMinPayment());
+//			
+//			// Convert to new range
+//			double newScoreItem = percentComplete * (1 - newRange) + newRange;
+//			
+//			// Add to history and update
+//			history.add(new GenericCreditEvent(CreditEventType.PAID_MINIMUM, new Date(), newScoreItem, theLoan));
+//			updateScore(newScoreItem);
+//		}
+//		// Payment missed completely
+//		else {
+//			history.add(new GenericCreditEvent(CreditEventType.MISSED_PAYMENT, new Date(), 0.0, theLoan));
+//			updateScore(0);
+//		}
 		
 		// Finally, apply credit card score adjustments
 //		if(theLoan instanceof CreditCard){
@@ -649,7 +721,7 @@ public class CreditHistory {
 //			}
 //			
 //		}
-	}
+//	}
 	
 	/**
 	 * This method records a payment that is not associated with a statement. 
@@ -754,27 +826,33 @@ public class CreditHistory {
 	/*
 	 * This method applies the exponential moving average function to the credit score.
 	 * It computes the results iteratively from the previous score and the new element
-	 * to be added to the average. The decay or dissipation factor is set in the
-	 * config file.
+	 * to be added to the average. 
+	 * 
+	 * It is the responsibility of the caller to set up the list of credit events 
+	 * correctly.
 	 */
-	private void updateScore(double newScoreItem){
+	private double updateScore(FinancialEntity entity, List<CreditEvent> newScoreItems){
+		FinancialEntity toCheck = plugin.playerManager.getFinancialEntity(entity.getUserID());
 		
-		// Collect parameters from config
-		double alpha = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.dissipation-factor");
+		double score = normalizeScore(toCheck.getCreditScore());
+		double dissipationFactor = alpha;
 		
-		// Sanitize inputs
-		if(alpha > 1 || alpha < 0)
-			throw new ConfigurationException("Dissipation factor must be between 0 and 1.");
+		for(CreditEvent ce : newScoreItems){
+			dissipationFactor = ce.getDissipationFactor();
+			score = dissipationFactor * ce.getUpdateScore(score) + (1 - dissipationFactor) * score;
+		}
 		
-		if(newScoreItem > 1 || newScoreItem < 0)
-			return;
+		plugin.playerManager.setCreditScore(toCheck, scaleScore(score));
 		
-		// Magic happens here
-		score = newScoreItem * alpha + (1 - alpha) * score;
+		return score;
 	}
 	
 	private double normalizeScore(double rawScore){
 		return (rawScore - scoreMin)/(scoreMax - scoreMin);
+	}
+	
+	private double scaleScore(double normalScore){
+		return normalScore * (scoreMax - scoreMin) + scoreMin;
 	}
 
 }
