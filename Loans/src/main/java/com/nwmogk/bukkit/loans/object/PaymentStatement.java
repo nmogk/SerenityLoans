@@ -56,16 +56,20 @@ public final class PaymentStatement {
 	private Timestamp statementDate;
 	private Timestamp dueDate;
 	
-	private final double billAmount;
+	private final double principalAmount;
+	private final double interestAmount;
+	private final double feeAmount;
 	private final double paid;
 	private final double minPayment;
 	private final int loanID;
 	private final int statementID;
 	
-	public PaymentStatement(int statementID, int loan, double amount, double min, Timestamp statement, Timestamp due, double paid){
+	public PaymentStatement(int statementID, int loan, double amountPrincipal, double intAmount, double feeAmount, double min, Timestamp statement, Timestamp due, double paid){
 		this.statementID = statementID;
 		this.loanID = loan;
-		billAmount = amount;
+		principalAmount = amountPrincipal;
+		interestAmount = intAmount;
+		this.feeAmount = feeAmount;
 		minPayment = min;
 		statementDate = statement;
 		dueDate = due;
@@ -89,11 +93,41 @@ public final class PaymentStatement {
 	}
 
 	public double getBillAmount() {
-		return billAmount;
+		return feeAmount + interestAmount + principalAmount;
 	}
 	
 	public double getPaymentRemaining(){
-		return Math.max(0.0, billAmount - paid);
+		return Math.max(0.0, getBillAmount() - paid);
+	}
+	
+	public double getPrincipalAmount(){
+		return principalAmount;
+	}
+	
+	public double getInterestAmount(){
+		return interestAmount;
+	}
+	
+	public double getFeeAmount(){
+		return feeAmount;
+	}
+	
+	public double getPrincipalRemaining(){
+		if (paid <= interestAmount + feeAmount)
+			return principalAmount;
+		
+		return Math.max(0.0, getBillAmount() - paid);
+	}
+	
+	public double getFeesRemaining(){
+		return Math.max(0.0, feeAmount - paid);
+	}
+	
+	public double getInterestRemaining(){
+		if(paid <= feeAmount)
+			return interestAmount;
+		
+		return Math.max(0.0, feeAmount + interestAmount - paid);
 	}
 	
 	public Timestamp getStatementDate() {
@@ -112,7 +146,7 @@ public final class PaymentStatement {
 				String.format("    Payment Remaining: %s", plugin.econ.format(getPaymentRemaining())),
 				String.format("    Due date: %F", new Date(dueDate.getTime())),
 				String.format("    Statement Date: %F", new Date(statementDate.getTime())),
-				String.format("    %s", paid >= minPayment? "Original balance: " + plugin.econ.format(billAmount) : "Please pay at least " + plugin.econ.format(minPayment) + ".")
+				String.format("    %s", paid >= minPayment? "Original balance: " + plugin.econ.format(getBillAmount()) : "Please pay at least " + plugin.econ.format(minPayment) + ".")
 			};
 		
 		return result;
