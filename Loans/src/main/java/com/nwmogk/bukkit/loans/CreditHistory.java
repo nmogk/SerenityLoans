@@ -387,23 +387,9 @@ public class CreditHistory {
 	 * 
 	 * @return
 	 */
-	public String getInterpretation(){
-		JavaPlugin plug = SerenityLoans.getPlugin();
+	public String getInterpretation(FinancialEntity entity){
 		
-		// Gather parameters from config
-		// Max and min in this case are simply to check the subprime limit validity
-		double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
-		double primeLimit = plug.getConfig().getDouble("trust.credit-score.subprime-limit");
-		
-		// Sanitize inputs
-		if(scoreMax <= scoreMin)
-			throw new ConfigurationException("Credit score range invalid! max <= min");
-		if(primeLimit > scoreMax || primeLimit < scoreMin)
-			throw new ConfigurationException("Prime score not within range.");
-		
-		
-		if(getCreditScore() < primeLimit)
+		if(entity.getCreditScore() < Conf.getCreditScoreSettings(CreditScoreSettings.SUBPRIME))
 			return "Subprime";
 		else
 			return "Prime";
