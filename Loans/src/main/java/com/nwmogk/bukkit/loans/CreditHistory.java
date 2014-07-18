@@ -53,6 +53,8 @@
 
 package com.nwmogk.bukkit.loans;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -365,43 +367,13 @@ public class CreditHistory {
 	 * 
 	 * @return
 	 */
-	public double getCreditScore() {
-		// Update for inactivity
-		recordInactivity();
+	public String formatCreditScore(double scaledScore) {
 		
-		// Gather parameters from config file
-		double scoreMax = plugin.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plugin.getConfig().getDouble("trust.credit-score.score-range.min");
-		double precision = plugin.getConfig().getDouble("trust.credit-score.sig-figs-reported");
+		int sigFigs = (int)Conf.getCreditScoreSettings(CreditScoreSettings.SIG_FIGS);
 		
-		// Sanitize inputs
-		if(scoreMax <= scoreMin)
-			throw new ConfigurationException("Credit score range invalid! max <= min");
-		if(precision <= 0){
-			throw new ConfigurationException("Invalid significant figures reported. Sigfigs must be > 0");
-		}
+		BigDecimal inputScore = new BigDecimal(scaledScore);
 		
-		// Transform from internal score to config score
-		double result = score * (scoreMax - scoreMin) + scoreMin;
-		
-		// Determine number of figures before the decimal point
-		int wholeFigures = (int) Math.floor(Math.log10(result));
-		
-		if(precision > wholeFigures){
-			result *= Math.pow(10, precision - wholeFigures);
-			result = Math.round(result);
-			result /= Math.pow(10, precision - wholeFigures);
-		}
-		else if(precision < wholeFigures){
-			result /= Math.pow(10, wholeFigures - precision);
-			result = Math.round(result);
-			result *= Math.pow(10, wholeFigures - precision);
-		}
-		else
-			result = Math.round(result);
-		
-		
-		return result;
+		return inputScore.round(new MathContext(sigFigs)).toString();
 	}
 	
 	public CreditEvent getInactivityEvent(){
@@ -815,12 +787,13 @@ public class CreditHistory {
 	 * 
 	 * @param loan
 	 */
-	public void recordPayoff(Loanable loan){
+/*	public void recordPayoff(Loanable loan){
 		// Still have to update for inactivity
 		recordInactivity();
 		history.add(new GenericCreditEvent(CreditEventType.LOANCLOSE, new Date(), score, loan));
 	}
-
+*/
+	
 	/**
 	 * This method returns a string representation of the CreditHistory. It simply
 	 * returns the list of CreditEvents as a string. CreditEvent has toString
@@ -828,56 +801,10 @@ public class CreditHistory {
 	 * 
 	 * In the future, a line by line update of the final score may be included.
 	 */
-	public String toString(){
+/*	public String toString(){
 		return history.toString();
 	}
-
-	/*
-	 * This method applies a penalty for every week there has not been credit
-	 * score activity. Eventually inactivity will cause a credit score to tend
-	 * towards the no-credit score.
-	 */
-	private void recordInactivity(){
-		
-		// Users with no history need not apply
-		if(history.size() == 0)
-			return;
-		
-		// Determine penalty
-		JavaPlugin plug = SerenityLoans.getPlugin();
-		double penalty = plug.getConfig().getDouble("trust.credit-history.account-inactivity-factor");
-		double configScore = plug.getConfig().getDouble("trust.credit-history.no-history-score");
-		double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
-		
-		// Sanitize inputs
-		if(scoreMax <= scoreMin)
-			throw new ConfigurationException("Credit score range invalid! max <= min");
-		if(configScore > scoreMax || configScore < scoreMin)
-			throw new ConfigurationException("Initial credit score not within range.");
-		if(penalty > 1 || penalty < 0)
-			throw new ConfigurationException("Overpayment penalty factor must be between 0 and 1.");
-		
-		double noCreditScore = (configScore - scoreMin)/(scoreMax - scoreMin);
-		
-		// Loop applies an event for every week between now and the last activity
-		
-		long inactivityTime = 604800000l;
-		
-		if(SerenityLoans.getPlugin().getConfig().contains("trust.credit-score.account-inactivity-time"))
-			inactivityTime = Conf.parseTime(SerenityLoans.getPlugin().getConfig().getString("trust.credit-score.account-inactivity-time"));
-		
-		for(int time = 0; time < (int)((new Date().getTime() - history.getFirst().date.getTime())/inactivityTime); time++){
-			
-			// Score decays exponentially towards having no score (up or down)
-			double newScoreItem = penalty * score + (1 - penalty) * noCreditScore;
-			
-			history.add(new GenericCreditEvent(CreditEventType.INACTIVITY, new Date(), newScoreItem, null));
-			
-			// Score is updated every iteration
-			updateScore(newScoreItem);
-		}
-	}
+*/
 	
 	/*
 	 * This method applies the exponential moving average function to the credit score.
