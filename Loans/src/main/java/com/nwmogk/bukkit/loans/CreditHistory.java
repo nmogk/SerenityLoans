@@ -177,6 +177,14 @@ public class CreditHistory {
 		public Eventerator(Loan theLoan){this.theLoan = theLoan;}
 		
 		public Eventerator(PaymentStatement ps, Loan theLoan){this.ps = ps; this.theLoan = theLoan;}
+		
+		public CreditEvent getStatementlessOverpayment(final Loanable loan, final double amount) {
+			return new AbstractCreditEvent(CreditEventType.OVERPAYMENT){
+				public double getUpdateScore(double currentScore) {
+					return Math.min(1, Conf.getCreditScoreSettings(CreditScoreSettings.OVERPAYMENT_PENALTY) * currentScore * amount/loan.getValue());
+				}
+			};
+		}
 
 		public CreditEvent getCreditEvent(CreditEventType type) {
 			
@@ -493,10 +501,11 @@ public class CreditHistory {
 	 * 
 	 * @param bill
 	 */
-	public void recordMissedPayment(PaymentStatement bill){
+/*	public void recordMissedPayment(PaymentStatement bill){
 		recordPayment(bill, 0.0);
 	}
-
+*/
+	
 	/**
 	 * This method records a payment made to a loan. This method may generate
 	 * several different CreditEvent types including those that represent payment
@@ -526,7 +535,8 @@ public class CreditHistory {
 		LinkedList<CreditEvent> eventsList = new LinkedList<CreditEvent>();
 		Eventerator evtr = new Eventerator(bill, plugin.loanManager.getLoan(bill.getLoanID()));
 		
-		FinancialEntity borrower = plugin.loanManager.getLoan(bill.getLoanID()).getBorrower();
+		Loan loan = plugin.loanManager.getLoan(bill.getLoanID());
+		FinancialEntity borrower = loan.getBorrower();
 		String historySQL = String.format("SELECT EventTime FROM CreditHistory WHERE UserID='%s' ORDER BY EventTime DESC;", borrower.getUserID().toString());
 		
 		try {
@@ -557,7 +567,9 @@ public class CreditHistory {
 		CreditEvent event = null;
 		double currentScore = updateScore(borrower, eventsList);
 		
-		if(bill.getActualPaid() > bill.getBillAmount())
+		if (loan.getBalance() <= 0)
+			event = evtr.getCreditEvent(CreditEventType.FINAL_PAYMENT);
+		else if (bill.getActualPaid() > bill.getBillAmount())
 			event = evtr.getCreditEvent(CreditEventType.OVERPAYMENT);
 		else if (bill.getActualPaid() == bill.getBillAmount())
 			event = evtr.getCreditEvent(CreditEventType.PAID_BALANCE);
@@ -586,7 +598,7 @@ public class CreditHistory {
 	
 	}
 	
-//	/**
+/*	/**
 //	 * 
 //	 * This method records a payment made to a loan. This method may generate
 //	 * several different CreditEvent types including those that represent payment
@@ -597,7 +609,7 @@ public class CreditHistory {
 //	 * @param bill
 //	 * @param amount
 //	 */
-//	public void recordPayment(PaymentStatement bill, double amount){
+/*	public void recordPayment(PaymentStatement bill, double amount){
 //		// Update for inactivity
 ////		recordInactivity();
 //		
@@ -641,7 +653,7 @@ public class CreditHistory {
 ////				creditLimit = penalty * score;
 ////			}
 ////		}
-//		
+/*	
 //		// If the bill has been paid
 //		if(amount >= bill.getBillAmount()){
 //			// Record in history
@@ -722,7 +734,8 @@ public class CreditHistory {
 //			
 //		}
 //	}
-	
+*/
+
 	/**
 	 * This method records a payment that is not associated with a statement. 
 	 * It should not be used if a statement is available. It will apply the
@@ -732,24 +745,67 @@ public class CreditHistory {
 	 * @param amount
 	 * @param loan
 	 */
-	public void recordPayment(double amount, Loanable loan){
+	public void recordPayment(double amount, Loan loan){
 		// If null nothing to do
 		if(loan == null || amount < 0)
 			return;
 		
-		// Params from config file
-		double penalty = SerenityLoans.getPlugin().getConfig().getDouble("trust.credit-score.overpayment-penalty-factor");
+		LinkedList<CreditEvent> eventsList = new LinkedList<CreditEvent>();
+		Eventerator evtr = new Eventerator(loan);
 		
-		// Sanitize input
-		if(penalty > 1 || penalty < 0)
-			throw new ConfigurationException("Overpayment penalty factor must be between 0 and 1.");
+		FinancialEntity borrower = loan.getBorrower();
+		String historySQL = String.format("SELECT EventTime FROM CreditHistory WHERE UserID='%s' ORDER BY EventTime DESC;", borrower.getUserID().toString());
 		
-		// Calculate overpayment penalty
-		double newScoreItem = score * Math.min(1.0, 1 - penalty * amount/loan.getValue());
-
-		// Update
-		history.add(new GenericCreditEvent(CreditEventType.OVERPAYMENT, new Date(), newScoreItem, loan));
-		updateScore(newScoreItem);
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = null;
+			synchronized(creditHistoryLock){
+				rs = stmt.executeQuery(historySQL);
+			}
+			
+			if(rs.next()){
+				Timestamp ts = rs.getTimestamp(1);
+				
+				long timeAgo = new Date().getTime() - ts.getTime();
+				
+				int numWeeks = (int) Math.floor(((double)timeAgo) / Conf.getCreditScoreSettings(CreditScoreSettings.TAU));
+				
+				for(int i = 0; i < numWeeks; i++)
+					eventsList.add(evtr.getCreditEvent(CreditEventType.INACTIVITY));
+			}
+				
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		CreditEvent event = null;
+		double currentScore = updateScore(borrower, eventsList);
+		
+		if (loan.getBalance() <= 0)
+			event = evtr.getCreditEvent(CreditEventType.FINAL_PAYMENT);
+		else
+			event = evtr.getStatementlessOverpayment(loan, amount);
+		
+		eventsList.clear();
+		eventsList.add(event);
+		
+		String insertSQL = String.format("INSERT INTO CreditHistory (UserID, EventType, ScoreValue, Parameter) VALUES ('%s', '%s', %f, %f)", borrower.getUserID().toString(), event.getType().toString(), event.getUpdateScore(currentScore), event.getDissipationFactor());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			stmt.executeUpdate(insertSQL);
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		updateScore(borrower, eventsList);
 	}
 	
 	
