@@ -401,32 +401,62 @@ public class CreditHistory {
 	 * the credit score to match the bankruptcy score in the config file. It
 	 * checks to see if bankruptcies are allowed first.
 	 */
-	public void recordBankruptcy(){
-		// Update for inactivity
-		recordInactivity();
-		
-		// Check if bankruptcy is allowed by configuration
-		if(!SerenityLoans.getPlugin().getConfig().getBoolean("bankruptcy.enabled"))
+	public void recordBankruptcy(FinancialEntity entity){
+
+		if(entity == null)
 			return;
 		
-		JavaPlugin plug = SerenityLoans.getPlugin();
+		LinkedList<CreditEvent> eventsList = new LinkedList<CreditEvent>();
+		Eventerator evtr = new Eventerator();
 		
-		// Gather config information
-		double configScore = plug.getConfig().getDouble("trust.credit-score.bankrupt-score");
-		double scoreMax = plug.getConfig().getDouble("trust.credit-score.score-range.max");
-		double scoreMin = plug.getConfig().getDouble("trust.credit-score.score-range.min");
+		String historySQL = String.format("SELECT EventTime FROM CreditHistory WHERE UserID='%s' ORDER BY EventTime DESC;", entity.getUserID().toString());
 		
-		// Sanitize inputs
-		if(scoreMax <= scoreMin)
-			throw new ConfigurationException("Credit score range invalid! max <= min");
-		if(configScore > scoreMax || configScore < scoreMin)
-			throw new ConfigurationException("Bankruptcy credit score not within range.");
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = null;
+			synchronized(creditHistoryLock){
+				rs = stmt.executeQuery(historySQL);
+			}
+			
+			if(rs.next()){
+				Timestamp ts = rs.getTimestamp(1);
+				
+				long timeAgo = new Date().getTime() - ts.getTime();
+				
+				int numWeeks = (int) Math.floor(((double)timeAgo) / Conf.getCreditScoreSettings(CreditScoreSettings.TAU));
+				
+				for(int i = 0; i < numWeeks; i++)
+					eventsList.add(evtr.getCreditEvent(CreditEventType.INACTIVITY));
+			}
+				
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
 		
-		// Change score to bankruptcy score
-		score = (configScore - scoreMin)/(scoreMax - scoreMin);
+		CreditEvent event = evtr.getCreditEvent(CreditEventType.BANKRUPT);
+		double currentScore = updateScore(entity, eventsList);
 		
-		history.add(new GenericCreditEvent(CreditEventType.BANKRUPT, new Date(), score, null));
 		
+		eventsList.clear();
+		eventsList.add(event);
+		
+		String insertSQL = String.format("INSERT INTO CreditHistory (UserID, EventType, ScoreValue, Parameter) VALUES ('%s', '%s', %f, %f)", entity.getUserID().toString(), event.getType().toString(), event.getUpdateScore(currentScore), event.getDissipationFactor());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			stmt.executeUpdate(insertSQL);
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		updateScore(entity, eventsList);
 	}
 
 	/**
