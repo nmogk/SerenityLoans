@@ -210,6 +210,11 @@ public class EconomyManager {
 		return new EconResult(0, balance, answer, message);
 	}
 	
+	public EconResult getCash(FinancialEntity entity){
+		// TODO differentiate between assets and cash
+		return getBalance(entity);
+	}
+	
 	public String getName(){
 		switch(config){
 		case VAULT:
@@ -224,9 +229,9 @@ public class EconomyManager {
 		return "";
 	}
 
-	public boolean getNetWorth(FinancialEntity entity){
+	public EconResult getNetWorth(FinancialEntity entity){
 		// TODO
-		return false;
+		return null;
 	}
 
 	/**
