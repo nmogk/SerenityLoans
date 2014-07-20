@@ -236,6 +236,7 @@ public class LoanManager {
 	private SerenityLoans plugin;
 	private String prfx;
 	
+	// Objects for locking access to the database tables.
 	private Object loanTableLock = new Object();
 	private Object loanEventTableLock = new Object();
 	private Object paymentStatementTableLock = new Object();
@@ -245,14 +246,26 @@ public class LoanManager {
 		prfx = Conf.getMessageString();
 	}
 
-	/*
-	 * This method runs when payments are due and applies all of the payments
-	 * made to the outstanding balances. 
+	/**
+	 * This method runs when payments are made and applies all of the payments
+	 * made to the outstanding balances. It attempts to first find an outstanding
+	 * payment statement on the loan and will apply payments according to the 
+	 * statement first with extra funds being devoted to the loan principal.
+	 * 
+	 * After the payment has been applied, then this method records the relevant
+	 * event in the credit history of the borrower. This method will attempt to
+	 * refund the borrower if the amount of payment is more than the loan balance.
+	 * 
+	 * @param theLoan
+	 * @param amount
+	 * @return the amount leftover after applying the payment. Should always be
+	 * zero because of the refund behavior.
 	 */
 	public double applyPayment(Loan theLoan, double amount) {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "applyPayment(Loan, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
+		// Find the payment statement that is applicable
 		PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
 		
 		// If there is a payment statement, apply payment according to the statement,
@@ -304,6 +317,7 @@ public class LoanManager {
 			}
 		}
 		
+		// Refund the borrower if the payment is too much.
 		if(balance <= 0 && runningTotal > 0){
 			runningTotal -= balance;
 			balance = 0;
@@ -312,14 +326,12 @@ public class LoanManager {
 		}
 		
 		
-		
 		String updateSQL = String.format("UPDATE Loans SET Balance=%f, InterestBalance=%f, FeeBalance=%f WHERE LoanID=%d;", balance, interestBalance, feeBalance, theLoan.getLoanID() );
-		
-		
 		
 		try {
 			Statement stmt = plugin.conn.createStatement();
 			
+			// Set new loan balances
 			synchronized(loanTableLock){
 				stmt.executeUpdate(updateSQL);
 			}
@@ -329,6 +341,7 @@ public class LoanManager {
 			
 			if(ps != null){
 			
+				// Register payment in the paymentStatement
 				String updateBill = String.format("UPDATE PaymentStatements SET BillAmountPaid=%f WHERE StatementID=%d;", ps.getActualPaid() + amount - runningTotal, ps.getStatementID());
 				synchronized(paymentStatementTableLock){
 					stmt.executeUpdate(updateBill);
@@ -336,8 +349,10 @@ public class LoanManager {
 				
 				ps = getPaymentStatement(theLoan.getLoanID());
 				
+				// Register credit history event
 				plugin.historyManager.recordPayment(ps);
 			} else {
+				// Treat as an overpayment
 				plugin.historyManager.recordPayment(amount - runningTotal, theLoan);
 			}
 			
@@ -348,6 +363,7 @@ public class LoanManager {
 			e.printStackTrace();
 		}
 		
+		// Record the action in the LoanEvents table.
 		addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.PAYMENTMADE, amount - runningTotal, theLoan.getLoanID()), true);
 		
 		if(balance == 0){
@@ -359,6 +375,17 @@ public class LoanManager {
 		
 	}
 
+	/**
+	 * Creates a new loan from the given termsID and value with the lender and borrower.
+	 * Will build the table of LoanEvents after opening the loan. Returns the call
+	 * success. Assumes that the caller has input the correct value and terms ID.
+	 * 
+	 * @param lenderID
+	 * @param borrowerID
+	 * @param termsID
+	 * @param value
+	 * @return
+	 */
 	public boolean createLoan(UUID lenderID, UUID borrowerID, int termsID, double value){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createLoan(UUID, UUID, int, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -410,6 +437,12 @@ public class LoanManager {
 		return exitFlag;
 	}
 
+	/**
+	 * Returns a Loan object from the given loanID. 
+	 * 
+	 * @param loanID
+	 * @return
+	 */
 	public Loan getLoan(int loanID){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoan(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -455,8 +488,13 @@ public class LoanManager {
 		return null;
 	}
 
-	/*
-	 * Can't return null. Must return an empty array if there are no results found.
+	/**
+	 * Returns an array of all of the loans held between the lender and borrower.
+	 * Can't return null. Will return an empty array if there are no results found.
+	 * 
+	 * @param lender
+	 * @param borrower
+	 * @return
 	 */
 	public Loan[] getLoan(FinancialEntity lender, FinancialEntity borrower) {
 		if(SerenityLoans.debugLevel >= 3)
@@ -498,14 +536,19 @@ public class LoanManager {
 		return result;
 	}
 	
+	/**
+	 * Returns a list of PaymentStatements which have outstanding balances due for the
+	 * given borrower. Returns null if no statements could be found.
+	 * 
+	 * @param borrowerId
+	 * @return
+	 */
 	public List<PaymentStatement> getOutstandingStatements(UUID borrowerId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoansWithOutstandingStatements(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		// TODO Filter out previous statements.
 		String betterQuery = String.format("SELECT DISTINCT LoanID FROM PaymentStatements JOIN Loans ON Loans.BorrowerID='%s';", borrowerId.toString());
 		
-		// String psQuery = "SELECT DISTINCT LoanID FROM PaymentStatements WHERE BillAmountPaid < BillAmount;";
 		LinkedList<PaymentStatement> result = new LinkedList<PaymentStatement>();
 		
 		Statement paymentStatements;
@@ -524,6 +567,7 @@ public class LoanManager {
 				
 				PaymentStatement potential = getPaymentStatement(loanId);
 				
+				// Ensure that the statements are outstanding.
 				if(potential.getPaymentRemaining() > 0)
 					result.add(potential);
 			}
@@ -539,7 +583,16 @@ public class LoanManager {
 		
 		
 	}
-	
+
+	/**
+	 * Returns the payment statement associated with the given loan or null
+	 * if none exists. A loan may have many payment statements, so this method
+	 * returns only the most recent one, which contains all of the outstanding
+	 * charges up to that point.
+	 * 
+	 * @param loanID
+	 * @return
+	 */
 	public PaymentStatement getPaymentStatement(int loanID) {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPaymentStatement(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -578,6 +631,13 @@ public class LoanManager {
 		return null;
 	}
 	
+	/**
+	 * Sets the autopay of the given loan to the given boolean value.
+	 * 
+	 * @param loanId
+	 * @param valueToSet
+	 * @return
+	 */
 	public boolean setAutoPay(int loanId, boolean valueToSet){
 		String updateSql = String.format("UPDATE Loans SET AutoPay='%s' WHERE LoanID=%d;", Boolean.toString(valueToSet), loanId);
 	
@@ -601,6 +661,13 @@ public class LoanManager {
 		return false;
 	}
 	
+	/**
+	 * Sets the lender for the given loan to the given lender.
+	 * 
+	 * @param loanId
+	 * @param newLenderId
+	 * @return
+	 */
 	public boolean setLender(int loanId, UUID newLenderId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "setLender(int, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -715,6 +782,9 @@ public class LoanManager {
 		} 
 	}
 
+	/**
+	 * Runs the update logic on all of the open loans in the system.
+	 */
 	public synchronized void updateAll() {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "updateAll()", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
@@ -754,6 +824,7 @@ public class LoanManager {
 		
 	}
 
+	
 	private void accrueInterest(int loanID) {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "accrueInterest(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
