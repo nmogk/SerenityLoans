@@ -68,6 +68,7 @@ import com.nwmogk.bukkit.loans.Conf.CreditScoreSettings;
 import com.nwmogk.bukkit.loans.api.CreditEvent;
 import com.nwmogk.bukkit.loans.api.CreditEventFactory;
 import com.nwmogk.bukkit.loans.api.CreditEventType;
+import com.nwmogk.bukkit.loans.api.CreditScore;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.Loanable;
 import com.nwmogk.bukkit.loans.object.Loan;
@@ -191,6 +192,13 @@ public class CreditHistory {
 		}
 	}
 */
+	private class DefaultCreditModel implements CreditScore {
+
+		public double updateScore(double previousScore, double measurement, double parameter, double covariance) {
+			return parameter * measurement + (1 - parameter) * previousScore;
+		}
+		
+	}
 	
 	private class Eventerator implements CreditEventFactory{
 
@@ -314,6 +322,8 @@ public class CreditHistory {
 	
 	private double alpha;
 	
+	private CreditScore scoreModel;
+	
 	/**
 	 * This method is the default constructor for a CreditHistory object. It
 	 * initializes the list array and applies a default credit score.
@@ -321,7 +331,7 @@ public class CreditHistory {
 	public CreditHistory(SerenityLoans plugin){
 		
 		this.plugin = plugin;
-		
+		scoreModel = new DefaultCreditModel();
 		
 		String getInfo = "SELECT CRscore_max, CRscore_min FROM Info;";
 		double lastScoreMax = 0;
@@ -811,7 +821,7 @@ public class CreditHistory {
 		
 		for(CreditEvent ce : newScoreItems){
 			dissipationFactor = ce.getDissipationFactor();
-			score = dissipationFactor * ce.getUpdateScore(score) + (1 - dissipationFactor) * score;
+			score = scoreModel.updateScore(score, ce.getUpdateScore(score), dissipationFactor, 0);
 		}
 		
 		plugin.playerManager.setCreditScore(toCheck, scaleScore(score));
