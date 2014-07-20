@@ -57,7 +57,7 @@ import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
-import com.nwmogk.bukkit.loans.object.Loan;
+import com.nwmogk.bukkit.loans.object.PaymentStatement;
 
 public final class PlayerLoginListener implements Listener {
 	
@@ -108,7 +108,7 @@ public final class PlayerLoginListener implements Listener {
 				
 				for(UUID i : toCheck){
 					
-					List<Loan> loanSet = plugin.loanManager.getLoansWithOutstandingStatements(i);
+					List<PaymentStatement> loanSet = plugin.loanManager.getLoansWithOutstandingStatements(i);
 					FinancialEntity currentEntity = plugin.playerManager.getFinancialEntity(i);
 					Player recipient = evt.getPlayer();
 					
@@ -120,14 +120,14 @@ public final class PlayerLoginListener implements Listener {
 						plugin.scheduleMessage(recipient, String.format("%s Details are given below:", prfx));
 						
 						
-						for(Loan theLoan : loanSet){
+						for(PaymentStatement ps : loanSet){
 
 							
 							if(recipient == null)
 								continue;
 
 							try {
-								plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(theLoan.getLoanID()).toString(plugin));
+								plugin.scheduleMessage(recipient, ps.toString(plugin));
 							} catch (InterruptedException | ExecutionException | TimeoutException e) {
 								// TODO add message to configuration
 								plugin.scheduleMessage(recipient, prfx + " Problem during name lookup. Try again later.");
