@@ -82,6 +82,7 @@ public final class SerenityLoans extends JavaPlugin {
     public EconomyManager econ;
 	public LoanManager loanManager;
 	public OfferManager offerManager;
+	public CreditHistory historyManager;
 	
 	public ExecutorService threads;
     
@@ -198,6 +199,7 @@ public final class SerenityLoans extends JavaPlugin {
         }
 		
 		loanManager = new LoanManager(this);
+		historyManager = new CreditHistory(this);
 //        setupPermissions();
 //        setupChat();
 		
@@ -353,7 +355,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "("
 				 	+ "ItemID int NOT NULL AUTO_INCREMENT,"
 				 	+ "UserID varchar(36) NOT NULL,"
-				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified') NOT NULL,"
+				 	+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified', 'CreditUtilization', 'Overpayment') NOT NULL,"
 				 	+ "ScoreValue double NOT NULL,"
 				 	+ "Parameter double NOT NULL DEFAULT " + dissipationFactor + ","
 				 	+ "Notes TEXT,"
@@ -416,9 +418,9 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "StatementDate TIMESTAMP DEFAULT 0,"
 				 	+ "DueDate TIMESTAMP DEFAULT 0,"
 				 	+ "BillAmountPaid DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
-				 	+ "AdditionalPrincipal DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
-				 	+ "AdditionalInterest DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
-				 	+ "AdditionalFees DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
+				 	+ "AmountPrincipal DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
+				 	+ "AmountInterest DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
+				 	+ "AmountFees DECIMAL(9," + decimals + ") NOT NULL DEFAULT 0,"
 				 	+ "PRIMARY KEY (StatementID),"
 				 	+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
 				 	+ ");";

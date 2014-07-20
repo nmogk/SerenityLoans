@@ -45,8 +45,6 @@
 
 package com.nwmogk.bukkit.loans;
 
-import java.math.BigDecimal;
-import java.math.MathContext;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.PreparedStatement;
@@ -255,35 +253,65 @@ public class LoanManager {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "applyPayment(Loan, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		double runningTotal = amount;
-		double feeBalance = theLoan.getFeesOutstanding();
-		double interestBalance = theLoan.getInterestBalance();
-		double balance = theLoan.getBalance();
+		PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
 		
+		// If there is a payment statement, apply payment according to the statement,
+		// otherwise, apply it to the loan itself.
+		double runningTotal = amount;
+		double feeBalance = ps == null? theLoan.getFeesOutstanding() : ps.getFeesRemaining();
+		double interestBalance =  ps == null? theLoan.getInterestBalance() : ps.getInterestRemaining();
+		double balance = ps == null? theLoan.getBalance() : ps.getFeesRemaining();
+		
+		// Pay fees first
 		if(runningTotal >= feeBalance){
 			runningTotal -= feeBalance;
-			feeBalance = 0;
+			feeBalance = theLoan.getFeesOutstanding() - feeBalance;
 		}
 		else{
 			feeBalance -= runningTotal;
 			runningTotal = 0;
 		}
 		
+		// Pay interest next
 		if(runningTotal >= interestBalance){
 			runningTotal -= interestBalance;
-			interestBalance = 0;
+			interestBalance = theLoan.getInterestBalance() - interestBalance;
 		}
 		else {
 			interestBalance -= runningTotal;
 			runningTotal = 0;
 		}
 		
+		// Pay principal last
 		if(runningTotal > 0){
-			if(balance >= runningTotal)
-				balance -= runningTotal;	
-			else
-				balance = 0;
+			if(balance <= runningTotal){
+				runningTotal -= balance;
+				balance = theLoan.getBalance() - balance;
+			} else {
+				balance -= runningTotal;
+				runningTotal = 0;
+			}
 		}
+		
+		// Apply additional payment as extra principal if possible.
+		if (runningTotal > 0 && balance > 0){
+			if(balance <= runningTotal){
+				runningTotal -= balance;
+				balance = 0;
+			} else {
+				balance -= runningTotal;
+				runningTotal = 0;
+			}
+		}
+		
+		if(balance <= 0 && runningTotal > 0){
+			runningTotal -= balance;
+			balance = 0;
+			plugin.econ.deposit(theLoan.getBorrower(), runningTotal);
+			plugin.econ.withdraw(theLoan.getLender(), runningTotal);
+		}
+		
+		
 		
 		String updateSQL = String.format("UPDATE Loans SET Balance=%f, InterestBalance=%f, FeeBalance=%f WHERE LoanID=%d;", balance, interestBalance, feeBalance, theLoan.getLoanID() );
 		
@@ -295,7 +323,9 @@ public class LoanManager {
 			synchronized(loanTableLock){
 				stmt.executeUpdate(updateSQL);
 			}
-			PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
+			
+			if(balance == 0)
+				closeLoan(theLoan.getLoanID());
 			
 			if(ps != null){
 			
@@ -303,7 +333,15 @@ public class LoanManager {
 				synchronized(paymentStatementTableLock){
 					stmt.executeUpdate(updateBill);
 				}
+				
+				ps = getPaymentStatement(theLoan.getLoanID());
+				
+				plugin.historyManager.recordPayment(ps);
+			} else {
+				plugin.historyManager.recordPayment(amount - runningTotal, theLoan);
 			}
+			
+			
 			stmt.close();
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
@@ -517,15 +555,17 @@ public class LoanManager {
 				return null;
 			
 			int statementID = rs.getInt("StatementID");
-			double billAmount = rs.getDouble("BillAmount");
 			double minimum = rs.getDouble("Minimum");
 			Timestamp statementDate = rs.getTimestamp("StatementDate");
 			Timestamp dueDate = rs.getTimestamp("DueDate");
 			double amountPaid = rs.getDouble("BillAmountPaid");
+			double amountPrincipal = rs.getDouble("AmountPrincipal");
+			double amountInterest = rs.getDouble("AmountInterest");
+			double amountFees = rs.getDouble("AmountFees");
 			
 			stmt.close();
 			
-			return new PaymentStatement(statementID, loanID, billAmount, minimum, statementDate, dueDate, amountPaid);
+			return new PaymentStatement(statementID, loanID, amountPrincipal, amountInterest, amountFees, minimum, statementDate, dueDate, amountPaid);
 		} catch (SQLException e) {
 			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
 			e.printStackTrace();
@@ -1128,12 +1168,16 @@ public class LoanManager {
 		if(plugin.getConfig().contains(rulePath) && plugin.getConfig().isBoolean(rulePath))
 			percentageRule = plugin.getConfig().getBoolean(rulePath);
 	
-		double statementAmount = Math.min(theLoan.getCloseValue() , le.amount) + theLoan.getFeesOutstanding() + ps.getPaymentRemaining();
+		double feeAmount = theLoan.getFeesOutstanding() + (ps != null? ps.getFeesRemaining() : 0.0);
+		double intAmount = theLoan.getInterestBalance() + (ps != null? ps.getInterestRemaining() : 0.0);
+		double principalAmount = le.amount - theLoan.getInterestBalance() + (ps != null? ps.getPrincipalRemaining() : 0.0);
+		
+		double statementAmount = feeAmount + intAmount + principalAmount;
 		double minPayment = theLoan.getMinPayment() * (percentageRule? le.amount : 1);
 		
 		Timestamp due = new Timestamp(le.time.getTime() + theLoan.getPaymentTime());
 		
-		String insertSQL = String.format("INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate) VALUES (%d, $f, $f, ?, ?);", le.loan, statementAmount, minPayment);
+		String insertSQL = String.format("INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate, AmountPrincipal, AmountInterest, AmountFees) VALUES (%d, %f, %f, ?, ?, %f, %f, %f);", le.loan, statementAmount, minPayment, principalAmount, intAmount, feeAmount);
 	
 		try {
 			
