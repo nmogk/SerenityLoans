@@ -74,6 +74,44 @@ import com.nwmogk.bukkit.loans.object.Loan;
 import com.nwmogk.bukkit.loans.object.PaymentStatement;
 
 
+/*
+ * Algorithm:
+ * 
+ * Ignore changes if score range min==score range max
+ * 
+ * Collect previous score and setting information
+ * Determine inactivity updates
+ * Determine new score update
+ * Apply all updates in order
+ * 
+ * Scores must be normalized before using them in the algorithm.
+ * 
+ * Main algorithm:
+ * 
+ * 	newScore = previousScore * (1 - alpha) + alpha * updateScore
+ * 
+ * Update scores:
+ * 
+ * 	payment made         	==> updateScore = 1
+ * 	minimum payment made 	==> updateScore = subprimeLimitScore
+ * 	payment missed     	 	==> updateScore = 0
+ *  account inactivity	 	==> updateScore = max(no history score, inactivity penalty * current score )
+ *  credit limit reached 	==> updateScore = credit limit penalty * current score
+ *  credit utilization   	==> updateScore = (1 - utlization limit * abs((statement balance)/(credit limit) - credit utilization goal)) * current score
+ *  final loan payment		==> updateScore = (1 - current score)(time taken)/term + current score
+ *  overpayment penalty		==> updateScore = min(1, 1 - overpayment penalty * ( (amount paid - statement balance)/value)) * current score
+ *  bankruptcy				==> newScore = bankruptcy score
+ */
+
+/*
+ * To display correct sig figs:
+ * 
+ * double d1 = 1234500;
+ * BigDecimal bd1 = new BigDecimal(d1);
+ * bd1.round(new MathContext(7)).toPlainString();
+ */
+
+
 public class CreditHistory {
 	
 
