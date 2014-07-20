@@ -51,6 +51,7 @@ import org.bukkit.plugin.java.*;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.nwmogk.bukkit.loans.api.PlayerType;
+import com.nwmogk.bukkit.loans.command.EconomyHandler;
 import com.nwmogk.bukkit.loans.command.LoanHandler;
 import com.nwmogk.bukkit.loans.exception.DatabaseVersionMismatchException;
 import com.nwmogk.bukkit.loans.listener.PlayerLoginListener;
@@ -209,6 +210,12 @@ public final class SerenityLoans extends JavaPlugin {
 			logInfo("Setting command handlers.");
 		
 		getCommand("loan").setExecutor(new LoanHandler(this));
+		
+		EconomyHandler ecHandle = new EconomyHandler(this);
+		getCommand("sl-pay").setExecutor(ecHandle);
+		getCommand("sl-cash").setExecutor(ecHandle);
+		getCommand("sl-balance").setExecutor(ecHandle);
+		getCommand("sl-networth").setExecutor(ecHandle);
 		
 		if(debugLevel >= 2)
 			logInfo("Scheduling repeating upates.");
