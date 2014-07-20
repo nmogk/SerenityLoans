@@ -524,7 +524,8 @@ public class LoanManager {
 				
 				PaymentStatement potential = getPaymentStatement(loanId);
 				
-				result.add(potential);
+				if(potential.getPaymentRemaining() > 0)
+					result.add(potential);
 			}
 			
 		} catch (SQLException e) {
