@@ -373,10 +373,12 @@ public class CreditHistoryManager {
 	
 		} else if (lastScoreMax != scoreMax || lastScoreMin != scoreMin)
 			migrateScores(lastScoreMax, lastScoreMin);
-		
-		
-		
 
+	}
+	
+	public CreditHistoryManager(SerenityLoans plugin, CreditScore cm){
+		this(plugin);
+		scoreModel = cm;
 	}
 	
 	/**
