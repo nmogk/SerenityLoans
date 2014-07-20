@@ -113,7 +113,7 @@ import com.nwmogk.bukkit.loans.object.PaymentStatement;
  */
 
 
-public class CreditHistory {
+public class CreditHistoryManager {
 	
 
 	private SerenityLoans plugin;
@@ -328,7 +328,7 @@ public class CreditHistory {
 	 * This method is the default constructor for a CreditHistory object. It
 	 * initializes the list array and applies a default credit score.
 	 */
-	public CreditHistory(SerenityLoans plugin){
+	public CreditHistoryManager(SerenityLoans plugin){
 		
 		this.plugin = plugin;
 		scoreModel = new DefaultCreditModel();
@@ -379,18 +379,6 @@ public class CreditHistory {
 
 	}
 	
-	private void migrateScores(double lastScoreMax, double lastScoreMin) {
-		FinancialEntity[] list = plugin.playerManager.getFinancialEntities();
-		
-		for(FinancialEntity fe : list){
-			double oldScore = fe.getCreditScore();
-			double normScore = (oldScore - lastScoreMin)/(lastScoreMax - lastScoreMin);
-			double newScore = normScore * (scoreMax - scoreMin) + scoreMin;
-			
-			plugin.playerManager.setCreditScore(fe, newScore);
-		}
-	}
-
 	/**
 	 * This method returns a numeric representation of the credit score. The credit
 	 * score is stored internally as a double between the values of 0 and 1. The 
@@ -805,6 +793,26 @@ public class CreditHistory {
 	
 	
 	
+	private void migrateScores(double lastScoreMax, double lastScoreMin) {
+		FinancialEntity[] list = plugin.playerManager.getFinancialEntities();
+		
+		for(FinancialEntity fe : list){
+			double oldScore = fe.getCreditScore();
+			double normScore = (oldScore - lastScoreMin)/(lastScoreMax - lastScoreMin);
+			double newScore = normScore * (scoreMax - scoreMin) + scoreMin;
+			
+			plugin.playerManager.setCreditScore(fe, newScore);
+		}
+	}
+
+	private double normalizeScore(double rawScore){
+		return (rawScore - scoreMin)/(scoreMax - scoreMin);
+	}
+	
+	private double scaleScore(double normalScore){
+		return normalScore * (scoreMax - scoreMin) + scoreMin;
+	}
+
 	/*
 	 * This method applies the exponential moving average function to the credit score.
 	 * It computes the results iteratively from the previous score and the new element
@@ -827,14 +835,6 @@ public class CreditHistory {
 		plugin.playerManager.setCreditScore(toCheck, scaleScore(score));
 		
 		return score;
-	}
-	
-	private double normalizeScore(double rawScore){
-		return (rawScore - scoreMin)/(scoreMax - scoreMin);
-	}
-	
-	private double scaleScore(double normalScore){
-		return normalScore * (scoreMax - scoreMin) + scoreMin;
 	}
 
 }
