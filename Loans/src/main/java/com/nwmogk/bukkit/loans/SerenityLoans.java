@@ -216,6 +216,7 @@ public final class SerenityLoans extends JavaPlugin {
 		getCommand("sl-cash").setExecutor(ecHandle);
 		getCommand("sl-balance").setExecutor(ecHandle);
 		getCommand("sl-networth").setExecutor(ecHandle);
+		getCommand("sl-eco").setExecutor(ecHandle);
 		
 		if(debugLevel >= 2)
 			logInfo("Scheduling repeating upates.");
