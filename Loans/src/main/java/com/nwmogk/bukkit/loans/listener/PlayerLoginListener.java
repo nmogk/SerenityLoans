@@ -108,7 +108,7 @@ public final class PlayerLoginListener implements Listener {
 				
 				for(UUID i : toCheck){
 					
-					List<PaymentStatement> loanSet = plugin.loanManager.getLoansWithOutstandingStatements(i);
+					List<PaymentStatement> loanSet = plugin.loanManager.getOutstandingStatements(i);
 					FinancialEntity currentEntity = plugin.playerManager.getFinancialEntity(i);
 					Player recipient = evt.getPlayer();
 					

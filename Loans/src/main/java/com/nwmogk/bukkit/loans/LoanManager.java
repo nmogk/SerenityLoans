@@ -498,7 +498,7 @@ public class LoanManager {
 		return result;
 	}
 	
-	public List<PaymentStatement> getLoansWithOutstandingStatements(UUID borrowerId){
+	public List<PaymentStatement> getOutstandingStatements(UUID borrowerId){
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoansWithOutstandingStatements(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
