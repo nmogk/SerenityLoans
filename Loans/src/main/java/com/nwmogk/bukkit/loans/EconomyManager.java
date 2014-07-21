@@ -55,6 +55,7 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import com.nwmogk.bukkit.loans.api.EconResult;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.PlayerType;
+import com.nwmogk.bukkit.loans.object.Loan;
 
 public class EconomyManager {
 
@@ -230,8 +231,18 @@ public class EconomyManager {
 	}
 
 	public EconResult getNetWorth(FinancialEntity entity){
-		// TODO
-		return null;
+		
+		double netWorth = getCash(entity).balance;
+		
+		for(Loan loan : plugin.loanManager.getLoans(entity, false)){
+			netWorth += loan.getCloseValue();
+		}
+		
+		for(Loan loan : plugin.loanManager.getLoans(entity, true)){
+			netWorth -= loan.getCloseValue();
+		}
+		
+		return new EconResult(0, netWorth, true, null);
 	}
 
 	/**

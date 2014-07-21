@@ -537,6 +537,45 @@ public class LoanManager {
 	}
 	
 	/**
+	 * Returns the list of loans that the entity is party to. The
+	 * boolean parameter determines weather or not to check the
+	 * lender or borrower columns.
+	 * 
+	 * @param entity
+	 * @param isBorrower
+	 * @return
+	 */
+	public List<Loan> getLoans(FinancialEntity entity, boolean isBorrower){
+		
+		String query = String.format("SELECT LoanID from Loans WHERE %s='%s';", isBorrower? "BorrowerID" : "LenderID", entity.getUserID().toString());
+		List<Loan> results = new LinkedList<Loan>();
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(query);
+			
+			while(rs.next()){
+				int loanId = rs.getInt(1);
+				
+				Loan potential = getLoan(loanId);
+				
+				if(potential != null)
+					results.add(potential);
+			}
+			
+			stmt.close();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		
+		return results;
+		
+	}
+	
+	/**
 	 * Returns a list of PaymentStatements which have outstanding balances due for the
 	 * given borrower. Returns null if no statements could be found.
 	 * 
