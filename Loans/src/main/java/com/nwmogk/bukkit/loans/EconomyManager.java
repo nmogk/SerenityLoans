@@ -44,17 +44,23 @@
 
 package com.nwmogk.bukkit.loans;
 
+import java.util.LinkedList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
+import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
 
 import com.nwmogk.bukkit.loans.api.EconResult;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.PlayerType;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.Loan;
 
 public class EconomyManager {
@@ -365,5 +371,59 @@ public class EconomyManager {
 			return econ.hasBankSupport();
 		
 		return true;
+	}
+	
+	public List<String> getBanks() {
+		if(config == EconType.VAULT)
+			return econ.getBanks();
+		
+		FinancialInstitution[] institutions = plugin.playerManager.getFinancialInstitutions();
+		
+		List<String> result = new LinkedList<String>();
+		
+		for(FinancialInstitution fi : institutions ){
+			result.add(fi.getName());
+		}
+		
+		return result;
+	}
+	
+	public EconResult isBankOwner(String bankName, OfflinePlayer player) {
+		if(config == EconType.VAULT)
+			return new EconResult(econ.isBankOwner(bankName, player));
+		
+		FinancialInstitution bank = plugin.playerManager.getFinancialInstitution(bankName);
+		OfflinePlayer manager = plugin.playerManager.getOfflinePlayer(bank.getUserID());
+		
+		return new EconResult(0, 0, manager.getUniqueId().equals(player.getUniqueId()), null );
+	}
+	
+	public boolean hasAccount(OfflinePlayer player) {
+		if(config == EconType.VAULT)
+			return econ.hasAccount(player);
+		
+		FinancialEntity entity = plugin.playerManager.getFinancialEntity(player.getUniqueId());
+		
+		return entity != null;
+	}
+	
+	public boolean createPlayerAccount(OfflinePlayer player) {
+		boolean result = true;
+		
+		if(config == EconType.VAULT)
+			result &= econ.createPlayerAccount(player);
+		
+		result &= plugin.playerManager.addPlayer(player.getUniqueId());
+		
+		return result;
+	}
+	
+	public EconResult createBank(String bankName, OfflinePlayer manager){
+		if(config == EconType.VAULT)
+			return new EconResult(econ.createBank(bankName, manager));
+		
+		FinancialEntity entity = plugin.playerManager.getFinancialEntityAdd(manager.getUniqueId());
+		
+		return new EconResult(0, 0, plugin.playerManager.createFinancialInstitution(bankName, entity), null);
 	}
 }
