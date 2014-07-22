@@ -400,4 +400,15 @@ public class Conf {
 			
 		return 0.0;
 	}
+	
+	public synchronized static int getFractionalDigits(){
+		int digits = 2;
+		String path = "economy.currency.fractional-digits";
+		
+		if(config.contains(path) && config.isInt(path))
+			digits = config.getInt(path);
+		
+		return digits;
+		
+	}
 }
