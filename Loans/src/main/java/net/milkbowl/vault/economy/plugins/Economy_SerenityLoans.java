@@ -1,8 +1,6 @@
 package net.milkbowl.vault.economy.plugins;
 
-import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -27,7 +25,9 @@ import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 
 public class Economy_SerenityLoans implements Economy {
 	
-	// TODO Implement all methods
+	// TODO Do something with name lookup calls
+	//      Implement bank memberships
+	//      Add response messages to failed EconomyResponse objects
 	
 	private static final Logger log = Logger.getLogger("Minecraft");
 
@@ -83,28 +83,28 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	public EconomyResponse bankBalance(String bankName) {
-		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		FinancialInstitution entity = slPlug.playerManager.getFinancialInstitution(bankName);
 		EconResult result = economy.getBalance(entity);
 		
 		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankDeposit(String bankName, double amount) {
-		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		FinancialInstitution entity = slPlug.playerManager.getFinancialInstitution(bankName);
 		EconResult result = economy.deposit(entity, amount);
 		
 		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankHas(String bankName, double amount) {
-		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		FinancialInstitution entity = slPlug.playerManager.getFinancialInstitution(bankName);
 		EconResult result = economy.has(entity, amount);
 		
 		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankWithdraw(String bankName, double amount) {
-		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		FinancialInstitution entity = slPlug.playerManager.getFinancialInstitution(bankName);
 		EconResult result = economy.withdraw(entity, amount);
 		
 		return economy.convertEconResult(result);
