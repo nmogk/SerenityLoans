@@ -378,6 +378,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "UserID varchar(36) NOT NULL,"
 				 	+ "MemberOf varchar(36) NOT NULL,"
 				 	+ "JoinDate DATE NOT NULL,"
+				 	+ "Roles varchar(255),"
 					+ "CONSTRAINT uc_memberID PRIMARY KEY (UserID,MemberOf),"
 					+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
 					+ "FOREIGN KEY (MemberOf) REFERENCES FinancialEntities(UserID)"
