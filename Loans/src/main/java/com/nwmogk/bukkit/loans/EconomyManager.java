@@ -359,4 +359,11 @@ public class EconomyManager {
 	       econ = rsp.getProvider();
 	       
 	}
+	
+	public boolean hasBankSupport(){
+		if(config == EconType.VAULT)
+			return econ.hasBankSupport();
+		
+		return true;
+	}
 }
