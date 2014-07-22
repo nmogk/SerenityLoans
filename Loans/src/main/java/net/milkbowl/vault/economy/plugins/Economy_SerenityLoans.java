@@ -1,5 +1,6 @@
 package net.milkbowl.vault.economy.plugins;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -13,10 +14,12 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.plugin.Plugin;
 
+import com.nwmogk.bukkit.loans.Conf;
 import com.nwmogk.bukkit.loans.EconomyManager;
 import com.nwmogk.bukkit.loans.SerenityLoans;
 import com.nwmogk.bukkit.loans.api.EconResult;
 import com.nwmogk.bukkit.loans.api.FinancialEntity;
+import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -79,137 +82,154 @@ public class Economy_SerenityLoans implements Economy {
         }
 	}
 
-	public EconomyResponse bankBalance(String arg0) {
+	public EconomyResponse bankBalance(String bankName) {
 		return null;
 	}
 
-	public EconomyResponse bankDeposit(String arg0, double arg1) {
+	public EconomyResponse bankDeposit(String bankName, double amount) {
 		return null;
 	}
 
-	public EconomyResponse bankHas(String arg0, double arg1) {
+	public EconomyResponse bankHas(String bankName, double amount) {
 		return null;
 	}
 
-	public EconomyResponse bankWithdraw(String arg0, double arg1) {
+	public EconomyResponse bankWithdraw(String bankName, double amount) {
 		return null;
 	}
 
-	public EconomyResponse createBank(String arg0, String arg1) {
-		return null;
+	@Deprecated
+	public EconomyResponse createBank(String bankName, String playerName) {
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse createBank(String arg0, OfflinePlayer arg1) {
-		return null;
+	public EconomyResponse createBank(String bankName, OfflinePlayer player) {
+		return economy.convertEconResult(economy.createBank(bankName, player));
 	}
 
+	@Deprecated
 	public boolean createPlayerAccount(String arg0) {
 		return false;
 	}
 
-	public boolean createPlayerAccount(OfflinePlayer arg0) {
-		return false;
+	public boolean createPlayerAccount(OfflinePlayer player) {
+		return economy.createPlayerAccount(player);
 	}
 
-	public boolean createPlayerAccount(String arg0, String arg1) {
-		return false;
+	@Deprecated
+	public boolean createPlayerAccount(String playerName, String world) {
+		return createPlayerAccount(playerName);
 	}
 
-	public boolean createPlayerAccount(OfflinePlayer arg0, String arg1) {
-		return false;
+	public boolean createPlayerAccount(OfflinePlayer player, String world) {
+		return createPlayerAccount(player);
 	}
 
 	public String currencyNamePlural() {
-		return null;
+		return economy.currencyNamePlural();
 	}
 
 	public String currencyNameSingular() {
-		return null;
+		return economy.currencyNameSingular();
 	}
 
 	public EconomyResponse deleteBank(String arg0) {
-		return null;
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse depositPlayer(String arg0, double arg1) {
-		return null;
+	@Deprecated
+	public EconomyResponse depositPlayer(String playerName, double amount) {
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse depositPlayer(OfflinePlayer arg0, double arg1) {
-		return null;
+	public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
+		FinancialEntity entity = slPlug.playerManager.getFinancialEntity(player.getUniqueId());
+		EconResult result = economy.deposit(entity, amount);
+		
+		return economy.convertEconResult(result);
 	}
 
-	public EconomyResponse depositPlayer(String arg0, String arg1, double arg2) {
-		return null;
+	@Deprecated
+	public EconomyResponse depositPlayer(String playerName, String world, double amount) {
+		return depositPlayer(playerName, amount);
 	}
 
-	public EconomyResponse depositPlayer(OfflinePlayer arg0, String arg1,
-			double arg2) {
-		return null;
+	public EconomyResponse depositPlayer(OfflinePlayer player, String world, double amount) {
+		return depositPlayer(player, amount);
 	}
 
-	public String format(double arg0) {
-		return null;
+	public String format(double amount) {
+		return economy.format(amount);
 	}
 
 	public int fractionalDigits() {
+		return Conf.getFractionalDigits();
+	}
+
+	@Deprecated
+	public double getBalance(String playerName) {
 		return 0;
 	}
 
-	public double getBalance(String arg0) {
-		return 0;
+	public double getBalance(OfflinePlayer player) {
+		FinancialEntity entity = slPlug.playerManager.getFinancialEntity(player.getUniqueId());
+		
+		return economy.getBalance(entity).balance;
 	}
 
-	public double getBalance(OfflinePlayer arg0) {
-		return 0;
+	@Deprecated
+	public double getBalance(String playerName, String world) {
+		return getBalance(playerName);
 	}
 
-	public double getBalance(String arg0, String arg1) {
-		return 0;
-	}
-
-	public double getBalance(OfflinePlayer arg0, String arg1) {
-		return 0;
+	public double getBalance(OfflinePlayer player, String world) {
+		return getBalance(player);
 	}
 
 	public List<String> getBanks() {
-		return null;
+		return economy.getBanks();
 	}
 
 	public String getName() {
-		return null;
+		return name;
 	}
 
-	public boolean has(String arg0, double arg1) {
+	@Deprecated
+	public boolean has(String playerName, double amount) {
 		return false;
 	}
 
-	public boolean has(OfflinePlayer arg0, double arg1) {
+	public boolean has(OfflinePlayer player, double amount) {
+		FinancialEntity entity = slPlug.playerManager.getFinancialEntity(player.getUniqueId());
+		
+		return economy.has(entity, amount).callSuccess;
+	}
+
+	@Deprecated
+	public boolean has(String playerName, String world, double amount) {
+		return has(playerName, amount);
+	}
+
+	public boolean has(OfflinePlayer player, String world, double amount) {
+		return has(player, amount);
+	}
+
+	@Deprecated
+	public boolean hasAccount(String playerName) {
 		return false;
 	}
 
-	public boolean has(String arg0, String arg1, double arg2) {
-		return false;
+	public boolean hasAccount(OfflinePlayer player) {
+		return economy.hasAccount(player);
 	}
 
-	public boolean has(OfflinePlayer arg0, String arg1, double arg2) {
-		return false;
+	@Deprecated
+	public boolean hasAccount(String playerName, String world) {
+		return hasAccount(playerName);
 	}
 
-	public boolean hasAccount(String arg0) {
-		return false;
-	}
-
-	public boolean hasAccount(OfflinePlayer arg0) {
-		return false;
-	}
-
-	public boolean hasAccount(String arg0, String arg1) {
-		return false;
-	}
-
-	public boolean hasAccount(OfflinePlayer arg0, String arg1) {
-		return false;
+	public boolean hasAccount(OfflinePlayer player, String world) {
+		return hasAccount(player);
 	}
 
 	public boolean hasBankSupport() {
@@ -231,10 +251,7 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	public EconomyResponse isBankOwner(String bankName, OfflinePlayer player) {
-		UUID bankId = slPlug.playerManager.getFinancialInstituteID(bankName);
-		OfflinePlayer manager = slPlug.playerManager.getOfflinePlayer(bankId);
-		
-		return new EconomyResponse(0, 0, manager.getUniqueId().equals(player.getUniqueId())? ResponseType.SUCCESS : ResponseType.FAILURE, null );
+		return economy.convertEconResult(economy.isBankOwner(bankName, player));
 	}
 
 	public boolean isEnabled() {
