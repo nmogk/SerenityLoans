@@ -948,6 +948,22 @@ public class PlayerManager {
 	}
 	
 	/**
+	 * Checks to see if the given entity is the manager of the
+	 * given financial institution. Will return false if either
+	 * of the given entities is null.
+	 * 
+	 * @param bank
+	 * @param manager
+	 * @return
+	 */
+	public boolean isManager(FinancialInstitution bank, FinancialEntity manager){
+		if(bank == null || manager == null)
+			return false;
+		
+		return bank.getResponsibleParty().equals(manager.getUserID());
+	}
+	
+	/**
 	 * Updates the credit score of the given entity to the given value.
 	 * Does not perform any input validation. Returns the success of
 	 * the update.
