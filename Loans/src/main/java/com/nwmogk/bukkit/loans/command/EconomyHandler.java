@@ -40,7 +40,9 @@ public class EconomyHandler  implements CommandExecutor {
 				return true;
 			}
 			
+			pay(sender, args);
 			
+			return true;
 		} else if (cmd.getName().equalsIgnoreCase("sl-cash") && balancePerms) {
 			balanceLookup(sender, args, BalanceType.CASH);
 			return true;
@@ -79,7 +81,7 @@ public class EconomyHandler  implements CommandExecutor {
 					}
 					
 				} else if (! (sender instanceof Player)){
-					plugin.scheduleMessage(sender, prfx + "Player argument required from console.");
+					plugin.scheduleMessage(sender, prfx + " Player argument required from console.");
 					return;
 				} else {
 					toCheck = plugin.playerManager.getFinancialEntityAdd(((Player) sender).getUniqueId());
@@ -141,7 +143,7 @@ public class EconomyHandler  implements CommandExecutor {
 				} else if (args[0].equalsIgnoreCase("set"))
 					action = EcoAction.SET;
 				else {
-					plugin.scheduleMessage(sender, prfx + "Unknown action.");
+					plugin.scheduleMessage(sender, prfx + " Unknown action.");
 					return;
 				}
 				
@@ -156,7 +158,7 @@ public class EconomyHandler  implements CommandExecutor {
 				}
 				
 				if(target == null){
-					plugin.scheduleMessage(sender, prfx + "Entity not found!");
+					plugin.scheduleMessage(sender, prfx + " Entity not found!");
 					return;
 				}
 				
@@ -198,4 +200,60 @@ public class EconomyHandler  implements CommandExecutor {
 	}
 	
 
+	private void pay(final CommandSender sender, final String[] args){
+		
+		
+		if(args.length < 2){
+			Conf.messageCenter("too-few-arguments", null, null);
+			return;
+		}
+		
+		
+		
+		plugin.threads.execute(new Runnable(){
+			
+			@SuppressWarnings("deprecation")
+			public void run(){
+				
+				FinancialEntity source = plugin.playerManager.getFinancialEntity(((Player) sender).getUniqueId());
+				FinancialEntity target = null;
+				
+				try {
+					target = plugin.playerManager.getFinancialEntityAdd(args[0]);
+				} catch (InterruptedException | ExecutionException | TimeoutException e) {
+					// TODO add message to configuration
+					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[0] + ". Try again later.");
+					return;
+				}
+				
+				if(target == null){
+					plugin.scheduleMessage(sender, prfx + " Entity not found!");
+					return;
+				}
+				
+				double amount = Double.parseDouble(args[1]);
+				
+				EconResult result = null;
+				
+				if(!plugin.econ.has(source, amount).callSuccess){
+					plugin.scheduleMessage(sender, prfx + " You do not have enough money!");
+					return;
+				}
+				
+				plugin.econ.withdraw(source, amount);
+				result = plugin.econ.deposit(target, amount);
+					
+				
+				if(result.callSuccess){
+					plugin.scheduleMessage(sender, Conf.messageCenter("generic-success", null, null));
+				} else {
+					plugin.scheduleMessage(sender, Conf.messageCenter("generic-refuse", null, null));
+					plugin.scheduleMessage(sender, prfx + result.errMsg);
+				}
+				
+			}
+		});
+			
+		
+	}
 }
