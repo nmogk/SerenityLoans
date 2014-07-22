@@ -367,6 +367,7 @@ public class EconomyManager {
 	}
 	
 	public boolean hasBankSupport(){
+		// TODO evaluate eliminating this for conversion purposes
 		if(config == EconType.VAULT)
 			return econ.hasBankSupport();
 		
@@ -374,6 +375,7 @@ public class EconomyManager {
 	}
 	
 	public List<String> getBanks() {
+		// TODO evaluate eliminating this for conversion purposes
 		if(config == EconType.VAULT)
 			return econ.getBanks();
 		
@@ -389,6 +391,7 @@ public class EconomyManager {
 	}
 	
 	public EconResult isBankOwner(String bankName, OfflinePlayer player) {
+		// TODO evaluate eliminating this for conversion purposes
 		if(config == EconType.VAULT)
 			return new EconResult(econ.isBankOwner(bankName, player));
 		
@@ -399,6 +402,7 @@ public class EconomyManager {
 	}
 	
 	public boolean hasAccount(OfflinePlayer player) {
+		// TODO evaluate eliminating this for conversion purposes
 		if(config == EconType.VAULT)
 			return econ.hasAccount(player);
 		
@@ -410,7 +414,8 @@ public class EconomyManager {
 	public boolean createPlayerAccount(OfflinePlayer player) {
 		boolean result = true;
 		
-		if(config == EconType.VAULT)
+		// TODO evaluate eliminating this for conversion purposes
+		if(config == EconType.VAULT || config == EconType.HYBRID)
 			result &= econ.createPlayerAccount(player);
 		
 		result &= plugin.playerManager.addPlayer(player.getUniqueId());
@@ -419,6 +424,7 @@ public class EconomyManager {
 	}
 	
 	public EconResult createBank(String bankName, OfflinePlayer manager){
+		// TODO evaluate eliminating this for conversion purposes
 		if(config == EconType.VAULT)
 			return new EconResult(econ.createBank(bankName, manager));
 		
