@@ -1,6 +1,7 @@
 package net.milkbowl.vault.economy.plugins;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
@@ -19,6 +20,7 @@ import com.nwmogk.bukkit.loans.api.FinancialEntity;
 
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
+import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 
 public class Economy_SerenityLoans implements Economy {
 	
@@ -211,23 +213,28 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	public boolean hasBankSupport() {
-		return false;
+		return economy.hasBankSupport();
 	}
 
-	public EconomyResponse isBankMember(String arg0, String arg1) {
-		return null;
+	@Deprecated
+	public EconomyResponse isBankMember(String bankName, String playerName) {
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse isBankMember(String arg0, OfflinePlayer arg1) {
-		return null;
+	public EconomyResponse isBankMember(String bankName, OfflinePlayer player) {
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse isBankOwner(String arg0, String arg1) {
-		return null;
+	@Deprecated
+	public EconomyResponse isBankOwner(String bankName, String playerName) {
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
-	public EconomyResponse isBankOwner(String arg0, OfflinePlayer arg1) {
-		return null;
+	public EconomyResponse isBankOwner(String bankName, OfflinePlayer player) {
+		UUID bankId = slPlug.playerManager.getFinancialInstituteID(bankName);
+		OfflinePlayer manager = slPlug.playerManager.getOfflinePlayer(bankId);
+		
+		return new EconomyResponse(0, 0, manager.getUniqueId().equals(player.getUniqueId())? ResponseType.SUCCESS : ResponseType.FAILURE, null );
 	}
 
 	public boolean isEnabled() {
@@ -239,7 +246,7 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public EconomyResponse withdrawPlayer(String arg0, double arg1) {
-		return null;
+		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
 	}
 
 	public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount) {
