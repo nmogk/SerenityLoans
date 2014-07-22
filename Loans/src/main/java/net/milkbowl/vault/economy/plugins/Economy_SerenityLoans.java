@@ -83,19 +83,31 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	public EconomyResponse bankBalance(String bankName) {
-		return null;
+		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		EconResult result = economy.getBalance(entity);
+		
+		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankDeposit(String bankName, double amount) {
-		return null;
+		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		EconResult result = economy.deposit(entity, amount);
+		
+		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankHas(String bankName, double amount) {
-		return null;
+		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		EconResult result = economy.has(entity, amount);
+		
+		return economy.convertEconResult(result);
 	}
 
 	public EconomyResponse bankWithdraw(String bankName, double amount) {
-		return null;
+		FinancialEntity entity = slPlug.playerManager.getFinancialInstitution(bankName);
+		EconResult result = economy.withdraw(entity, amount);
+		
+		return economy.convertEconResult(result);
 	}
 
 	@Deprecated
