@@ -117,6 +117,7 @@ public final class SerenityLoans extends JavaPlugin {
 			return;
 		}
 		
+		// TODO evaluate reconnection in other places i.e. don't rely on this.
 		squrl += "?autoReconnect=true";
 		
 		if(getConfig().contains("mysql.username") || getConfig().contains("mysql.password")){
