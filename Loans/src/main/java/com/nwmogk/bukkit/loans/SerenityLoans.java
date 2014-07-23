@@ -117,8 +117,10 @@ public final class SerenityLoans extends JavaPlugin {
 			return;
 		}
 		
+		squrl += "?autoReconnect=true";
+		
 		if(getConfig().contains("mysql.username") || getConfig().contains("mysql.password")){
-			squrl += "?";
+			squrl += "&";
 			if(debugLevel >= 1)
 				logInfo("Using username and password info.");
 		}
@@ -133,6 +135,7 @@ public final class SerenityLoans extends JavaPlugin {
 			if(debugLevel >= 2)
 				logInfo("Password given.");
 		}
+		
 		
 		if(debugLevel >= 2)
 			logInfo("Database configuration loaded. Setting up...");
