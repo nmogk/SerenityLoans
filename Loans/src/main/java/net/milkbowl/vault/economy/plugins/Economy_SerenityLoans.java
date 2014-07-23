@@ -1,5 +1,6 @@
 package net.milkbowl.vault.economy.plugins;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -25,9 +26,7 @@ import net.milkbowl.vault.economy.EconomyResponse.ResponseType;
 
 public class Economy_SerenityLoans implements Economy {
 	
-	// TODO Do something with name lookup calls
-	//      Implement bank memberships
-	//      Add response messages to failed EconomyResponse objects
+	// TODO Implement deleting banks
 	
 	private static final Logger log = Logger.getLogger("Minecraft");
 
@@ -112,7 +111,12 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public EconomyResponse createBank(String bankName, String playerName) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return new EconomyResponse(0, 0, ResponseType.FAILURE, "Player not found.");
+		
+		return createBank(bankName, player);
 	}
 
 	public EconomyResponse createBank(String bankName, OfflinePlayer player) {
@@ -120,8 +124,13 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	@Deprecated
-	public boolean createPlayerAccount(String arg0) {
-		return false;
+	public boolean createPlayerAccount(String playerName) {
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return false;
+		
+		return createPlayerAccount(player);
 	}
 
 	public boolean createPlayerAccount(OfflinePlayer player) {
@@ -151,7 +160,12 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public EconomyResponse depositPlayer(String playerName, double amount) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return new EconomyResponse(0, 0, ResponseType.FAILURE, "Player not found.");
+		
+		return depositPlayer(player, amount);
 	}
 
 	public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
@@ -180,7 +194,12 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public double getBalance(String playerName) {
-		return 0;
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return 0;
+		
+		return getBalance(player);
 	}
 
 	public double getBalance(OfflinePlayer player) {
@@ -208,7 +227,12 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public boolean has(String playerName, double amount) {
-		return false;
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return false;
+		
+		return has(player, amount);
 	}
 
 	public boolean has(OfflinePlayer player, double amount) {
@@ -228,7 +252,12 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public boolean hasAccount(String playerName) {
-		return false;
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return false;
+		
+		return hasAccount(player);
 	}
 
 	public boolean hasAccount(OfflinePlayer player) {
@@ -250,16 +279,33 @@ public class Economy_SerenityLoans implements Economy {
 
 	@Deprecated
 	public EconomyResponse isBankMember(String bankName, String playerName) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return new EconomyResponse(0, 0, ResponseType.FAILURE, "Player not found.");
+		
+		return isBankMember(bankName, player);
 	}
 
 	public EconomyResponse isBankMember(String bankName, OfflinePlayer player) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+		
+		FinancialInstitution bank = slPlug.playerManager.getFinancialInstitution(bankName);
+		FinancialEntity fe = slPlug.playerManager.getFinancialEntity(player.getUniqueId());
+		
+		ResponseType rt = slPlug.playerManager.isMember(bank, fe) ? ResponseType.SUCCESS : ResponseType.FAILURE;
+		
+		return new EconomyResponse(0, 0, rt, null);
 	}
 
 	@Deprecated
 	public EconomyResponse isBankOwner(String bankName, String playerName) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return new EconomyResponse(0, 0, ResponseType.FAILURE, "Player not found.");
+		
+		return isBankOwner(bankName, player);
+		
 	}
 
 	public EconomyResponse isBankOwner(String bankName, OfflinePlayer player) {
@@ -274,8 +320,13 @@ public class Economy_SerenityLoans implements Economy {
 	}
 
 	@Deprecated
-	public EconomyResponse withdrawPlayer(String arg0, double arg1) {
-		return new EconomyResponse(0, 0, ResponseType.NOT_IMPLEMENTED, null);
+	public EconomyResponse withdrawPlayer(String playerName, double amount) {
+		OfflinePlayer player = getOfflinePlayer(playerName);
+		
+		if(player == null)
+			return new EconomyResponse(0, 0, ResponseType.FAILURE, "Player not found.");
+		
+		return withdrawPlayer(player, amount);
 	}
 
 	public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount) {
@@ -294,6 +345,21 @@ public class Economy_SerenityLoans implements Economy {
 		return withdrawPlayer(player, amount);
 	}
 
-	
+	private OfflinePlayer getOfflinePlayer(String playerName){
+		OfflinePlayer[] choices = plugin.getServer().getOfflinePlayers();
+
+		String[] names = new String[choices.length];
+		
+		for(int i=0; i < choices.length; i++)
+			names[i] = choices[i].getName();
+		
+		Arrays.sort(names);
+		int index = Arrays.binarySearch(names, playerName);
+		
+		if(index < 0)
+			return null;
+		
+		return choices[index];
+	}
 
 }
