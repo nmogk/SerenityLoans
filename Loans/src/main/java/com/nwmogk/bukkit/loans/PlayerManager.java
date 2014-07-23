@@ -76,6 +76,7 @@ import com.nwmogk.bukkit.loans.api.FinancialEntity;
 import com.nwmogk.bukkit.loans.api.PlayerType;
 import com.nwmogk.bukkit.loans.object.FinancialInstitution;
 import com.nwmogk.bukkit.loans.object.FinancialPlayer;
+import com.nwmogk.bukkit.loans.object.MembershipRecord;
 
 public class PlayerManager {
 	
@@ -221,6 +222,36 @@ public class PlayerManager {
 		}
 		
 		return result;
+	}
+	
+	/**
+	 * This method adds all of the specified FinancialEntities to the membership
+	 * table associated with the given FinancialInstitution.
+	 * 
+	 * @param bank
+	 * @param members
+	 */
+	public void addMembers(FinancialInstitution bank, FinancialEntity[] members){
+		
+		String sql = String.format("INSERT INTO Memberships (UserID, MemberOf, JoinDate) VALUES ?, '%s', ?;", bank.getUserID().toString());
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(sql);
+			
+			ps.setDate(2, new java.sql.Date(new java.util.Date().getTime()));
+			
+			for(FinancialEntity fe : members){
+				
+				ps.setString(1, fe.getUserID().toString());
+				
+				ps.executeUpdate();
+				
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -760,6 +791,78 @@ public class PlayerManager {
 		
 		return results;
 	}
+	
+	/**
+	 * This method returns an array of FinancialEntities which are members
+	 * of the given FinancialInstitution will return null if none are
+	 * found. The FinancialInstitution manager is not returned in the
+	 * result.
+	 * 
+	 * @param bank
+	 * @return
+	 */
+	public FinancialEntity[] getMembers(FinancialInstitution bank){
+		String sql = String.format("SELECT UserID FROM Memberships WHERE MemberOf='%s'", bank.getUserID().toString());
+		
+		Vector<FinancialEntity> result = new Vector<FinancialEntity>();
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(sql);
+			
+			while(rs.next()){
+				UUID member = UUID.fromString(rs.getString(1));
+				FinancialEntity fe = getFinancialEntity(member);
+				
+				if(fe != null)
+					result.add(fe);
+			}
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		if(result.size() == 0)
+			return null;
+		
+		return (FinancialEntity[])result.toArray();
+	}
+	
+	/**
+	 * Returns a membership record object for the given financialInstitution and 
+	 * FinancialEntity. The membership record contains all of the additional
+	 * information that is associated with a membership such as join date, roles, and
+	 * shares.
+	 * 
+	 * @param bank
+	 * @param entity
+	 * @return
+	 */
+	public MembershipRecord getMembershipRecord(FinancialInstitution bank, FinancialEntity entity){
+		MembershipRecord result = null;
+		String sql = String.format("SELECT * FROM Memberships WHERE UserID='%s' AND MemberOf='%s';", entity.getUserID().toString(), bank.getUserID().toString());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(sql);
+			
+			if(rs.next()){
+				java.sql.Date joinDate = rs.getDate("JoinDate");
+				String roles = rs.getString("Roles");
+				int shares = rs.getInt("Shares");
+				
+				result = new MembershipRecord(bank, entity, joinDate, roles, shares);
+			}
+				
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return result;
+	}
 
 	/**
 	 * This method returns an OfflinePlayer object given a FinancialEntity
@@ -961,6 +1064,62 @@ public class PlayerManager {
 			return false;
 		
 		return bank.getResponsibleParty().equals(manager.getUserID());
+	}
+	
+	/**
+	 * Checks the membership tables of the given FinancialInstitution to see
+	 * if the given Entity is a member of the institution. This may or
+	 * may not include the manager depending on if the manager was added
+	 * to the membership table explicitly.
+	 * 
+	 * @param bank
+	 * @param toCheck
+	 * @return
+	 */
+	public boolean isMember(FinancialInstitution bank, FinancialEntity toCheck){
+		boolean result = false;
+		String sql = String.format("SELECT * FROM Memberships WHERE UserID='%s' AND MemberOf='%s';", toCheck.getUserID().toString(), bank.getUserID().toString());
+		
+		try {
+			Statement stmt = plugin.conn.createStatement();
+			
+			ResultSet rs = stmt.executeQuery(sql);
+			
+			result = rs.next();
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
+		
+		return result;
+	}
+	
+	/**
+	 * This method removes all of the specified FinancialEntities to the membership
+	 * table associated with the given FinancialInstitution.
+	 * 
+	 * @param bank
+	 * @param members
+	 */
+	public void removeMembers(FinancialInstitution bank, FinancialEntity[] members){
+		
+		String sql = String.format("DELETE FROM Memberships WHERE UserID=? AND MemberOf='%s';", bank.getUserID().toString());
+		
+		try {
+			PreparedStatement ps = plugin.conn.prepareStatement(sql);
+			
+			for(FinancialEntity fe : members){
+				
+				ps.setString(1, fe.getUserID().toString());
+				
+				ps.executeUpdate();
+				
+			}
+			
+		} catch (SQLException e) {
+			SerenityLoans.logFail(e.getMessage());
+			e.printStackTrace();
+		}
 	}
 	
 	/**
