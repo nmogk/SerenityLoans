@@ -514,7 +514,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "CONSTRAINT uc_relationID PRIMARY KEY (DBmajor,DBminor)"
 				 	+ ");";
 		 
-		 String writeVersion = "INSERT INTO Info VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
+		 String writeVersion = "INSERT INTO Info (DBmajor, DBminor) VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
 
 		 Statement statement = null;
 		 
