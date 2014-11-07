@@ -55,6 +55,11 @@ commands:
     usage: /<command> [player] [amount]
     permission: serenityloans.pay
     permission-message: You do not have <permission>!
+  sl-eco
+    description: This command allows administrators to directly set or change player balances.
+    usage: /<command> <give|take|set> <entity> <amount>
+    permission: serenityloan.admin
+    permission-message: You do not have <permission>!
     
 permissions:
   serenityloans.credit:
