@@ -129,8 +129,8 @@ public final class PlayerLoginListener implements Listener {
 							try {
 								plugin.scheduleMessage(recipient, ps.toString(plugin));
 							} catch (InterruptedException | ExecutionException | TimeoutException e) {
-								// TODO add message to configuration
-								plugin.scheduleMessage(recipient, prfx + " Problem during name lookup. Try again later.");
+								plugin.scheduleMessage(recipient, Conf.messageCenter("name-lookup-fail", new String[]{"$$p"},  new String[]{recipient.getName()}));
+								
 							}
 							plugin.scheduleMessage(recipient, String.format("%s Use %s statement to view this statement again.", prfx, firstRun? "/loan": "/crunion"));
 							
@@ -145,7 +145,7 @@ public final class PlayerLoginListener implements Listener {
 						try {
 							sender = plugin.playerManager.entityNameLookup(fe);
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
+							plugin.scheduleMessage(recipient, Conf.messageCenter("name-lookup-fail", new String[]{"$$p"},  new String[]{recipient.getName()}));
 							plugin.scheduleMessage(recipient, prfx + " Problem during name lookup. Try again later.");
 							continue;
 						}

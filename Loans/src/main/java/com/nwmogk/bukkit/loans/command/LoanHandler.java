@@ -218,8 +218,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					lender = plugin.playerManager.getFinancialEntityAdd(lenderName);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 					return;
 				}
 				
@@ -415,8 +414,7 @@ public class LoanHandler implements CommandExecutor{
 					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
 				
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{borrowerName, sender.getName()}));
 					return;
 				}
 				
@@ -440,8 +438,7 @@ public class LoanHandler implements CommandExecutor{
 						try {
 							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
-							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{borrowerName, sender.getName()}));
 							continue;
 						}
 					}
@@ -812,8 +809,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					target = plugin.playerManager.getFinancialEntityAdd(args[1]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{args[1], sender.getName()}));
 					return;
 				}
 				
@@ -955,8 +951,7 @@ public class LoanHandler implements CommandExecutor{
 					try {
 						other = plugin.playerManager.getFinancialEntity(args[1]);
 					} catch (InterruptedException | ExecutionException | TimeoutException e) {
-						// TODO add message to configuration
-						plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+						plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{entityTarget, sender.getName()}));
 						return;
 					}
 					
@@ -978,8 +973,8 @@ public class LoanHandler implements CommandExecutor{
 					try {
 						plugin.scheduleMessage(sender, offer.toString(plugin));
 					} catch (InterruptedException | ExecutionException | TimeoutException e) {
-						// TODO add message to configuration
-						plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+						plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{entityTarget, sender.getName()}));
+						
 					}
 					
 					return;
@@ -1163,8 +1158,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					lender = plugin.playerManager.getFinancialEntity(args[1]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 					return;
 				}
 				
@@ -1189,8 +1183,7 @@ public class LoanHandler implements CommandExecutor{
 						try {
 							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
-							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 							continue;
 						}
 					}
@@ -1222,8 +1215,8 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					plugin.scheduleMessage(sender, String.format("%s Payment of %s successfully applied to loan, %s.", prfx, plugin.econ.format(payAmount), loanSelection.result.getShortDescription(plugin, true)));
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
+				
 				}
 				
 			}
@@ -1268,8 +1261,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					lender = plugin.playerManager.getFinancialEntity(entityTarget);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{entityTarget, sender.getName()}));
 					return;
 				}
 				
@@ -1335,8 +1327,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					borrowerId = plugin.playerManager.entityIdLookup(args[1]);
 				} catch (InterruptedException | ExecutionException	| TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[1] + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{args[1], sender.getName()}));
 					return;
 				}
 				
@@ -1424,8 +1415,7 @@ public class LoanHandler implements CommandExecutor{
 					borrower = plugin.playerManager.getFinancialEntity(borrowerName);
 					
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + borrowerName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{borrowerName, sender.getName()}));
 					return;
 				}
 			
@@ -1448,8 +1438,7 @@ public class LoanHandler implements CommandExecutor{
 						try {
 							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, false) ));
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
-							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{borrowerName, sender.getName()}));
 							continue;
 						}
 					}
@@ -1474,8 +1463,7 @@ public class LoanHandler implements CommandExecutor{
 					recipient = plugin.playerManager.getFinancialEntityAdd(recipientName);
 					
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + recipientName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{recipientName, sender.getName()}));
 					return;
 				}
 				
@@ -1627,8 +1615,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					borrower = plugin.playerManager.getFinancialEntityAdd(entityTarget);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + entityTarget + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{entityTarget, sender.getName()}));
 					return;
 				}
 				
@@ -1753,8 +1740,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					lender = plugin.playerManager.getFinancialEntity(args[1]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e1) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + lenderName + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 					return;
 				}
 				
@@ -1779,8 +1765,7 @@ public class LoanHandler implements CommandExecutor{
 						try {
 							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
-							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 							continue;
 						}
 					}
@@ -1887,27 +1872,35 @@ public class LoanHandler implements CommandExecutor{
 		// TODO Message center
 		
 		if(!sender.hasPermission("serenityloans.loan.lend")){
+			
 			sender.sendMessage(Conf.messageCenter("perm-lend-fail", new String[]{"$$p", "$$c"}, new String[]{sender.getName(), "/" + alias}));
 			return true;
+			
 		}
 	
 		if(!pendingSales.containsKey(entity)){
+			
 			sender.sendMessage(prfx + " You do not have any outstanding offers to buy a loan");
 			return true;
+			
 		}
 		
 		plugin.threads.execute(new Runnable(){
 			
 			public void run(){
+				
 				LoanSale ls = pendingSales.get(entity);
 				
 				plugin.scheduleMessage(sender, String.format(prfx + " You have an offer to buy a loan for %s.", plugin.econ.format(ls.amount)));
+				
 				try {
 					plugin.scheduleMessage(sender, ls.theLoan.toString(plugin));
+					
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$p"},  new String[]{sender.getName()}));
+					
 				}
+				
 			}
 		});
 		
@@ -1952,7 +1945,7 @@ public class LoanHandler implements CommandExecutor{
 				try {
 					lender = plugin.playerManager.getFinancialEntity(args[1]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO Auto-generated catch block
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
 					e.printStackTrace();
 				}
 				
@@ -1971,16 +1964,22 @@ public class LoanHandler implements CommandExecutor{
 				}
 				
 				if(loanSelection.multipleValues){
+					
 					plugin.scheduleMessage(sender, prfx + " You have multiple loans with this entity. Select one of the following.");
 					Loan[] allLoans = plugin.loanManager.getLoan(lender, borrower);
+					
 					for(int i = 0; i < allLoans.length ; i++){
+						
 						try {
 							plugin.scheduleMessage(sender, String.format("    %d: %s", i, allLoans[i].getShortDescription(plugin, true) ));
+							
 						} catch (InterruptedException | ExecutionException | TimeoutException e) {
-							// TODO add message to configuration
-							plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+							
+							plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$p"},  new String[]{sender.getName()}));
 							continue;
+							
 						}
+						
 					}
 					
 					return;
@@ -1996,12 +1995,15 @@ public class LoanHandler implements CommandExecutor{
 				plugin.scheduleMessage(recipient, String.format("%s %s an outstanding payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)loanSelection.result.getBorrower()).getName() + " has"));
 				plugin.scheduleMessage(recipient, String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
 				plugin.scheduleMessage(recipient, String.format("%s Details are given below:", prfx));
+				
 				try {
 					plugin.scheduleMessage(recipient, plugin.loanManager.getPaymentStatement(loanSelection.result.getLoanID()).toString(plugin));
+					
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup. Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{lenderName, sender.getName()}));
+					
 				}
+				
 				plugin.scheduleMessage(recipient, String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", lenderName));
 			
 			}
