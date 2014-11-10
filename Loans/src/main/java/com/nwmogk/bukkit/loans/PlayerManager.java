@@ -743,7 +743,19 @@ public class PlayerManager {
 				rs = stmt.executeQuery(sql);
 			}
 			
-			return (FinancialInstitution[]) buildEntity(rs);
+			Vector<FinancialInstitution> result = new Vector<FinancialInstitution>();
+			
+			for(FinancialEntity entity : buildEntity(rs)){
+				try {
+					result.add((FinancialInstitution) entity);
+					
+				} catch (ClassCastException e) {
+					continue;
+					
+				}
+			}
+			
+			return result.toArray(new FinancialInstitution[0]);
 		} catch (SQLException e) {
 			SerenityLoans.logFail(e.getMessage());
 			e.printStackTrace();
@@ -826,7 +838,7 @@ public class PlayerManager {
 		if(result.size() == 0)
 			return null;
 		
-		return (FinancialEntity[])result.toArray();
+		return result.toArray(new FinancialEntity[0]);
 	}
 	
 	/**
@@ -1321,7 +1333,7 @@ public class PlayerManager {
 		if(resultVector.size() == 0)
 			return null;
 		
-		return (FinancialEntity[]) resultVector.toArray();
+		return resultVector.toArray(new FinancialEntity[0]);
 	}
 
 	/*

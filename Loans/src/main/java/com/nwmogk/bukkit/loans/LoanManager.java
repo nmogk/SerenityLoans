@@ -586,7 +586,7 @@ public class LoanManager {
 		if(SerenityLoans.debugLevel >= 3)
 			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoansWithOutstandingStatements(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
 		
-		String betterQuery = String.format("SELECT DISTINCT LoanID FROM PaymentStatements JOIN Loans ON Loans.BorrowerID='%s';", borrowerId.toString());
+		String betterQuery = String.format("SELECT DISTINCT PaymentStatements.LoanID FROM PaymentStatements JOIN Loans ON PaymentStatements.LoanID=Loans.LoanID WHERE Loans.BorrowerID='%s';", borrowerId.toString());
 		
 		LinkedList<PaymentStatement> result = new LinkedList<PaymentStatement>();
 		

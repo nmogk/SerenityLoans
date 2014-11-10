@@ -152,8 +152,7 @@ public class EconomyHandler  implements CommandExecutor {
 				try {
 					target = plugin.playerManager.getFinancialEntityAdd(args[entityIndex]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[entityIndex] + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{args[entityIndex], sender.getName()}));
 					return;
 				}
 				
@@ -221,8 +220,7 @@ public class EconomyHandler  implements CommandExecutor {
 				try {
 					target = plugin.playerManager.getFinancialEntityAdd(args[0]);
 				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					// TODO add message to configuration
-					plugin.scheduleMessage(sender, prfx + " Problem during name lookup for " + args[0] + ". Try again later.");
+					plugin.scheduleMessage(sender, Conf.messageCenter("name-lookup-fail", new String[]{"$$r", "$$p"},  new String[]{args[0], sender.getName()}));
 					return;
 				}
 				

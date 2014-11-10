@@ -133,6 +133,7 @@ options:
     queued-for-approval: Your loan has been sent to an admin for approval.
     payment-made: A payment on loan $$l has been made.
     missing-lender-argument: Lender argument required.
+    name-lookup-fail: Problem during name lookup. Try again later.
   
   auditing: 
     require-admin-approve: false

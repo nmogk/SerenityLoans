@@ -117,8 +117,11 @@ public final class SerenityLoans extends JavaPlugin {
 			return;
 		}
 		
+		// TODO evaluate reconnection in other places i.e. don't rely on this.
+		squrl += "?autoReconnect=true";
+		
 		if(getConfig().contains("mysql.username") || getConfig().contains("mysql.password")){
-			squrl += "?";
+			squrl += "&";
 			if(debugLevel >= 1)
 				logInfo("Using username and password info.");
 		}
@@ -133,6 +136,7 @@ public final class SerenityLoans extends JavaPlugin {
 			if(debugLevel >= 2)
 				logInfo("Password given.");
 		}
+		
 		
 		if(debugLevel >= 2)
 			logInfo("Database configuration loaded. Setting up...");
@@ -509,7 +513,7 @@ public final class SerenityLoans extends JavaPlugin {
 				 	+ "CONSTRAINT uc_relationID PRIMARY KEY (DBmajor,DBminor)"
 				 	+ ");";
 		 
-		 String writeVersion = "INSERT INTO Info VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
+		 String writeVersion = "INSERT INTO Info (DBmajor, DBminor) VALUES(" + dbMajorVersion + "," + dbMinorVersion + ");";
 
 		 Statement statement = null;
 		 
