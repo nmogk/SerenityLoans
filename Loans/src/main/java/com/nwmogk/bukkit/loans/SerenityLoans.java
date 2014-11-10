@@ -185,7 +185,6 @@ public final class SerenityLoans extends JavaPlugin {
 		 * 
 		 * Remove references to the regular configuration pathway in other classes. Use only the Conf object
 		 * 
-		 * Work out economy stuff
 		 */
 		
 		if(debugLevel >=1)
