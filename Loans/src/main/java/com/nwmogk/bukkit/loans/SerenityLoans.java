@@ -1,8 +1,11 @@
+//@formatter:off
 /**
+ * 
  * ========================================================================
  * DESCRIPTION
- * ======================================================================== This
- * file is part of the SerenityLoans Bukkit plugin project.
+ * ========================================================================
+ * 
+ * This file is part of the SerenityLoans Bukkit plugin project.
  * 
  * File: SerenityLoans.java Contributing Authors: Nathan W Mogk
  * 
@@ -35,13 +38,26 @@
  * 
  * ========================================================================
  * CHANGE LOG
- * ======================================================================== Date
- * Name Description Defect # ---------- --------------
- * ---------------------------------- -------- 2014-xx-xx nmogk Initial release
- * for v0.1
+ * ======================================================================== 
+ * Date       Name           Description                        Defect # 
+ * ---------- -------------- ---------------------------------- -------- 
+ * 2014-xx-xx nmogk          Initial release for v0.1
  * 
- * 
+ *
  */
+
+//@formatter:on
+
+/*
+ * TODO next: Setup listeners/handlers
+ * 
+ * Remove references to the regular configuration pathway in other
+ * classes. Use only the Conf object
+ * 
+ * Ensure that all database communication methods have finally clauses.
+ * Close all statement objects
+ */
+		
 
 package com.nwmogk.bukkit.loans;
 
@@ -87,7 +103,19 @@ public final class SerenityLoans extends JavaPlugin {
 	public ExecutorService			threads;
 
 
+	/**
+	 * Performs startup functions, as specified by the Bukkit API. This method
+	 * is the entry point for the plugin. It sets up the database and logger
+	 * connections as well as all of the core manager objects required for
+	 * interacting with the database.
+	 */
 	public void onEnable() {
+
+		/*
+		 * ===================================================================
+		 * CONFIGURATION SETUP
+		 * ===================================================================
+		 */
 
 		log = Logger.getLogger( "Minecraft." + getDescription().getName() );
 
@@ -104,6 +132,12 @@ public final class SerenityLoans extends JavaPlugin {
 		if ( debugLevel >= 4 )
 			logInfo( "Main thread ID: " + Thread.currentThread().getId() + "." );
 
+		/*
+		 * ===================================================================
+		 * DATABASE SETUP
+		 * ===================================================================
+		 */
+		
 		try {
 			getConnection();
 
@@ -115,23 +149,32 @@ public final class SerenityLoans extends JavaPlugin {
 			return;
 		}
 
-		playerManager = new PlayerManager( this );
-		offerManager = new OfferManager( this );
-
 		try {
 			if ( buildRequired() ) setupTables();
+			
 		} catch ( SQLException e ) {
+			
 			if ( debugLevel >= 2 ) logFail( e.getMessage() );
 
 			logFail( "Unable to build database! Disabling..." );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
+			
 		} catch ( DatabaseVersionMismatchException e ) {
+			
 			logFail( String.format( "%s Disabling...", e.getMessage() ) );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
+			
 		}
+		
+		/*
+		 * ===================================================================
+		 * PLAYER MANAGER SETUP
+		 * ===================================================================
+		 */
 
+		playerManager = new PlayerManager( this );
 
 		// Attempt to add online players to the loan system.
 		if ( debugLevel >= 1 )
@@ -142,11 +185,11 @@ public final class SerenityLoans extends JavaPlugin {
 		getServer().getPluginManager().registerEvents(
 				new PlayerLoginListener( this ), this );
 
+		
 		/*
-		 * TODO next: Setup listeners/handlers
-		 * 
-		 * Remove references to the regular configuration pathway in other
-		 * classes. Use only the Conf object
+		 * ===================================================================
+		 * ECONOMY MANAGER SETUP
+		 * ===================================================================
 		 */
 
 		if ( debugLevel >= 1 ) logInfo( "Setting up economy functions." );
@@ -154,17 +197,31 @@ public final class SerenityLoans extends JavaPlugin {
 		econ = new EconomyManager( this );
 
 		if ( !econ.isInitialized() ) {
+
+			// This error could already be out of date as I have implemented
+			// some of the economy.
+			// At least the error message will probably change.
 			logFail( "Disabled due to no Vault dependency found!" );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
+
 		}
 
+		/*
+		 * ===================================================================
+		 * LOAN RELATED MANAGERS SETUP
+		 * ===================================================================
+		 */
+		
 		loanManager = new LoanManager( this );
+		offerManager = new OfferManager( this );
 		historyManager = new CreditHistoryManager( this );
-		// setupPermissions();
-		// setupChat();
-
-		// Populate tables with online users
+		
+		/*
+		 * ===================================================================
+		 * REGISTER COMMAND HANDLERS
+		 * ===================================================================
+		 */
 
 		if ( debugLevel >= 3 ) logInfo( "Setting command handlers." );
 
@@ -176,6 +233,12 @@ public final class SerenityLoans extends JavaPlugin {
 		getCommand( "sl-balance" ).setExecutor( ecHandle );
 		getCommand( "sl-networth" ).setExecutor( ecHandle );
 		getCommand( "sl-eco" ).setExecutor( ecHandle );
+			
+		/*
+		 * ===================================================================
+		 * RUN INITIAL UPDATE
+		 * ===================================================================
+		 */
 
 		if ( debugLevel >= 2 ) logInfo( "Scheduling repeating upates." );
 
@@ -188,12 +251,19 @@ public final class SerenityLoans extends JavaPlugin {
 						offerManager.updateAll();
 					}
 				}, 0, Conf.getUpdateTime() );
+
+		if ( debugLevel >= 2 ) logInfo( "Initial setup complete." );
 	}
 
 
+	/**
+	 * This method is specified by the Bukkit API. It performs cleanup of the
+	 * plugin setup when the plugin shuts down. Mostly closing objects.
+	 */
 	public void onDisable() {
 
-		threads.shutdown();
+		if ( threads != null ) threads.shutdown();
+
 		this.getServer().getScheduler().cancelTasks( this );
 
 		try {
@@ -219,12 +289,21 @@ public final class SerenityLoans extends JavaPlugin {
 	// return perms != null;
 	// }
 
+
+	/*
+	 * This method determines if the database is the most up-to-date version. It
+	 * compares the version of the database listed in the Info table against the
+	 * version variables defined at the top of the file. If it catches a SQL
+	 * exception from the query, it logs it then passes it along. If the
+	 * database is out of date, it throws a DatabaseVersionMismatchException.
+	 */
 	private boolean buildRequired() throws SQLException,
 			DatabaseVersionMismatchException {
 
 		Statement statement = null;
 
 		try {
+
 			statement = conn.createStatement();
 
 			ResultSet tables = statement.executeQuery( "SHOW Tables;" );
@@ -247,18 +326,23 @@ public final class SerenityLoans extends JavaPlugin {
 
 			if ( version.getInt( "DBMajor" ) != dbMajorVersion
 					|| version.getInt( "DBMinor" ) != dbMinorVersion ) {
+
 				String ruhroh = "DB Version mismatch. V"
 						+ version.getInt( "DBMajor" ) + "."
 						+ version.getInt( "DBMinor" ) + " needs V"
 						+ dbMajorVersion + "." + dbMinorVersion + ".";
 				throw new DatabaseVersionMismatchException( ruhroh );
+
 			}
 
 		} catch ( SQLException e ) {
+
 			if ( debugLevel >= 2 ) logFail( e.getMessage() );
 
 			throw e;
+
 		} finally {
+
 			if ( statement != null ) {
 				statement.close();
 			}
@@ -268,6 +352,16 @@ public final class SerenityLoans extends JavaPlugin {
 	}
 
 
+	/*
+	 * This method executes the code required to build the database tables. It
+	 * will disable the plugin if success was not achieved. Some database
+	 * parameters are set from config values, which probably shouldn't be
+	 * changed without discarding the entire database.
+	 * 
+	 * In the future, I want to have SQL files that convert between different
+	 * versions of the database without losing any player data. This will be a
+	 * feature of builds after the production release.
+	 */
 	private void setupTables() throws SQLException {
 
 		boolean success = true;
@@ -277,30 +371,30 @@ public final class SerenityLoans extends JavaPlugin {
 		double dissipationFactor = 0.15;
 
 		if ( getConfig().contains( "trust.credit-score.no-history-score" ) ) {
-			
+
 			defaultCreditScore = getConfig().getInt(
 					"trust.credit-score.no-history-score" );
-			
+
 			if ( debugLevel >= 3 ) logInfo( "Loaded default credit score." );
-			
+
 		}
 
 		if ( getConfig().contains( "trust.credit-score.dissipation-factor" ) ) {
-			
+
 			dissipationFactor = getConfig().getInt(
 					"trust.credit-score.dissipation-factor" );
-			
+
 			if ( debugLevel >= 3 ) logInfo( "Loaded dissipation factor." );
-			
+
 		}
 
 		if ( getConfig().contains( "economy.currency.fractional-digits" ) ) {
-			
+
 			decimals = getConfig()
 					.getInt( "economy.currency.fractional-digits" );
-			
+
 			if ( debugLevel >= 3 ) logInfo( "Loaded currency digits." );
-			
+
 		}
 
 		String financialEntityTable = "CREATE TABLE FinancialEntities"
@@ -585,24 +679,24 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 		} catch ( SQLException e ) {
-			
+
 			if ( debugLevel >= 2 ) logFail( e.getMessage() );
 			success = false;
-			
+
 		} finally {
-			
+
 			if ( statement != null ) {
 				statement.close();
 			}
-			
+
 		}
 
 		if ( !success ) {
-			
+
 			logFail( "Unable to build database tables! Disabling..." );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
-			
+
 		}
 
 		if ( success && debugLevel >= 1 )
@@ -624,7 +718,7 @@ public final class SerenityLoans extends JavaPlugin {
 				centralBankScore );
 
 		if ( debugLevel >= 1 ) {
-			
+
 			if ( cbResult )
 				logInfo( "Central bank entry added." );
 			else
@@ -635,7 +729,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * A convenience method to statically get a reference to the most recently enabled instance of this plugin.
+	 * A convenience method to statically get a reference to the most recently
+	 * enabled instance of this plugin.
 	 * 
 	 * @return plugin Most recently enabled instance of SerenityLoans
 	 */
@@ -791,10 +886,10 @@ public final class SerenityLoans extends JavaPlugin {
 					"scheduleMessage(CommandSender, String)",
 					SerenityLoans.debugLevel >= 4 ? "Thread: "
 							+ Thread.currentThread().getId() : "" ) );
-		
+
 		getServer().getScheduler().scheduleSyncDelayedTask( plugin,
 				plugin.new MessageSender( sender, new String[] { message } ) );
-		
+
 		if ( debugLevel >= 4 )
 			logInfo( String.format( "Leaving %s method. Thread: %d.",
 					"scheduleMessage(CommandSender, String)", Thread
