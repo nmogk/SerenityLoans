@@ -275,21 +275,6 @@ public final class SerenityLoans extends JavaPlugin {
 	}
 
 
-	// private boolean setupChat() {
-	// RegisteredServiceProvider<Chat> rsp =
-	// getServer().getServicesManager().getRegistration(Chat.class);
-	// chat = rsp.getProvider();
-	// return chat != null;
-	// }
-
-	// private boolean setupPermissions() {
-	// RegisteredServiceProvider<Permission> rsp =
-	// getServer().getServicesManager().getRegistration(Permission.class);
-	// perms = rsp.getProvider();
-	// return perms != null;
-	// }
-
-
 	/*
 	 * This method determines if the database is the most up-to-date version. It
 	 * compares the version of the database listed in the Info table against the
