@@ -1,3 +1,4 @@
+//@formatter:off
 /**
  * ========================================================================
  *                               DESCRIPTION
@@ -42,6 +43,7 @@
  * 
  * 
  */
+//@formatter:on
 
 package com.nwmogk.bukkit.loans;
 
@@ -70,192 +72,208 @@ import com.nwmogk.bukkit.loans.object.PaymentStatement;
 
 // TODO make thread safe + comments
 public class LoanManager {
-	
+
 	/*
 	 * This enum defines all of the event types for the loan model
 	 */
 	private enum LoanEventType {
 		COMPOUND, INTERESTACCRUAL, SERVICEFEE, LATEFEE, PAYMENTDUE, PAYMENTMADE, STATEMENTOUT, OPEN, CLOSE, EXTRAPRINCIPALPAID, EXTRAINTERESTPAID, EXTRAFEESPAID;
-		
-		public static LoanEventType getFromString(String type){
-		
-			if(type.equalsIgnoreCase("CompoundInterest"))
-				return COMPOUND;
 
-			if(type.equalsIgnoreCase("Close"))
-				return CLOSE;
+		public static LoanEventType getFromString( String type ) {
 
-			if(type.equalsIgnoreCase("ExtraFeesPaid"))
+			if ( type.equalsIgnoreCase( "CompoundInterest" ) ) return COMPOUND;
+
+			if ( type.equalsIgnoreCase( "Close" ) ) return CLOSE;
+
+			if ( type.equalsIgnoreCase( "ExtraFeesPaid" ) )
 				return EXTRAFEESPAID;
-	
-			if(type.equalsIgnoreCase("ExtraInterestPaid"))
+
+			if ( type.equalsIgnoreCase( "ExtraInterestPaid" ) )
 				return EXTRAINTERESTPAID;
-	
-			if(type.equalsIgnoreCase("ExtraPrincipalPaid"))
+
+			if ( type.equalsIgnoreCase( "ExtraPrincipalPaid" ) )
 				return EXTRAPRINCIPALPAID;
-		
-			if(type.equalsIgnoreCase("AccrueInterest"))
+
+			if ( type.equalsIgnoreCase( "AccrueInterest" ) )
 				return INTERESTACCRUAL;
-	
-			if(type.equalsIgnoreCase("LateFee"))
-				return LATEFEE;
-		
-			if(type.equalsIgnoreCase("Open"))
-				return OPEN;
-	
-			if(type.equalsIgnoreCase("PaymentDue"))
-				return PAYMENTDUE;
-		
-			if(type.equalsIgnoreCase("PaymentMade"))
-				return PAYMENTMADE;
-		
-			if(type.equalsIgnoreCase("ServiceFee"))
-				return SERVICEFEE;
-		
-			if(type.equalsIgnoreCase("StatementOut"))
-				return STATEMENTOUT;
+
+			if ( type.equalsIgnoreCase( "LateFee" ) ) return LATEFEE;
+
+			if ( type.equalsIgnoreCase( "Open" ) ) return OPEN;
+
+			if ( type.equalsIgnoreCase( "PaymentDue" ) ) return PAYMENTDUE;
+
+			if ( type.equalsIgnoreCase( "PaymentMade" ) ) return PAYMENTMADE;
+
+			if ( type.equalsIgnoreCase( "ServiceFee" ) ) return SERVICEFEE;
+
+			if ( type.equalsIgnoreCase( "StatementOut" ) ) return STATEMENTOUT;
 
 			return null;
 		}
-		
-		public String toString(){
-			switch(this){
-			case COMPOUND:
-				return "CompoundInterest";
-			case CLOSE:
-				return "Close";
-			case EXTRAFEESPAID:
-				return "ExtraFeesPaid";
-			case EXTRAINTERESTPAID:
-				return "ExtraInterestPaid";
-			case EXTRAPRINCIPALPAID:
-				return "ExtraPrincipalPaid";
-			case INTERESTACCRUAL:
-				return "AccrueInterest";
-			case LATEFEE:
-				return "LateFee";
-			case OPEN:
-				return "Open";
-			case PAYMENTDUE:
-				return "PaymentDue";
-			case PAYMENTMADE:
-				return "PaymentMade";
-			case SERVICEFEE:
-				return "ServiceFee";
-			case STATEMENTOUT:
-				return "StatementOut";
-			default:
-				return "";
-			
-			
+
+
+		public String toString() {
+
+			switch ( this ) {
+				case COMPOUND:
+					return "CompoundInterest";
+				case CLOSE:
+					return "Close";
+				case EXTRAFEESPAID:
+					return "ExtraFeesPaid";
+				case EXTRAINTERESTPAID:
+					return "ExtraInterestPaid";
+				case EXTRAPRINCIPALPAID:
+					return "ExtraPrincipalPaid";
+				case INTERESTACCRUAL:
+					return "AccrueInterest";
+				case LATEFEE:
+					return "LateFee";
+				case OPEN:
+					return "Open";
+				case PAYMENTDUE:
+					return "PaymentDue";
+				case PAYMENTMADE:
+					return "PaymentMade";
+				case SERVICEFEE:
+					return "ServiceFee";
+				case STATEMENTOUT:
+					return "StatementOut";
+				default:
+					return "";
+
+
 			}
 		}
 	};
-	
+
 	/*
-	 * This class defines an event in the loan model. These events are used to construct the balance of the
-	 * loan and determine when events should happen, e.g. interest being accrued, a late fee being assessed.
+	 * This class defines an event in the loan model. These events are used to
+	 * construct the balance of the loan and determine when events should
+	 * happen, e.g. interest being accrued, a late fee being assessed.
 	 * 
-	 * The entire loan should be reconstructable from all of the events. The LoanEvent class is Comparable
-	 * by date of event.
+	 * The entire loan should be reconstructable from all of the events. The
+	 * LoanEvent class is Comparable by date of event.
 	 */
-	private class LoanEvent implements Comparable<LoanEvent>{
-		
-		public Timestamp time;
-		public LoanEventType action;
-		public int loan;
-		public double amount;
-		public int loanEventID;
-		
-		public LoanEvent(Timestamp t, LoanEventType a, double amt, int loanID, int loanEventID ){
+	private class LoanEvent implements Comparable<LoanEvent> {
+
+		public Timestamp		time;
+		public LoanEventType	action;
+		public int				loan;
+		public double			amount;
+		public int				loanEventID;
+
+
+		public LoanEvent( Timestamp t, LoanEventType a, double amt, int loanID,
+				int loanEventID ) {
+
 			time = t;
 			action = a;
 			amount = amt;
 			loan = loanID;
 			this.loanEventID = loanEventID;
 		}
-		
-		public LoanEvent(Timestamp t, LoanEventType a, double amt, int loanID ){
-			this(t, a, amt, loanID, 0);
+
+
+		public LoanEvent( Timestamp t, LoanEventType a, double amt, int loanID ) {
+
+			this( t, a, amt, loanID, 0 );
 		}
-		
+
+
 		/**
-		 * This method causes LoanEvents to be sorted by date, oldest first, then by LoanEventType
+		 * This method causes LoanEvents to be sorted by date, oldest first,
+		 * then by LoanEventType
 		 */
-		public int compareTo(LoanEvent other) {
+		public int compareTo( LoanEvent other ) {
+
 			if ( time.getTime() == other.time.getTime() )
 				return other.action.ordinal() - action.ordinal();
-			
-			return (int)(time.getTime() - other.time.getTime());
+
+			return (int) ( time.getTime() - other.time.getTime() );
 		}
 
 	}
-	
-	private SerenityLoans plugin;
-	private String prfx;
-	
+
+	private SerenityLoans	plugin;
+	private String			prfx;
+
 	// Objects for locking access to the database tables.
-	private Object loanTableLock = new Object();
-	private Object loanEventTableLock = new Object();
-	private Object paymentStatementTableLock = new Object();
-	
-	public LoanManager(SerenityLoans plugin){
+	private Object			loanTableLock				= new Object();
+	private Object			loanEventTableLock			= new Object();
+	private Object			paymentStatementTableLock	= new Object();
+
+
+	public LoanManager( SerenityLoans plugin ) {
+
 		this.plugin = plugin;
 		prfx = Conf.getMessageString();
 	}
 
+
 	/**
 	 * This method runs when payments are made and applies all of the payments
-	 * made to the outstanding balances. It attempts to first find an outstanding
-	 * payment statement on the loan and will apply payments according to the 
-	 * statement first with extra funds being devoted to the loan principal.
+	 * made to the outstanding balances. It attempts to first find an
+	 * outstanding payment statement on the loan and will apply payments
+	 * according to the statement first with extra funds being devoted to the
+	 * loan principal.
 	 * 
 	 * After the payment has been applied, then this method records the relevant
 	 * event in the credit history of the borrower. This method will attempt to
-	 * refund the borrower if the amount of payment is more than the loan balance.
+	 * refund the borrower if the amount of payment is more than the loan
+	 * balance.
 	 * 
 	 * @param theLoan
 	 * @param amount
 	 * @return the amount leftover after applying the payment. Should always be
-	 * zero because of the refund behavior.
+	 *         zero because of the refund behavior.
+	 * @throws SQLException
 	 */
-	public double applyPayment(Loan theLoan, double amount) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "applyPayment(Loan, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
+	public double applyPayment( Loan theLoan, double amount )
+			throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"applyPayment(Loan, double)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
 		// Find the payment statement that is applicable
-		PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
-		
-		// If there is a payment statement, apply payment according to the statement,
+		PaymentStatement ps = getPaymentStatement( theLoan.getLoanID() );
+
+		// If there is a payment statement, apply payment according to the
+		// statement,
 		// otherwise, apply it to the loan itself.
 		double runningTotal = amount;
-		double feeBalance = ps == null? theLoan.getFeesOutstanding() : ps.getFeesRemaining();
-		double interestBalance =  ps == null? theLoan.getInterestBalance() : ps.getInterestRemaining();
-		double balance = ps == null? theLoan.getBalance() : ps.getFeesRemaining();
-		
+		double feeBalance = ps == null ? theLoan.getFeesOutstanding() : ps
+				.getFeesRemaining();
+		double interestBalance = ps == null ? theLoan.getInterestBalance() : ps
+				.getInterestRemaining();
+		double balance = ps == null ? theLoan.getBalance() : ps
+				.getFeesRemaining();
+
 		// Pay fees first
-		if(runningTotal >= feeBalance){
+		if ( runningTotal >= feeBalance ) {
 			runningTotal -= feeBalance;
 			feeBalance = theLoan.getFeesOutstanding() - feeBalance;
-		}
-		else{
+		} else {
 			feeBalance -= runningTotal;
 			runningTotal = 0;
 		}
-		
+
 		// Pay interest next
-		if(runningTotal >= interestBalance){
+		if ( runningTotal >= interestBalance ) {
 			runningTotal -= interestBalance;
 			interestBalance = theLoan.getInterestBalance() - interestBalance;
-		}
-		else {
+		} else {
 			interestBalance -= runningTotal;
 			runningTotal = 0;
 		}
-		
+
 		// Pay principal last
-		if(runningTotal > 0){
-			if(balance <= runningTotal){
+		if ( runningTotal > 0 ) {
+			if ( balance <= runningTotal ) {
 				runningTotal -= balance;
 				balance = theLoan.getBalance() - balance;
 			} else {
@@ -263,10 +281,10 @@ public class LoanManager {
 				runningTotal = 0;
 			}
 		}
-		
+
 		// Apply additional payment as extra principal if possible.
-		if (runningTotal > 0 && balance > 0){
-			if(balance <= runningTotal){
+		if ( runningTotal > 0 && balance > 0 ) {
+			if ( balance <= runningTotal ) {
 				runningTotal -= balance;
 				balance = 0;
 			} else {
@@ -274,69 +292,89 @@ public class LoanManager {
 				runningTotal = 0;
 			}
 		}
-		
+
 		// Refund the borrower if the payment is too much.
-		if(balance <= 0 && runningTotal > 0){
+		if ( balance <= 0 && runningTotal > 0 ) {
 			runningTotal -= balance;
 			balance = 0;
-			plugin.econ.deposit(theLoan.getBorrower(), runningTotal);
-			plugin.econ.withdraw(theLoan.getLender(), runningTotal);
+			plugin.econ.deposit( theLoan.getBorrower(), runningTotal );
+			plugin.econ.withdraw( theLoan.getLender(), runningTotal );
 		}
-		
-		
-		String updateSQL = String.format("UPDATE Loans SET Balance=%f, InterestBalance=%f, FeeBalance=%f WHERE LoanID=%d;", balance, interestBalance, feeBalance, theLoan.getLoanID() );
-		
+
+
+		String updateSQL = String
+				.format(
+						"UPDATE Loans SET Balance=%f, InterestBalance=%f, FeeBalance=%f WHERE LoanID=%d;",
+						balance, interestBalance, feeBalance,
+						theLoan.getLoanID() );
+
+		Statement stmt = null;
+
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
+			stmt = plugin.conn.createStatement();
+
 			// Set new loan balances
-			synchronized(loanTableLock){
-				stmt.executeUpdate(updateSQL);
+			synchronized ( loanTableLock ) {
+				stmt.executeUpdate( updateSQL );
 			}
-			
-			if(balance == 0)
-				closeLoan(theLoan.getLoanID());
-			
-			if(ps != null){
-			
+
+			if ( balance == 0 ) closeLoan( theLoan.getLoanID() );
+
+			if ( ps != null ) {
+
 				// Register payment in the paymentStatement
-				String updateBill = String.format("UPDATE PaymentStatements SET BillAmountPaid=%f WHERE StatementID=%d;", ps.getActualPaid() + amount - runningTotal, ps.getStatementID());
-				synchronized(paymentStatementTableLock){
-					stmt.executeUpdate(updateBill);
+				String updateBill = String
+						.format(
+								"UPDATE PaymentStatements SET BillAmountPaid=%f WHERE StatementID=%d;",
+								ps.getActualPaid() + amount - runningTotal,
+								ps.getStatementID() );
+				synchronized ( paymentStatementTableLock ) {
+					stmt.executeUpdate( updateBill );
 				}
-				
-				ps = getPaymentStatement(theLoan.getLoanID());
-				
+
+				ps = getPaymentStatement( theLoan.getLoanID() );
+
 				// Register credit history event
-				plugin.historyManager.recordPayment(ps);
+				plugin.historyManager.recordPayment( ps );
 			} else {
 				// Treat as an overpayment
-				plugin.historyManager.recordPayment(amount - runningTotal, theLoan);
+				plugin.historyManager.recordPayment( amount - runningTotal,
+						theLoan );
 			}
-			
-			
-			stmt.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+
+			// Record the action in the LoanEvents table.
+			addLoanEvent(
+					new LoanEvent( new Timestamp( new Date().getTime() ),
+							LoanEventType.PAYMENTMADE, amount - runningTotal,
+							theLoan.getLoanID() ), true );
+
+			if ( balance == 0 ) {
+				addLoanEvent(
+						new LoanEvent( new Timestamp( new Date().getTime() ),
+								LoanEventType.CLOSE, theLoan.getValue(),
+								theLoan.getLoanID() ), true );
+				closeLoan( theLoan.getLoanID() );
+			}
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
-		
-		// Record the action in the LoanEvents table.
-		addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.PAYMENTMADE, amount - runningTotal, theLoan.getLoanID()), true);
-		
-		if(balance == 0){
-			addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.CLOSE, theLoan.getValue(), theLoan.getLoanID()), true);
-			closeLoan(theLoan.getLoanID());
-		}
-			
+
 		return runningTotal;
-		
+
 	}
 
+
 	/**
-	 * Creates a new loan from the given termsID and value with the lender and borrower.
-	 * Will build the table of LoanEvents after opening the loan. Returns the call
-	 * success. Assumes that the caller has input the correct value and terms ID.
+	 * Creates a new loan from the given termsID and value with the lender and
+	 * borrower. Will build the table of LoanEvents after opening the loan.
+	 * Returns the call success. Assumes that the caller has input the correct
+	 * value and terms ID.
 	 * 
 	 * @param lenderID
 	 * @param borrowerID
@@ -344,290 +382,340 @@ public class LoanManager {
 	 * @param value
 	 * @return
 	 */
-	public boolean createLoan(UUID lenderID, UUID borrowerID, int termsID, double value){
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "createLoan(UUID, UUID, int, double)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		String insertLoan = String.format("INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES ('%s', '%s', %d, %f, ?, ?);", lenderID.toString(), borrowerID.toString(), termsID, value );
-		String whatsNew = String.format("SELECT LoanID FROM Loans WHERE Terms=%d;", termsID);
-		
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(insertLoan);
-		
-		
+	public boolean createLoan( UUID lenderID, UUID borrowerID, int termsID,
+			double value ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"createLoan(UUID, UUID, int, double)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String insertLoan = String
+				.format(
+						"INSERT INTO Loans(LenderID, BorrowerID, Terms, Balance, StartDate, LastUpdate) VALUES ('%s', '%s', %d, %f, ?, ?);",
+						lenderID.toString(), borrowerID.toString(), termsID,
+						value );
+		String whatsNew = String.format(
+				"SELECT LoanID FROM Loans WHERE Terms=%d;", termsID );
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( insertLoan );
+
+
 		boolean exitFlag = true;
 		int loanID = 0;
-		
+
 		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(insertLoan);
-			
-			stmt.setTimestamp(1, new Timestamp(new Date().getTime()));
-			stmt.setTimestamp(2, new Timestamp(new Date().getTime()));
-			
-			synchronized(loanTableLock){
-				if(stmt.executeUpdate() != 1)
-					return false;
+			PreparedStatement stmt = plugin.conn.prepareStatement( insertLoan );
+
+			stmt.setTimestamp( 1, new Timestamp( new Date().getTime() ) );
+			stmt.setTimestamp( 2, new Timestamp( new Date().getTime() ) );
+
+			synchronized ( loanTableLock ) {
+				if ( stmt.executeUpdate() != 1 ) return false;
 			}
-			
-			plugin.offerManager.removeOffer(lenderID, borrowerID, false);
-			
-			
+
+			plugin.offerManager.removeOffer( lenderID, borrowerID, false );
+
+
 			Statement search = plugin.conn.createStatement();
-			
-			synchronized(loanTableLock){
-				ResultSet loanResult = search.executeQuery(whatsNew);
-			
+
+			synchronized ( loanTableLock ) {
+				ResultSet loanResult = search.executeQuery( whatsNew );
+
 				loanResult.next();
-			
-				loanID = loanResult.getInt(1);
+
+				loanID = loanResult.getInt( 1 );
 			}
-			
+
 			stmt.close();
 			search.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
 			return false;
 		}
-		
-		buildLoanEvents(loanID);
-		
+
+		buildLoanEvents( loanID );
+
 		return exitFlag;
 	}
 
+
 	/**
-	 * Returns a Loan object from the given loanID. 
+	 * Returns a Loan object from the given loanID.
 	 * 
 	 * @param loanID
 	 * @return
 	 */
-	public Loan getLoan(int loanID){
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoan(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-			
-		String querySQL = String.format("SELECT * FROM Loans WHERE LoanID=%d;", loanID);
-		
+	public Loan getLoan( int loanID ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"getLoan(int)", SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String querySQL = String.format(
+				"SELECT * FROM Loans WHERE LoanID=%d;", loanID );
+
 		try {
 			Statement stmt = plugin.conn.createStatement();
-			
+
 			ResultSet rs = null;
-			
-			synchronized(loanTableLock){
-				rs  = stmt.executeQuery(querySQL);
+
+			synchronized ( loanTableLock ) {
+				rs = stmt.executeQuery( querySQL );
 			}
-			
-			if(!rs.next()){
+
+			if ( !rs.next() ) {
 				stmt.close();
 				return null;
 			}
-			
-			int termsID = rs.getInt("Terms");
-			double balance = rs.getDouble("Balance");
-			double interestBal = rs.getDouble("InterestBalance");
-			double feeBal = rs.getDouble("FeeBalance");
-			Timestamp start = rs.getTimestamp("StartDate");
-			Timestamp last = rs.getTimestamp("LastUpdate");
-			FinancialEntity lender = plugin.playerManager.getFinancialEntity(UUID.fromString(rs.getString("LenderID")));
-			FinancialEntity borrower = plugin.playerManager.getFinancialEntity(UUID.fromString(rs.getString("BorrowerID")));
-			
-			
-			ImmutableOffer offer = plugin.offerManager.getPreparedOffer(termsID, lender, borrower);
-	
-			Loan theLoan = new Loan(loanID, balance, interestBal, feeBal, offer, start, last, termsID);
-			
+
+			int termsID = rs.getInt( "Terms" );
+			double balance = rs.getDouble( "Balance" );
+			double interestBal = rs.getDouble( "InterestBalance" );
+			double feeBal = rs.getDouble( "FeeBalance" );
+			Timestamp start = rs.getTimestamp( "StartDate" );
+			Timestamp last = rs.getTimestamp( "LastUpdate" );
+			FinancialEntity lender = plugin.playerManager
+					.getFinancialEntity( UUID.fromString( rs
+							.getString( "LenderID" ) ) );
+			FinancialEntity borrower = plugin.playerManager
+					.getFinancialEntity( UUID.fromString( rs
+							.getString( "BorrowerID" ) ) );
+
+
+			ImmutableOffer offer = plugin.offerManager.getPreparedOffer(
+					termsID, lender, borrower );
+
+			Loan theLoan = new Loan( loanID, balance, interestBal, feeBal,
+					offer, start, last, termsID );
+
 			stmt.close();
-			
+
 			return theLoan;
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
 
+
 	/**
-	 * Returns an array of all of the loans held between the lender and borrower.
-	 * Can't return null. Will return an empty array if there are no results found.
+	 * Returns an array of all of the loans held between the lender and
+	 * borrower. Can't return null. Will return an empty array if there are no
+	 * results found.
 	 * 
 	 * @param lender
 	 * @param borrower
 	 * @return
 	 */
-	public Loan[] getLoan(FinancialEntity lender, FinancialEntity borrower) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoan(FinancialEntity, FinancialEntity)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		Loan[] result = new Loan[]{};
+	public Loan[] getLoan( FinancialEntity lender, FinancialEntity borrower ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"getLoan(FinancialEntity, FinancialEntity)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan[] result = new Loan[] {};
 		Vector<Loan> loansFound = new Vector<Loan>();
-		
+
 		String querySQL = "SELECT LoanID FROM Loans WHERE LenderID=? AND BorrowerID=? ORDER BY LoanID;";
-		
+
 		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(querySQL);
-			
-			stmt.setString(1, lender.getUserID().toString());
-			stmt.setString(2, borrower.getUserID().toString());
-			
+			PreparedStatement stmt = plugin.conn.prepareStatement( querySQL );
+
+			stmt.setString( 1, lender.getUserID().toString() );
+			stmt.setString( 2, borrower.getUserID().toString() );
+
 			ResultSet rs = null;
-			
-			synchronized(loanTableLock){
-				rs = stmt.executeQuery(querySQL);
+
+			synchronized ( loanTableLock ) {
+				rs = stmt.executeQuery( querySQL );
 			}
-			
-			while(rs.next()){
-				Loan oneLoan = getLoan(rs.getInt("LoanID"));
-					
-				if(oneLoan != null)
-					loansFound.add(oneLoan);
+
+			while ( rs.next() ) {
+				Loan oneLoan = getLoan( rs.getInt( "LoanID" ) );
+
+				if ( oneLoan != null ) loansFound.add( oneLoan );
 			}
-			
+
 			stmt.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
 		}
-		
-		if(loansFound.size() > 0)
-			result = loansFound.toArray(result);
-		
+
+		if ( loansFound.size() > 0 ) result = loansFound.toArray( result );
+
 		return result;
 	}
-	
+
+
 	/**
-	 * Returns the list of loans that the entity is party to. The
-	 * boolean parameter determines weather or not to check the
-	 * lender or borrower columns.
+	 * Returns the list of loans that the entity is party to. The boolean
+	 * parameter determines weather or not to check the lender or borrower
+	 * columns.
 	 * 
 	 * @param entity
 	 * @param isBorrower
 	 * @return
 	 */
-	public List<Loan> getLoans(FinancialEntity entity, boolean isBorrower){
-		
-		String query = String.format("SELECT LoanID from Loans WHERE %s='%s';", isBorrower? "BorrowerID" : "LenderID", entity.getUserID().toString());
+	public List<Loan> getLoans( FinancialEntity entity, boolean isBorrower ) {
+
+		String query = String.format(
+				"SELECT LoanID from Loans WHERE %s='%s';",
+				isBorrower ? "BorrowerID" : "LenderID", entity.getUserID()
+						.toString() );
 		List<Loan> results = new LinkedList<Loan>();
-		
+
 		try {
 			Statement stmt = plugin.conn.createStatement();
-			
-			ResultSet rs = stmt.executeQuery(query);
-			
-			while(rs.next()){
-				int loanId = rs.getInt(1);
-				
-				Loan potential = getLoan(loanId);
-				
-				if(potential != null)
-					results.add(potential);
+
+			ResultSet rs = stmt.executeQuery( query );
+
+			while ( rs.next() ) {
+				int loanId = rs.getInt( 1 );
+
+				Loan potential = getLoan( loanId );
+
+				if ( potential != null ) results.add( potential );
 			}
-			
+
 			stmt.close();
-		} catch (SQLException e) {
-			SerenityLoans.logFail(e.getMessage());
+		} catch ( SQLException e ) {
+			SerenityLoans.logFail( e.getMessage() );
 			e.printStackTrace();
 		}
-		
-		
+
+
 		return results;
-		
+
 	}
-	
+
+
 	/**
-	 * Returns a list of PaymentStatements which have outstanding balances due for the
-	 * given borrower. Returns null if no statements could be found.
+	 * Returns a list of PaymentStatements which have outstanding balances due
+	 * for the given borrower. Returns null if no statements could be found.
 	 * 
 	 * @param borrowerId
 	 * @return
 	 */
-	public List<PaymentStatement> getOutstandingStatements(UUID borrowerId){
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getLoansWithOutstandingStatements(UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		String betterQuery = String.format("SELECT DISTINCT PaymentStatements.LoanID FROM PaymentStatements JOIN Loans ON PaymentStatements.LoanID=Loans.LoanID WHERE Loans.BorrowerID='%s';", borrowerId.toString());
-		
+	public List<PaymentStatement> getOutstandingStatements( UUID borrowerId ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"getLoansWithOutstandingStatements(UUID)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String betterQuery = String
+				.format(
+						"SELECT DISTINCT PaymentStatements.LoanID FROM PaymentStatements JOIN Loans ON PaymentStatements.LoanID=Loans.LoanID WHERE Loans.BorrowerID='%s';",
+						borrowerId.toString() );
+
 		LinkedList<PaymentStatement> result = new LinkedList<PaymentStatement>();
-		
+
 		Statement paymentStatements;
 		try {
 			paymentStatements = plugin.conn.createStatement();
-			
+
 			ResultSet loansWithStatements = null;
-			
-			synchronized(paymentStatementTableLock){
-				loansWithStatements = paymentStatements.executeQuery(betterQuery);
+
+			synchronized ( paymentStatementTableLock ) {
+				loansWithStatements = paymentStatements
+						.executeQuery( betterQuery );
 			}
-			
-			while(loansWithStatements.next()){
-			
-				int loanId = loansWithStatements.getInt(1);
-				
-				PaymentStatement potential = getPaymentStatement(loanId);
-				
+
+			while ( loansWithStatements.next() ) {
+
+				int loanId = loansWithStatements.getInt( 1 );
+
+				PaymentStatement potential = getPaymentStatement( loanId );
+
 				// Ensure that the statements are outstanding.
-				if(potential.getPaymentRemaining() > 0)
-					result.add(potential);
+				if ( potential.getPaymentRemaining() > 0 )
+					result.add( potential );
 			}
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
 		}
-		
-		if (result.size() == 0)
-				return null;
+
+		if ( result.size() == 0 ) return null;
 		return result;
-		
-		
+
+
 	}
 
+
 	/**
-	 * Returns the payment statement associated with the given loan or null
-	 * if none exists. A loan may have many payment statements, so this method
+	 * Returns the payment statement associated with the given loan or null if
+	 * none exists. A loan may have many payment statements, so this method
 	 * returns only the most recent one, which contains all of the outstanding
 	 * charges up to that point.
 	 * 
 	 * @param loanID
 	 * @return
 	 */
-	public PaymentStatement getPaymentStatement(int loanID) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "getPaymentStatement(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		String selectSQL = String.format("SELECT * FROM PaymentStatements WHERE LoanID=%d ORDER BY StatementDate DESC;", loanID);
-		
+	public PaymentStatement getPaymentStatement( int loanID ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"getPaymentStatement(int)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String selectSQL = String
+				.format(
+						"SELECT * FROM PaymentStatements WHERE LoanID=%d ORDER BY StatementDate DESC;",
+						loanID );
+
 		try {
 			Statement stmt = plugin.conn.createStatement();
-			
+
 			ResultSet rs = null;
-			
-			synchronized(paymentStatementTableLock){
-				rs = stmt.executeQuery(selectSQL);
+
+			synchronized ( paymentStatementTableLock ) {
+				rs = stmt.executeQuery( selectSQL );
 			}
-			
-			if(!rs.next())
-				return null;
-			
-			int statementID = rs.getInt("StatementID");
-			double minimum = rs.getDouble("Minimum");
-			Timestamp statementDate = rs.getTimestamp("StatementDate");
-			Timestamp dueDate = rs.getTimestamp("DueDate");
-			double amountPaid = rs.getDouble("BillAmountPaid");
-			double amountPrincipal = rs.getDouble("AmountPrincipal");
-			double amountInterest = rs.getDouble("AmountInterest");
-			double amountFees = rs.getDouble("AmountFees");
-			
+
+			if ( !rs.next() ) return null;
+
+			int statementID = rs.getInt( "StatementID" );
+			double minimum = rs.getDouble( "Minimum" );
+			Timestamp statementDate = rs.getTimestamp( "StatementDate" );
+			Timestamp dueDate = rs.getTimestamp( "DueDate" );
+			double amountPaid = rs.getDouble( "BillAmountPaid" );
+			double amountPrincipal = rs.getDouble( "AmountPrincipal" );
+			double amountInterest = rs.getDouble( "AmountInterest" );
+			double amountFees = rs.getDouble( "AmountFees" );
+
 			stmt.close();
-			
-			return new PaymentStatement(statementID, loanID, amountPrincipal, amountInterest, amountFees, minimum, statementDate, dueDate, amountPaid);
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+			return new PaymentStatement( statementID, loanID, amountPrincipal,
+					amountInterest, amountFees, minimum, statementDate,
+					dueDate, amountPaid );
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
+
 	/**
 	 * Sets the autopay of the given loan to the given boolean value.
 	 * 
@@ -635,613 +723,889 @@ public class LoanManager {
 	 * @param valueToSet
 	 * @return
 	 */
-	public boolean setAutoPay(int loanId, boolean valueToSet){
-		String updateSql = String.format("UPDATE Loans SET AutoPay='%s' WHERE LoanID=%d;", Boolean.toString(valueToSet), loanId);
-	
+	public boolean setAutoPay( int loanId, boolean valueToSet ) {
+
+		String updateSql = String.format(
+				"UPDATE Loans SET AutoPay='%s' WHERE LoanID=%d;",
+				Boolean.toString( valueToSet ), loanId );
+
 		try {
 			Statement stmt = plugin.conn.createStatement();
-			
+
 			int result;
-			
-			synchronized(loanTableLock){
-				result = stmt.executeUpdate(updateSql);
+
+			synchronized ( loanTableLock ) {
+				result = stmt.executeUpdate( updateSql );
 			}
-			
+
 			stmt.close();
-			
+
 			return result == 1;
-		} catch (SQLException e) {
-			SerenityLoans.logFail(e.getMessage());
+		} catch ( SQLException e ) {
+			SerenityLoans.logFail( e.getMessage() );
 			e.printStackTrace();
 		}
-		
+
 		return false;
 	}
-	
+
+
 	/**
 	 * Sets the lender for the given loan to the given lender.
 	 * 
 	 * @param loanId
 	 * @param newLenderId
 	 * @return
+	 * @throws SQLException 
 	 */
-	public boolean setLender(int loanId, UUID newLenderId){
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "setLender(int, UUID)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		String updateSQL = String.format("UPDATE Loans SET LenderID=? WHERE LoanID=%d;", loanId);
+	public boolean setLender( int loanId, UUID newLenderId ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"setLender(int, UUID)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String updateSQL = String.format(
+				"UPDATE Loans SET LenderID=? WHERE LoanID=%d;", loanId );
 		int result = -1;
+
+		PreparedStatement ps = null;
 		
 		try {
-			PreparedStatement ps = plugin.conn.prepareStatement(updateSQL);
-			
-			ps.setString(1, newLenderId.toString());
-			
-			synchronized(loanTableLock){
+			ps = plugin.conn.prepareStatement( updateSQL );
+
+			ps.setString( 1, newLenderId.toString() );
+
+			synchronized ( loanTableLock ) {
 				result = ps.executeUpdate();
 			}
-			
-			ps.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if(ps!=null) ps.close();
 		}
-		
+
 		return result == 1;
 	}
 
+
 	/**
-	 * This method causes Loan to check all of its scheduled events. If it finds a scheduled
-	 * event that requires action, it causes the loan to be updated with that action. It
-	 * assumes that the current time is the time that should be updated for.
+	 * This method causes Loan to check all of its scheduled events. If it finds
+	 * a scheduled event that requires action, it causes the loan to be updated
+	 * with that action. It assumes that the current time is the time that
+	 * should be updated for.
+	 * @throws SQLException 
 	 */
-	public void update(int loanID) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "update(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		Timestamp now = new Timestamp(new Date().getTime());
-		
-		String toDoQuery = String.format("SELECT * FROM LoanEvents WHERE LoanID=%d AND Executed='false' ORDER BY EventTime;", loanID);
-		
+	public void update( int loanID ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"update(int)", SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+		Timestamp now = new Timestamp( new Date().getTime() );
+
+		String toDoQuery = String
+				.format(
+						"SELECT * FROM LoanEvents WHERE LoanID=%d AND Executed='false' ORDER BY EventTime;",
+						loanID );
+
 		LinkedList<LoanEvent> checklist = new LinkedList<LoanEvent>();
+
+		Statement stmt = null;
+		ResultSet events = null;
 		
-		try{
-			Statement stmt = plugin.conn.createStatement();
-		
-			ResultSet events = null;
-			
-			synchronized(loanEventTableLock){
-				events = stmt.executeQuery(toDoQuery);
+		try {
+			stmt = plugin.conn.createStatement();
+
+			events = null;
+
+			synchronized ( loanEventTableLock ) {
+				events = stmt.executeQuery( toDoQuery );
 			}
-			
-			while(events.next()){
-				
-				Timestamp ts = events.getTimestamp("EventTime");
-				int loanEventID = events.getInt("LoanEventID");
-				String eventType = events.getString("EventType");
-				double amount = events.getDouble("Amount");
-				
-				checklist.add(new LoanEvent(ts, LoanEventType.getFromString(eventType), amount, loanID, loanEventID));
-				
+
+			while ( events.next() ) {
+
+				Timestamp ts = events.getTimestamp( "EventTime" );
+				int loanEventID = events.getInt( "LoanEventID" );
+				String eventType = events.getString( "EventType" );
+				double amount = events.getDouble( "Amount" );
+
+				checklist.add( new LoanEvent( ts, LoanEventType
+						.getFromString( eventType ), amount, loanID,
+						loanEventID ) );
+
 			}
-		
-		
-//		Collections.sort(checklist);
-		
-		ListIterator<LoanEvent> it = checklist.listIterator();
-		
-		while(it.hasNext()){
+
+
+			// Collections.sort(checklist);
+
+			ListIterator<LoanEvent> it = checklist.listIterator();
+
+			while ( it.hasNext() ) {
+
+				LoanEvent le = it.next();
+
+				if ( now.before( le.time ) ) break;
+
+				accrueInterest( loanID );
+
+				switch ( le.action ) {
+					case COMPOUND:
+						compoundInterest( le );
+						break;
+
+					case PAYMENTDUE:
+						attemptAutoPay( le );
+						break;
+
+					case LATEFEE:
+					case SERVICEFEE:
+						assessFee( le );
+						break;
+
+					case STATEMENTOUT:
+						sendOutStatement( le );
+						break;
+
+					default:
+						break;
+				}
+			}
+
+			// Update Last Updated Time
+			String updateTime = String.format(
+					"UPDATE Loans SET LastUpdate=NOW() WHERE LoanID=%d;",
+					loanID );
+
+			synchronized ( loanTableLock ) {
+				stmt.executeUpdate( updateTime );
+			}
+
 			
-			LoanEvent le = it.next();
-			
-			if(now.before(le.time))
-				break;
-			
-			accrueInterest(loanID);
-			
-			switch(le.action) {
-				case COMPOUND: 			
-					compoundInterest(le);
-					break;
-										
-				case PAYMENTDUE:		
-					attemptAutoPay(le);
-					break;
-					
-				case LATEFEE:
-				case SERVICEFEE:		
-					assessFee(le);		
-					break;
-					
-				case STATEMENTOUT:		
-					sendOutStatement(le);
-					break;
-							
-				default:
-					break;
-			}	
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
+			e.printStackTrace();
+		} catch ( InterruptedException | ExecutionException | TimeoutException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
+			e.printStackTrace();
+		} finally {
+			if (events != null) events.close();
+			if (stmt != null) stmt.close();
 		}
-		
-		// Update Last Updated Time
-			String updateTime = String.format("UPDATE Loans SET LastUpdate=NOW() WHERE LoanID=%d;", loanID);
-			
-			synchronized(loanTableLock){
-				stmt.executeUpdate(updateTime);
-			}
-			
-			stmt.close();
-		
-		} catch (SQLException e){
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		} catch (InterruptedException | ExecutionException | TimeoutException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
-			e.printStackTrace();
-		} 
 	}
+
 
 	/**
 	 * Runs the update logic on all of the open loans in the system.
+	 * @throws SQLException 
 	 */
-	public synchronized void updateAll() {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "updateAll()", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
+	public synchronized void updateAll() throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"updateAll()", SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
 		String query = "SELECT DISTINCT LoanID FROM Loans WHERE Open='true' ORDER BY LastUpdate ASC;";
 		LinkedList<Integer> allLoans = new LinkedList<Integer>();
+
+		Statement stmt = null;
+		ResultSet rs = null;
 		
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			ResultSet rs = null;
-			
-			synchronized(loanTableLock){
-				rs = stmt.executeQuery(query);
+			stmt = plugin.conn.createStatement();
+
+			rs = null;
+
+			synchronized ( loanTableLock ) {
+				rs = stmt.executeQuery( query );
 			}
-			
-			while(rs.next()){
-				allLoans.add(rs.getInt(1));
+
+			while ( rs.next() ) {
+				allLoans.add( rs.getInt( 1 ) );
 			}
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(e.getMessage());
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( e.getMessage() );
 			e.printStackTrace();
+		} finally {
+			if (rs != null) rs.close();
+			if (stmt != null) stmt.close();
 		}
-		
-		for(Integer loanID : allLoans){
-			
-			update(loanID);
-			
+
+		for ( Integer loanID : allLoans ) {
+
+			update( loanID );
+
 			try {
-				Thread.sleep((int)Math.floor(Math.random() * 200));
-			} catch (InterruptedException e) {
+				Thread.sleep( (int) Math.floor( Math.random() * 200 ) );
+			} catch ( InterruptedException e ) {
 				return;
 			}
-			
+
 		}
-		
+
 	}
 
-	
-	private void accrueInterest(int loanID) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "accrueInterest(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		Loan theLoan = getLoan(loanID);
-		
+
+	private void accrueInterest( int loanID ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"accrueInterest(int)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan theLoan = getLoan( loanID );
+
 		// Calculate time since last event
-		
-		String eventQuery = String.format("SELECT EventTime FROM LoanEvents WHERE LoanID=%d AND Executed='true' ORDER BY EventTime DESC;", theLoan.getLoanID());
+
+		String eventQuery = String
+				.format(
+						"SELECT EventTime FROM LoanEvents WHERE LoanID=%d AND Executed='true' ORDER BY EventTime DESC;",
+						theLoan.getLoanID() );
 		Timestamp lastTime = theLoan.getStartTime();
+
+		Statement stmt = null;
+		ResultSet eventsList = null;
 		
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			ResultSet eventsList = null;
-			synchronized(loanTableLock){
-				eventsList = stmt.executeQuery(eventQuery);
+			stmt = plugin.conn.createStatement();
+
+			synchronized ( loanTableLock ) {
+				eventsList = stmt.executeQuery( eventQuery );
 			}
-			
-			if(eventsList.next())
-				lastTime = eventsList.getTimestamp("EventTime");	
-			
-			double prorateFactor = ((double)((new Date().getTime()) - lastTime.getTime()))/((double) Conf.getIntReportingTime());
-			
-			
+
+			if ( eventsList.next() )
+				lastTime = eventsList.getTimestamp( "EventTime" );
+
+			double prorateFactor = ( (double) ( ( new Date().getTime() ) - lastTime
+					.getTime() ) ) / ( (double) Conf.getIntReportingTime() );
+
+
 			double interest;
-			
+
 			// Determine continuous or periodic
-			
-			
-			if(theLoan.getCompoundingPeriod() == 0){
-				double balance = theLoan.getBalance() * Math.exp(theLoan.getInterestRate() * prorateFactor);
+
+
+			if ( theLoan.getCompoundingPeriod() == 0 ) {
+				double balance = theLoan.getBalance()
+						* Math.exp( theLoan.getInterestRate() * prorateFactor );
 				interest = balance - theLoan.getBalance();
-				
-				String balanceUpdate = String.format("UPDATE Loan SET Balance=%f WHERE LoanID=%d;", balance, theLoan.getLoanID());
-				
+
+				String balanceUpdate = String.format(
+						"UPDATE Loan SET Balance=%f WHERE LoanID=%d;", balance,
+						theLoan.getLoanID() );
+
 				// Update balance directly
-				synchronized(loanTableLock){
-					stmt.executeUpdate(balanceUpdate);
+				synchronized ( loanTableLock ) {
+					stmt.executeUpdate( balanceUpdate );
 				}
 			} else {
-				interest = theLoan.getBalance() * theLoan.getInterestRate() * prorateFactor;
-				double newInterestBalance = interest + theLoan.getInterestBalance();
-				
-				String interestUpdate = String.format("UPDATE Loan SET InterestBalance=%f WHERE LoanID=%d;", newInterestBalance, theLoan.getLoanID());
-				
+				interest = theLoan.getBalance() * theLoan.getInterestRate()
+						* prorateFactor;
+				double newInterestBalance = interest
+						+ theLoan.getInterestBalance();
+
+				String interestUpdate = String.format(
+						"UPDATE Loan SET InterestBalance=%f WHERE LoanID=%d;",
+						newInterestBalance, theLoan.getLoanID() );
+
 				// Add to interest balance
-				synchronized(loanTableLock){
-					stmt.executeUpdate(interestUpdate);
+				synchronized ( loanTableLock ) {
+					stmt.executeUpdate( interestUpdate );
 				}
 			}
-			
+
 			// Add loanEvent
+
+			addLoanEvent(
+					new LoanEvent( new Timestamp( new Date().getTime() ),
+							LoanEventType.INTERESTACCRUAL, interest,
+							theLoan.getLoanID() ), true );
+
 			
-			addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.INTERESTACCRUAL, interest, theLoan.getLoanID()), true);
-			
-			stmt.close();
-		
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if (eventsList != null) eventsList.close();
+			if (stmt != null) stmt.close();
 		}
-		
+
 	}
-	
-	private void addLoanEvent(LoanEvent loanEvent, Boolean executed) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "addLoanEvent(LoanEvent, boolean)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-	
-		String insertSQL = String.format("INSERT INTO LoanEvents(LoanID, EventTime, EventType, Amount, Executed) VALUES (%d, ?, '%s', %f, '%s');", loanEvent.loan, loanEvent.action.toString(), loanEvent.amount, executed.toString());
-		
+
+
+	private void addLoanEvent( LoanEvent loanEvent, Boolean executed )
+			throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"addLoanEvent(LoanEvent, boolean)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+
+		String insertSQL = String
+				.format(
+						"INSERT INTO LoanEvents(LoanID, EventTime, EventType, Amount, Executed) VALUES (%d, ?, '%s', %f, '%s');",
+						loanEvent.loan, loanEvent.action.toString(),
+						loanEvent.amount, executed.toString() );
+
+		PreparedStatement stmt = null;
+
 		try {
-			PreparedStatement stmt = plugin.conn.prepareStatement(insertSQL);
-			
-			stmt.setTimestamp(1, loanEvent.time);
-			
-			synchronized(loanEventTableLock){
+			stmt = plugin.conn.prepareStatement( insertSQL );
+
+			stmt.setTimestamp( 1, loanEvent.time );
+
+			synchronized ( loanEventTableLock ) {
 				stmt.executeUpdate();
 			}
-			
-			stmt.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
-		
+
 	}
+
 
 	/*
 	 * This method handles assessing of fees. It determines the fee type from
-	 * the input argument and will dismiss a late fee if the minimum payment
-	 * has been made.
+	 * the input argument and will dismiss a late fee if the minimum payment has
+	 * been made.
 	 */
-	private void assessFee(LoanEvent le) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "assessFee(LoanEvent)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
+	private void assessFee( LoanEvent le ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"assessFee(LoanEvent)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Statement stmt = null;
+
 		try {
-			Statement stmt = plugin.conn.createStatement();
-		
-			Loan theLoan = getLoan(le.loan);
-		
-			String updateLE = String.format("UPDATE LoanEvents SET Executed='true' WHERE LoanEventID=%d;", le.loanEventID);
+			stmt = plugin.conn.createStatement();
+
+			Loan theLoan = getLoan( le.loan );
+
+			String updateLE = String
+					.format(
+							"UPDATE LoanEvents SET Executed='true' WHERE LoanEventID=%d;",
+							le.loanEventID );
 			double newFeeBalance = theLoan.getFeesOutstanding();
-			
-			if(le.action == LoanEventType.SERVICEFEE){
-			
+
+			if ( le.action == LoanEventType.SERVICEFEE ) {
+
 				newFeeBalance += le.amount;
-			
-				String updateFees = String.format("UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;", newFeeBalance, theLoan.getLoanID());
-				
-				
-				synchronized(loanTableLock){
-					stmt.executeUpdate(updateFees);
+
+				String updateFees = String.format(
+						"UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;",
+						newFeeBalance, theLoan.getLoanID() );
+
+
+				synchronized ( loanTableLock ) {
+					stmt.executeUpdate( updateFees );
 				}
 			} else {
-				
-				PaymentStatement ps = getPaymentStatement(theLoan.getLoanID());
-				
-				
-				if(ps.getActualPaid() < theLoan.getMinPayment()){
+
+				PaymentStatement ps = getPaymentStatement( theLoan.getLoanID() );
+
+
+				if ( ps.getActualPaid() < theLoan.getMinPayment() ) {
 					newFeeBalance += le.amount;
-					
-					String updateFees = String.format("UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;", newFeeBalance, theLoan.getLoanID());
-					
-					synchronized(loanTableLock){
-						stmt.executeUpdate(updateFees);
+
+					String updateFees = String.format(
+							"UPDATE Loans SET FeeBalance=%f WHERE LoanID=%d;",
+							newFeeBalance, theLoan.getLoanID() );
+
+					synchronized ( loanTableLock ) {
+						stmt.executeUpdate( updateFees );
 					}
-					
+
 				} else {
-					
-					updateLE = String.format("UPDATE LoanEvents SET Amount=0.0, Executed='true' WHERE LoanEventID=%d;", le.loanEventID);
-					
+
+					updateLE = String
+							.format(
+									"UPDATE LoanEvents SET Amount=0.0, Executed='true' WHERE LoanEventID=%d;",
+									le.loanEventID );
+
 				}
-				
+
 			}
-			
-	
-			synchronized(loanEventTableLock){
-				stmt.executeUpdate(updateLE);
+
+
+			synchronized ( loanEventTableLock ) {
+				stmt.executeUpdate( updateLE );
 			}
-			
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
 	}
 
-	private void attemptAutoPay(LoanEvent le) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "attemptAutoPay(LoanEvent)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		String allowedSQL = String.format("SELECT AutoPay FROM Loans WHERE LoanID=%d;", le.loan);
+
+	private void attemptAutoPay( LoanEvent le ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"attemptAutoPay(LoanEvent)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		String allowedSQL = String.format(
+				"SELECT AutoPay FROM Loans WHERE LoanID=%d;", le.loan );
 		boolean doAutoPay = false;
-		
+
+		Statement stmt = null;
+
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
+			stmt = plugin.conn.createStatement();
+
 			ResultSet rs = null;
-			
-			synchronized(loanTableLock){
-				rs = stmt.executeQuery(allowedSQL);
+
+			synchronized ( loanTableLock ) {
+				rs = stmt.executeQuery( allowedSQL );
 			}
-			
-			if(rs.next())
-				doAutoPay = Boolean.parseBoolean(rs.getString("AutoPay"));
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+			if ( rs.next() )
+				doAutoPay = Boolean.parseBoolean( rs.getString( "AutoPay" ) );
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
-		
-		if(!doAutoPay)
-			return;
-		
-		Loan theLoan = getLoan(le.loan);
-		PaymentStatement ps = getPaymentStatement(le.loan);
-		
+
+		if ( !doAutoPay ) return;
+
+		Loan theLoan = getLoan( le.loan );
+		PaymentStatement ps = getPaymentStatement( le.loan );
+
 		double paymentAmount = 0.0;
-		
-		double balance = plugin.econ.getBalance(theLoan.getBorrower()).balance;
-		
-		if(balance >= ps.getPaymentRemaining())
+
+		double balance = plugin.econ.getBalance( theLoan.getBorrower() ).balance;
+
+		if ( balance >= ps.getPaymentRemaining() )
 			paymentAmount = ps.getPaymentRemaining();
-		else if(balance >= ps.getMinimumPayment())
+		else if ( balance >= ps.getMinimumPayment() )
 			paymentAmount = ps.getMinimumPayment();
 		else
 			return;
-		
-		plugin.econ.withdraw(theLoan.getBorrower(), paymentAmount);
-		plugin.econ.deposit(theLoan.getLender(), paymentAmount);
-		
-		applyPayment(theLoan, paymentAmount);
-		
+
+		plugin.econ.withdraw( theLoan.getBorrower(), paymentAmount );
+		plugin.econ.deposit( theLoan.getLender(), paymentAmount );
+
+		applyPayment( theLoan, paymentAmount );
+
 	}
 
-	private void buildLoanEvents(int loanID) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "buildLoanEvents(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-			Loan theLoan = getLoan(loanID);
-			
-			if(theLoan == null){
-				if(SerenityLoans.debugLevel >= 2)
-					SerenityLoans.log.info(String.format("[%s] Loan not found when trying to populate events list.", plugin.getDescription().getName()));
-				return;
-			}
-			
-			addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.OPEN, theLoan.getValue(), theLoan.getLoanID()), true);
-			
-			double paymentAmount = calculatePaymentAmount(theLoan);
-			
-			//===================================Populate Events List=========================================
-			
-			// Calculate payment due dates, statement out dates, and latefee assessment times
-			long payFrequency = Math.max(theLoan.getPaymentFrequency(), theLoan.getPaymentTime() + theLoan.getGracePeriod());
-			
-			for(int i = 1; i * payFrequency <= theLoan.getTerm(); i += 1){
-				
-				Date actionTime = new Date( theLoan.getStartDate().getTime() + i * payFrequency);
-				Date feeTime = new Date(actionTime.getTime() + theLoan.getGracePeriod());
-				Date statementTime = new Date(actionTime.getTime() - theLoan.getPaymentTime());
-				
-				addLoanEvent(new LoanEvent(new Timestamp(actionTime.getTime()), LoanEventType.PAYMENTDUE, paymentAmount, theLoan.getLoanID()), false);
-				addLoanEvent(new LoanEvent(new Timestamp(feeTime.getTime()), LoanEventType.LATEFEE, theLoan.getLateFee(), theLoan.getLoanID()), false);
-				addLoanEvent(new LoanEvent(new Timestamp(statementTime.getTime()), LoanEventType.STATEMENTOUT, paymentAmount, theLoan.getLoanID()), false);
-				
-				// If the next iteration is strictly greater than the term, add an event for final payoff
-				if((i + 1) * payFrequency > theLoan.getTerm() && i * payFrequency != theLoan.getTerm()){
-					
-					Date actionTime2 = new Date(theLoan.getStartDate().getTime() + theLoan.getTerm());
-					Date feeTime2 = new Date(actionTime2.getTime() + theLoan.getGracePeriod());
-					Date statementTime2 = new Date(actionTime2.getTime() - theLoan.getPaymentTime());
-					
-					
-					addLoanEvent(new LoanEvent(new Timestamp(actionTime2.getTime()), LoanEventType.PAYMENTDUE, paymentAmount, theLoan.getLoanID()), false);
-					addLoanEvent(new LoanEvent(new Timestamp(feeTime2.getTime()), LoanEventType.LATEFEE, theLoan.getLateFee(), theLoan.getLoanID()), false);		
-					addLoanEvent(new LoanEvent(new Timestamp(statementTime2.getTime()), LoanEventType.STATEMENTOUT, paymentAmount, theLoan.getLoanID()), false);
-					
-				}
-						
-			}
-					
-				
-			// Calculate service fee times
-			for(int i = 0; i * theLoan.getServiceFeeFrequency() < theLoan.getTerm() && theLoan.getServiceFeeFrequency() != 0 && theLoan.getServiceFee() != 0; i += 1){
-				Date actionTime = new Date(theLoan.getStartDate().getTime() + i * theLoan.getServiceFeeFrequency());
-							
-				addLoanEvent(new LoanEvent(new Timestamp(actionTime.getTime()), LoanEventType.SERVICEFEE, theLoan.getServiceFee(), theLoan.getLoanID()), false);
-			}
-				
-			//Calculate interest accrual/compounding times
-			for(int i = 1; i * theLoan.getCompoundingPeriod() <= theLoan.getTerm() && theLoan.getCompoundingPeriod() != 0; i += 1){
-						
-				Date actionTime = new Date(theLoan.getStartDate().getTime() + i * theLoan.getCompoundingPeriod());
-				
-				addLoanEvent(new LoanEvent(new Timestamp(actionTime.getTime()), LoanEventType.COMPOUND, 0.0, theLoan.getLoanID()), false);
-	//			addLoanEvent(new LoanEvent(new Timestamp(actionTime.getTime() + 1l), LoanEventType.INTERESTACCRUAL, 0.0, theLoan.getLoanID()));
-						
-				if((i + 1) * theLoan.getCompoundingPeriod() > theLoan.getTerm() && i * theLoan.getCompoundingPeriod() != theLoan.getTerm()){
-							
-					Date actionTime2 = new Date(theLoan.getStartDate().getTime() + theLoan.getTerm());
-					
-					addLoanEvent(new LoanEvent(new Timestamp(actionTime2.getTime()), LoanEventType.COMPOUND, 0.0, theLoan.getLoanID()), false);
-	//				addLoanEvent(new LoanEvent(new Timestamp(actionTime2.getTime() + 1l), LoanEventType.INTERESTACCRUAL, 0.0, theLoan.getLoanID()));
-		
-				}					
-			}
-			
+
+	private void buildLoanEvents( int loanID ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"buildLoanEvents(int)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan theLoan = getLoan( loanID );
+
+		if ( theLoan == null ) {
+			if ( SerenityLoans.debugLevel >= 2 )
+				SerenityLoans.log
+						.info( String
+								.format(
+										"[%s] Loan not found when trying to populate events list.",
+										plugin.getDescription().getName() ) );
+			return;
 		}
+
+		try {
+			plugin.conn.setAutoCommit( false );
+
+			addLoanEvent(
+					new LoanEvent( new Timestamp( new Date().getTime() ),
+							LoanEventType.OPEN, theLoan.getValue(),
+							theLoan.getLoanID() ), true );
+
+			double paymentAmount = calculatePaymentAmount( theLoan );
+
+			// ===================================Populate Events
+			// List=========================================
+
+			// Calculate payment due dates, statement out dates, and latefee
+			// assessment times
+			long payFrequency = Math.max( theLoan.getPaymentFrequency(),
+					theLoan.getPaymentTime() + theLoan.getGracePeriod() );
+
+			for ( int i = 1; i * payFrequency <= theLoan.getTerm(); i += 1 ) {
+
+				Date actionTime = new Date( theLoan.getStartDate().getTime()
+						+ i * payFrequency );
+				Date feeTime = new Date( actionTime.getTime()
+						+ theLoan.getGracePeriod() );
+				Date statementTime = new Date( actionTime.getTime()
+						- theLoan.getPaymentTime() );
+
+				addLoanEvent(
+						new LoanEvent( new Timestamp( actionTime.getTime() ),
+								LoanEventType.PAYMENTDUE, paymentAmount,
+								theLoan.getLoanID() ), false );
+				addLoanEvent(
+						new LoanEvent( new Timestamp( feeTime.getTime() ),
+								LoanEventType.LATEFEE, theLoan.getLateFee(),
+								theLoan.getLoanID() ), false );
+				addLoanEvent(
+						new LoanEvent(
+								new Timestamp( statementTime.getTime() ),
+								LoanEventType.STATEMENTOUT, paymentAmount,
+								theLoan.getLoanID() ), false );
+
+				// If the next iteration is strictly greater than the term, add
+				// an
+				// event for final payoff
+				if ( ( i + 1 ) * payFrequency > theLoan.getTerm()
+						&& i * payFrequency != theLoan.getTerm() ) {
+
+					Date actionTime2 = new Date( theLoan.getStartDate()
+							.getTime() + theLoan.getTerm() );
+					Date feeTime2 = new Date( actionTime2.getTime()
+							+ theLoan.getGracePeriod() );
+					Date statementTime2 = new Date( actionTime2.getTime()
+							- theLoan.getPaymentTime() );
+
+
+					addLoanEvent(
+							new LoanEvent(
+									new Timestamp( actionTime2.getTime() ),
+									LoanEventType.PAYMENTDUE, paymentAmount,
+									theLoan.getLoanID() ), false );
+					addLoanEvent(
+							new LoanEvent( new Timestamp( feeTime2.getTime() ),
+									LoanEventType.LATEFEE,
+									theLoan.getLateFee(), theLoan.getLoanID() ),
+							false );
+					addLoanEvent(
+							new LoanEvent( new Timestamp(
+									statementTime2.getTime() ),
+									LoanEventType.STATEMENTOUT, paymentAmount,
+									theLoan.getLoanID() ), false );
+
+				}
+
+			}
+
+
+			// Calculate service fee times
+			for ( int i = 0; i * theLoan.getServiceFeeFrequency() < theLoan
+					.getTerm()
+					&& theLoan.getServiceFeeFrequency() != 0
+					&& theLoan.getServiceFee() != 0; i += 1 ) {
+				Date actionTime = new Date( theLoan.getStartDate().getTime()
+						+ i * theLoan.getServiceFeeFrequency() );
+
+				addLoanEvent(
+						new LoanEvent( new Timestamp( actionTime.getTime() ),
+								LoanEventType.SERVICEFEE,
+								theLoan.getServiceFee(), theLoan.getLoanID() ),
+						false );
+			}
+
+			// Calculate interest accrual/compounding times
+			for ( int i = 1; i * theLoan.getCompoundingPeriod() <= theLoan
+					.getTerm() && theLoan.getCompoundingPeriod() != 0; i += 1 ) {
+
+				Date actionTime = new Date( theLoan.getStartDate().getTime()
+						+ i * theLoan.getCompoundingPeriod() );
+
+				addLoanEvent(
+						new LoanEvent( new Timestamp( actionTime.getTime() ),
+								LoanEventType.COMPOUND, 0.0,
+								theLoan.getLoanID() ), false );
+				// addLoanEvent(new LoanEvent(new Timestamp(actionTime.getTime()
+				// +
+				// 1l), LoanEventType.INTERESTACCRUAL, 0.0,
+				// theLoan.getLoanID()));
+
+				if ( ( i + 1 ) * theLoan.getCompoundingPeriod() > theLoan
+						.getTerm()
+						&& i * theLoan.getCompoundingPeriod() != theLoan
+								.getTerm() ) {
+
+					Date actionTime2 = new Date( theLoan.getStartDate()
+							.getTime() + theLoan.getTerm() );
+
+					addLoanEvent(
+							new LoanEvent(
+									new Timestamp( actionTime2.getTime() ),
+									LoanEventType.COMPOUND, 0.0,
+									theLoan.getLoanID() ), false );
+					// addLoanEvent(new LoanEvent(new
+					// Timestamp(actionTime2.getTime() + 1l),
+					// LoanEventType.INTERESTACCRUAL, 0.0,
+					// theLoan.getLoanID()));
+
+				}
+			}
+
+			plugin.conn.commit();
+
+		} catch ( SQLException e ) {
+
+		} finally {
+			plugin.conn.setAutoCommit( true );
+		}
+
+	}
+
 
 	/*
 	 * This method calculates a fixed payment amount so that an amortizing loan
 	 * will be paid off with interest by the end of the loan. For all other loan
 	 * types, it divides the principal into the number of expected payments.
 	 * 
-	 * If the payment schedule does not perfectly align with the term, then this 
-	 * method assumes there will be one final payment in addition to the regularly
-	 * scheduled ones.
+	 * If the payment schedule does not perfectly align with the term, then this
+	 * method assumes there will be one final payment in addition to the
+	 * regularly scheduled ones.
 	 */
-	private double calculatePaymentAmount(Loan theLoan) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "calculatePaymentAmount(Loan)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
+	private double calculatePaymentAmount( Loan theLoan ) {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"calculatePaymentAmount(Loan)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
 		double r = theLoan.getInterestRate();
-		double n = Math.ceil(((double)  theLoan.getTerm())/((double) theLoan.getPaymentFrequency()));
-		
-		if(theLoan.getLoanType() == LoanType.AMORTIZING)
-			return theLoan.getBalance() * (r + (r/(Math.pow(1 + r,n) - 1)));
-		else if(theLoan.getLoanType() == LoanType.BULLET)
-			return theLoan.getBalance() * (1 + theLoan.getInterestRate() * theLoan.getTerm()/Conf.getIntReportingTime());
+		double n = Math.ceil( ( (double) theLoan.getTerm() )
+				/ ( (double) theLoan.getPaymentFrequency() ) );
+
+		if ( theLoan.getLoanType() == LoanType.AMORTIZING )
+			return theLoan.getBalance()
+					* ( r + ( r / ( Math.pow( 1 + r, n ) - 1 ) ) );
+		else if ( theLoan.getLoanType() == LoanType.BULLET )
+			return theLoan.getBalance()
+					* ( 1 + theLoan.getInterestRate() * theLoan.getTerm()
+							/ Conf.getIntReportingTime() );
 		else
-			return theLoan.getBalance()/n;
+			return theLoan.getBalance() / n;
 	}
 
-	private void closeLoan(int loanID) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "closeLoan(int)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		Loan theLoan = getLoan(loanID);
-		
-		if(theLoan.getCloseValue() > 0)
-			return;
-		
-		addLoanEvent(new LoanEvent(new Timestamp(new Date().getTime()), LoanEventType.CLOSE, 0.0, loanID), true);
-		
-		String closeSQL = String.format("UPDATE Loans SET Open='false' WHERE LoanID=%d;", loanID);
-		
+
+	private void closeLoan( int loanID ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"closeLoan(int)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan theLoan = getLoan( loanID );
+
+		if ( theLoan.getCloseValue() > 0 ) return;
+
+		addLoanEvent( new LoanEvent( new Timestamp( new Date().getTime() ),
+				LoanEventType.CLOSE, 0.0, loanID ), true );
+
+		String closeSQL = String.format(
+				"UPDATE Loans SET Open='false' WHERE LoanID=%d;", loanID );
+
+		Statement stmt = null;
+
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			synchronized(loanTableLock){
-				stmt.executeUpdate(closeSQL);
+			stmt = plugin.conn.createStatement();
+
+			synchronized ( loanTableLock ) {
+				stmt.executeUpdate( closeSQL );
 			}
-			
-			stmt.close();
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
 	}
+
 
 	/*
-	 * This method compounds the outstanding interest balance. That is, it moves the
-	 * interest to the principal, so it will accrue interest. This method is only
-	 * used for discreet compounding.
+	 * This method compounds the outstanding interest balance. That is, it moves
+	 * the interest to the principal, so it will accrue interest. This method is
+	 * only used for discreet compounding.
 	 */
-	private void compoundInterest(LoanEvent le) {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "compoundInterest(LoanEvent)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		Loan theLoan = getLoan(le.loan);
-		
+	private void compoundInterest( LoanEvent le ) throws SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"compoundInterest(LoanEvent)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan theLoan = getLoan( le.loan );
+
 		double compounded = theLoan.getInterestBalance();
 		double newBalance = theLoan.getBalance() + compounded;
-		
-		String updateLoan = String.format("UPDATE Loans SET Balance=%f, InterestBalance=%f WHERE LoanID=%d;", newBalance, 0.0, theLoan.getLoanID());
-		String updateLE = String.format("UPDATE LoanEvents SET Amount=%f, Executed='true' WHERE LoanEventID=%d;", compounded, le.loanEventID);
-		
+
+		String updateLoan = String
+				.format(
+						"UPDATE Loans SET Balance=%f, InterestBalance=%f WHERE LoanID=%d;",
+						newBalance, 0.0, theLoan.getLoanID() );
+		String updateLE = String
+				.format(
+						"UPDATE LoanEvents SET Amount=%f, Executed='true' WHERE LoanEventID=%d;",
+						compounded, le.loanEventID );
+
+		Statement stmt = null;
+
 		try {
-			Statement stmt = plugin.conn.createStatement();
-			
-			synchronized(loanTableLock){
-				stmt.executeUpdate(updateLoan);
+			stmt = plugin.conn.createStatement();
+
+			synchronized ( loanTableLock ) {
+				stmt.executeUpdate( updateLoan );
 			}
-			
-			synchronized(loanEventTableLock){
-				stmt.executeUpdate(updateLE);
+
+			synchronized ( loanEventTableLock ) {
+				stmt.executeUpdate( updateLE );
 			}
-			
-			stmt.close();
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+
+		} catch ( SQLException e ) {
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+		} finally {
+			if ( stmt != null ) stmt.close();
 		}
 	}
 
 
-	private void sendOutStatement(LoanEvent le) throws InterruptedException, ExecutionException, TimeoutException {
-		if(SerenityLoans.debugLevel >= 3)
-			SerenityLoans.logInfo(String.format("Entering %s method. %s", "sendOutStatement(LoanEvent)", SerenityLoans.debugLevel >= 4? "Thread: " + Thread.currentThread().getId() : "."));
-		
-		Loan theLoan = getLoan(le.loan);
-		PaymentStatement ps = getPaymentStatement(le.loan);
-		
+	private void sendOutStatement( LoanEvent le ) throws InterruptedException,
+			ExecutionException, TimeoutException, SQLException {
+
+		if ( SerenityLoans.debugLevel >= 3 )
+			SerenityLoans.logInfo( String.format( "Entering %s method. %s",
+					"sendOutStatement(LoanEvent)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
+		Loan theLoan = getLoan( le.loan );
+		PaymentStatement ps = getPaymentStatement( le.loan );
+
 		boolean percentageRule = false;
 		String rulePath = "loan.terms-constraints.min-payment.percent-rule";
-		if(plugin.getConfig().contains(rulePath) && plugin.getConfig().isBoolean(rulePath))
-			percentageRule = plugin.getConfig().getBoolean(rulePath);
-	
-		double feeAmount = theLoan.getFeesOutstanding() + (ps != null? ps.getFeesRemaining() : 0.0);
-		double intAmount = theLoan.getInterestBalance() + (ps != null? ps.getInterestRemaining() : 0.0);
-		double principalAmount = le.amount - theLoan.getInterestBalance() + (ps != null? ps.getPrincipalRemaining() : 0.0);
-		
+		if ( plugin.getConfig().contains( rulePath )
+				&& plugin.getConfig().isBoolean( rulePath ) )
+			percentageRule = plugin.getConfig().getBoolean( rulePath );
+
+		double feeAmount = theLoan.getFeesOutstanding()
+				+ ( ps != null ? ps.getFeesRemaining() : 0.0 );
+		double intAmount = theLoan.getInterestBalance()
+				+ ( ps != null ? ps.getInterestRemaining() : 0.0 );
+		double principalAmount = le.amount - theLoan.getInterestBalance()
+				+ ( ps != null ? ps.getPrincipalRemaining() : 0.0 );
+
 		double statementAmount = feeAmount + intAmount + principalAmount;
-		double minPayment = theLoan.getMinPayment() * (percentageRule? le.amount : 1);
-		
-		Timestamp due = new Timestamp(le.time.getTime() + theLoan.getPaymentTime());
-		
-		String insertSQL = String.format("INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate, AmountPrincipal, AmountInterest, AmountFees) VALUES (%d, %f, %f, ?, ?, %f, %f, %f);", le.loan, statementAmount, minPayment, principalAmount, intAmount, feeAmount);
-	
+		double minPayment = theLoan.getMinPayment()
+				* ( percentageRule ? le.amount : 1 );
+
+		Timestamp due = new Timestamp( le.time.getTime()
+				+ theLoan.getPaymentTime() );
+
+		String insertSQL = String
+				.format(
+						"INSERT INTO PaymentStatements (LoanID, BillAmount, Minimum, StatementDate, DueDate, AmountPrincipal, AmountInterest, AmountFees) VALUES (%d, %f, %f, ?, ?, %f, %f, %f);",
+						le.loan, statementAmount, minPayment, principalAmount,
+						intAmount, feeAmount );
+
+		PreparedStatement prep = null;
+		Statement stmt = null;
+
 		try {
-			
-			PreparedStatement prep = plugin.conn.prepareStatement(insertSQL);
-			
-			prep.setTimestamp(1, le.time);
-			prep.setTimestamp(2, due);
-			
-			synchronized(paymentStatementTableLock){
+
+			prep = plugin.conn.prepareStatement( insertSQL );
+
+			prep.setTimestamp( 1, le.time );
+			prep.setTimestamp( 2, due );
+
+			synchronized ( paymentStatementTableLock ) {
 				prep.executeUpdate();
 			}
-			
-			String updateLE = String.format("UPDATE LoanEvents SET Amount=%f, Executed='true' WHERE LoanEventID=%d;", statementAmount, le.loanEventID);
-	
-			Statement stmt = plugin.conn.createStatement();
-			
-			synchronized(loanEventTableLock){
-				stmt.executeUpdate(updateLE);
+
+			String updateLE = String
+					.format(
+							"UPDATE LoanEvents SET Amount=%f, Executed='true' WHERE LoanEventID=%d;",
+							statementAmount, le.loanEventID );
+
+			stmt = plugin.conn.createStatement();
+
+			synchronized ( loanEventTableLock ) {
+
+				stmt.executeUpdate( updateLE );
 			}
-			
-		} catch (SQLException e) {
-			SerenityLoans.log.severe(String.format("[%s] " + e.getMessage(), plugin.getDescription().getName()));
+
+		} catch ( SQLException e ) {
+
+			SerenityLoans.log.severe( String.format( "[%s] " + e.getMessage(),
+					plugin.getDescription().getName() ) );
 			e.printStackTrace();
+
+		} finally {
+
+			if ( prep != null ) prep.close();
+
+			if ( stmt != null ) stmt.close();
 		}
-		
-		Player recipient = plugin.playerManager.getPlayer(theLoan.getBorrower().getUserID());
-		
-		if(recipient == null)
-			return;
-		
-		boolean isPlayer = recipient.getUniqueId().equals(theLoan.getBorrower().getUserID());
-	
-		recipient.sendMessage(String.format("%s %s received a payment statement!", prfx, isPlayer? "You have" : ((FinancialInstitution)theLoan.getBorrower()).getName() + " has"));
-		recipient.sendMessage(String.format("%s Use %s to apply payment.", prfx, isPlayer? "/loan": "/crunion"));
-		recipient.sendMessage(String.format("%s Details are given below:", prfx));
-		recipient.sendMessage(getPaymentStatement(theLoan.getLoanID()).toString(plugin));
-		recipient.sendMessage(String.format("%s Use %s statement %s to view this statement again.", prfx, isPlayer? "/loan": "/crunion", plugin.playerManager.entityNameLookup(theLoan.getLender())));
+
+		Player recipient = plugin.playerManager.getPlayer( theLoan
+				.getBorrower().getUserID() );
+
+		if ( recipient == null ) return;
+
+		boolean isPlayer = recipient.getUniqueId().equals(
+				theLoan.getBorrower().getUserID() );
+
+		// TODO Add to message center.
+		recipient.sendMessage( String.format(
+				"%s %s received a payment statement!",
+				prfx,
+				isPlayer ? "You have" : ( (FinancialInstitution) theLoan
+						.getBorrower() ).getName() + " has" ) );
+		recipient.sendMessage( String.format( "%s Use %s to apply payment.",
+				prfx, isPlayer ? "/loan" : "/crunion" ) );
+		recipient.sendMessage( String.format( "%s Details are given below:",
+				prfx ) );
+		recipient.sendMessage( getPaymentStatement( theLoan.getLoanID() )
+				.toString( plugin ) );
+		recipient.sendMessage( String.format(
+				"%s Use %s statement %s to view this statement again.", prfx,
+				isPlayer ? "/loan" : "/crunion",
+				plugin.playerManager.entityNameLookup( theLoan.getLender() ) ) );
+
+		if ( SerenityLoans.debugLevel >= 4 )
+			SerenityLoans.logInfo( String.format( "Leaving %s method. %s",
+					"sendOutStatement(LoanEvent)",
+					SerenityLoans.debugLevel >= 4 ? "Thread: "
+							+ Thread.currentThread().getId() : "." ) );
+
 	}
 
 }
