@@ -1,3 +1,4 @@
+//@formatter:off
 /**
  * ========================================================================
  *                               DESCRIPTION
@@ -51,6 +52,7 @@
  * 
  * 
  */
+//@formatter:on
 
 package com.nwmogk.bukkit.loans;
 
@@ -655,13 +657,21 @@ public class CreditHistoryManager {
 		//		3) Update score
 		
 		LinkedList<CreditEvent> eventsList = new LinkedList<CreditEvent>();
-		Eventerator evtr = new Eventerator(bill, plugin.loanManager.getLoan(bill.getLoanID()));
 		
-		Loan loan = plugin.loanManager.getLoan(bill.getLoanID());
-		FinancialEntity borrower = loan.getBorrower();
+		Eventerator evtr = null;
+		Loan loan = null;
+		FinancialEntity borrower = null;
+		
+		try{
+		evtr = new Eventerator(bill, plugin.loanManager.getLoan(bill.getLoanID()));
+		
+		loan = plugin.loanManager.getLoan(bill.getLoanID());
+		borrower = loan.getBorrower();
 		String historySQL = String.format("SELECT EventTime FROM CreditHistory WHERE UserID='%s' ORDER BY EventTime DESC;", borrower.getUserID().toString());
 		
-		try {
+		
+			evtr = new Eventerator(bill, plugin.loanManager.getLoan(bill.getLoanID()));
+			
 			Statement stmt = plugin.conn.createStatement();
 			
 			ResultSet rs = null;
@@ -685,6 +695,9 @@ public class CreditHistoryManager {
 			SerenityLoans.logFail(e.getMessage());
 			e.printStackTrace();
 		}
+		
+		if(loan == null || borrower == null || evtr == null)
+			return;
 		
 		CreditEvent event = null;
 		double currentScore = updateScore(borrower, eventsList);

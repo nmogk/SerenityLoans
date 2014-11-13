@@ -51,13 +51,14 @@
 /*
  * TODO next: Setup listeners/handlers
  * 
- * Remove references to the regular configuration pathway in other
- * classes. Use only the Conf object
+ * Remove references to the regular configuration pathway in other classes. Use only the Conf object
  * 
- * Ensure that all database communication methods have finally clauses.
- * Close all statement objects
+ * Ensure that all database communication methods have finally clauses. Close all statement objects
+ * 
+ * Improve message center information availability, implement more macros for more messages. Easter
+ * eggs
  */
-		
+
 
 package com.nwmogk.bukkit.loans;
 
@@ -104,15 +105,14 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * Performs startup functions, as specified by the Bukkit API. This method
-	 * is the entry point for the plugin. It sets up the database and logger
-	 * connections as well as all of the core manager objects required for
-	 * interacting with the database.
+	 * Performs startup functions, as specified by the Bukkit API. This method is the entry point
+	 * for the plugin. It sets up the database and logger connections as well as all of the core
+	 * manager objects required for interacting with the database.
 	 */
 	public void onEnable() {
 
 		/*
-		 * ===================================================================
+		 * =================================================================== 
 		 * CONFIGURATION SETUP
 		 * ===================================================================
 		 */
@@ -133,11 +133,11 @@ public final class SerenityLoans extends JavaPlugin {
 			logInfo( "Main thread ID: " + Thread.currentThread().getId() + "." );
 
 		/*
-		 * ===================================================================
+		 * =================================================================== 
 		 * DATABASE SETUP
 		 * ===================================================================
 		 */
-		
+
 		try {
 			getConnection();
 
@@ -151,25 +151,25 @@ public final class SerenityLoans extends JavaPlugin {
 
 		try {
 			if ( buildRequired() ) setupTables();
-			
+
 		} catch ( SQLException e ) {
-			
+
 			if ( debugLevel >= 2 ) logFail( e.getMessage() );
 
 			logFail( "Unable to build database! Disabling..." );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
-			
+
 		} catch ( DatabaseVersionMismatchException e ) {
-			
+
 			logFail( String.format( "%s Disabling...", e.getMessage() ) );
 			getServer().getPluginManager().disablePlugin( this );
 			return;
-			
+
 		}
-		
+
 		/*
-		 * ===================================================================
+		 * =================================================================== 
 		 * PLAYER MANAGER SETUP
 		 * ===================================================================
 		 */
@@ -177,17 +177,15 @@ public final class SerenityLoans extends JavaPlugin {
 		playerManager = new PlayerManager( this );
 
 		// Attempt to add online players to the loan system.
-		if ( debugLevel >= 1 )
-			logInfo( "Attempting to add players to the system..." );
+		if ( debugLevel >= 1 ) logInfo( "Attempting to add players to the system..." );
 
 		playerManager.addPlayers( getServer().getOnlinePlayers() );
 
-		getServer().getPluginManager().registerEvents(
-				new PlayerLoginListener( this ), this );
+		getServer().getPluginManager().registerEvents( new PlayerLoginListener( this ), this );
 
-		
+
 		/*
-		 * ===================================================================
+		 * =================================================================== 
 		 * ECONOMY MANAGER SETUP
 		 * ===================================================================
 		 */
@@ -208,17 +206,17 @@ public final class SerenityLoans extends JavaPlugin {
 		}
 
 		/*
-		 * ===================================================================
-		 * LOAN RELATED MANAGERS SETUP
+		 * =================================================================== 
+		 * LOAN RELATED MANAGERS SETUP 
 		 * ===================================================================
 		 */
-		
+
 		loanManager = new LoanManager( this );
 		offerManager = new OfferManager( this );
 		historyManager = new CreditHistoryManager( this );
-		
+
 		/*
-		 * ===================================================================
+		 * =================================================================== 
 		 * REGISTER COMMAND HANDLERS
 		 * ===================================================================
 		 */
@@ -233,32 +231,36 @@ public final class SerenityLoans extends JavaPlugin {
 		getCommand( "sl-balance" ).setExecutor( ecHandle );
 		getCommand( "sl-networth" ).setExecutor( ecHandle );
 		getCommand( "sl-eco" ).setExecutor( ecHandle );
-			
+
 		/*
-		 * ===================================================================
-		 * RUN INITIAL UPDATE
-		 * ===================================================================
+		 * ==================================================================
+		 * RUN INITIAL UPDATE 
+		 * ==================================================================
 		 */
 
 		if ( debugLevel >= 2 ) logInfo( "Scheduling repeating upates." );
 
-		getServer().getScheduler().runTaskTimerAsynchronously( this,
-				new BukkitRunnable() {
+		getServer().getScheduler().runTaskTimerAsynchronously( this, new BukkitRunnable() {
 
-					public void run() {
+			public void run() {
 
-						loanManager.updateAll();
-						offerManager.updateAll();
-					}
-				}, 0, Conf.getUpdateTime() );
+				try {
+					loanManager.updateAll();
+				} catch ( SQLException e ) {
+					logFail( e.getMessage() );
+					e.printStackTrace();
+				}
+				offerManager.updateAll();
+			}
+		}, 0, Conf.getUpdateTime() );
 
 		if ( debugLevel >= 2 ) logInfo( "Initial setup complete." );
 	}
 
 
 	/**
-	 * This method is specified by the Bukkit API. It performs cleanup of the
-	 * plugin setup when the plugin shuts down. Mostly closing objects.
+	 * This method is specified by the Bukkit API. It performs cleanup of the plugin setup when the
+	 * plugin shuts down. Mostly closing objects.
 	 */
 	public void onDisable() {
 
@@ -276,14 +278,12 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/*
-	 * This method determines if the database is the most up-to-date version. It
-	 * compares the version of the database listed in the Info table against the
-	 * version variables defined at the top of the file. If it catches a SQL
-	 * exception from the query, it logs it then passes it along. If the
-	 * database is out of date, it throws a DatabaseVersionMismatchException.
+	 * This method determines if the database is the most up-to-date version. It compares the
+	 * version of the database listed in the Info table against the version variables defined at the
+	 * top of the file. If it catches a SQL exception from the query, it logs it then passes it
+	 * along. If the database is out of date, it throws a DatabaseVersionMismatchException.
 	 */
-	private boolean buildRequired() throws SQLException,
-			DatabaseVersionMismatchException {
+	private boolean buildRequired() throws SQLException, DatabaseVersionMismatchException {
 
 		Statement statement = null;
 
@@ -301,9 +301,7 @@ public final class SerenityLoans extends JavaPlugin {
 				hasInfo |= tables.getString( 1 ).equalsIgnoreCase( "Info" );
 			while ( tables.next() );
 
-			if ( !hasInfo )
-				throw new DatabaseVersionMismatchException(
-						"Info table missing!" );
+			if ( !hasInfo ) throw new DatabaseVersionMismatchException( "Info table missing!" );
 
 			ResultSet version = statement.executeQuery( "SELECT * FROM Info;" );
 
@@ -312,10 +310,9 @@ public final class SerenityLoans extends JavaPlugin {
 			if ( version.getInt( "DBMajor" ) != dbMajorVersion
 					|| version.getInt( "DBMinor" ) != dbMinorVersion ) {
 
-				String ruhroh = "DB Version mismatch. V"
-						+ version.getInt( "DBMajor" ) + "."
-						+ version.getInt( "DBMinor" ) + " needs V"
-						+ dbMajorVersion + "." + dbMinorVersion + ".";
+				String ruhroh = "DB Version mismatch. V" + version.getInt( "DBMajor" ) + "."
+						+ version.getInt( "DBMinor" ) + " needs V" + dbMajorVersion + "."
+						+ dbMinorVersion + ".";
 				throw new DatabaseVersionMismatchException( ruhroh );
 
 			}
@@ -338,14 +335,13 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/*
-	 * This method executes the code required to build the database tables. It
-	 * will disable the plugin if success was not achieved. Some database
-	 * parameters are set from config values, which probably shouldn't be
-	 * changed without discarding the entire database.
+	 * This method executes the code required to build the database tables. It will disable the
+	 * plugin if success was not achieved. Some database parameters are set from config values,
+	 * which probably shouldn't be changed without discarding the entire database.
 	 * 
-	 * In the future, I want to have SQL files that convert between different
-	 * versions of the database without losing any player data. This will be a
-	 * feature of builds after the production release.
+	 * In the future, I want to have SQL files that convert between different versions of the
+	 * database without losing any player data. This will be a feature of builds after the
+	 * production release.
 	 */
 	private void setupTables() throws SQLException {
 
@@ -357,8 +353,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 		if ( getConfig().contains( "trust.credit-score.no-history-score" ) ) {
 
-			defaultCreditScore = getConfig().getInt(
-					"trust.credit-score.no-history-score" );
+			defaultCreditScore = getConfig().getInt( "trust.credit-score.no-history-score" );
 
 			if ( debugLevel >= 3 ) logInfo( "Loaded default credit score." );
 
@@ -366,8 +361,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 		if ( getConfig().contains( "trust.credit-score.dissipation-factor" ) ) {
 
-			dissipationFactor = getConfig().getInt(
-					"trust.credit-score.dissipation-factor" );
+			dissipationFactor = getConfig().getInt( "trust.credit-score.dissipation-factor" );
 
 			if ( debugLevel >= 3 ) logInfo( "Loaded dissipation factor." );
 
@@ -375,8 +369,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 		if ( getConfig().contains( "economy.currency.fractional-digits" ) ) {
 
-			decimals = getConfig()
-					.getInt( "economy.currency.fractional-digits" );
+			decimals = getConfig().getInt( "economy.currency.fractional-digits" );
 
 			if ( debugLevel >= 3 ) logInfo( "Loaded currency digits." );
 
@@ -386,36 +379,24 @@ public final class SerenityLoans extends JavaPlugin {
 				+ "("
 				+ "UserID varchar(36) NOT NULL,"
 				+ "Type ENUM('Player','Bank','CreditUnion','Town/Faction','Employer') NOT NULL DEFAULT 'Player',"
-				+ "Cash DECIMAL(10,"
-				+ decimals
-				+ "),"
-				+ "CreditScore double DEFAULT "
-				+ defaultCreditScore
-				+ ","
+				+ "Cash DECIMAL(10," + decimals + ")," + "CreditScore double DEFAULT "
+				+ defaultCreditScore + ","
 				+ "LastSystemUse TIMESTAMP NOT NULL DEFAULT NOW() ON UPDATE NOW(),"
 				+ "PRIMARY KEY (UserID)" + ");";
 
-		String financialInstitutionsTable = "CREATE TABLE FinancialInstitutions"
-				+ "("
-				+ "BankID varchar(36) NOT NULL,"
-				+ "Name varchar(255) NOT NULL,"
-				+ "Manager varchar(36) NOT NULL,"
-				+ "UNIQUE (Name),"
-				+ "PRIMARY KEY (BankID),"
+		String financialInstitutionsTable = "CREATE TABLE FinancialInstitutions" + "("
+				+ "BankID varchar(36) NOT NULL," + "Name varchar(255) NOT NULL,"
+				+ "Manager varchar(36) NOT NULL," + "UNIQUE (Name)," + "PRIMARY KEY (BankID),"
 				+ "FOREIGN KEY (BankID) REFERENCES FinancialEntities(UserID),"
-				+ "FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID)"
-				+ ");";
+				+ "FOREIGN KEY (Manager) REFERENCES FinancialEntities(UserID)" + ");";
 
 
-		String trustTable = "CREATE TABLE Trust" + "("
-				+ "UserID varchar(36) NOT NULL,"
-				+ "TargetID varchar(36) NOT NULL,"
-				+ "TrustLevel int NOT NULL DEFAULT 0,"
+		String trustTable = "CREATE TABLE Trust" + "(" + "UserID varchar(36) NOT NULL,"
+				+ "TargetID varchar(36) NOT NULL," + "TrustLevel int NOT NULL DEFAULT 0,"
 				+ "IgnoreOffers ENUM('true','false') NOT NULL DEFAULt 'false',"
 				+ "CONSTRAINT uc_relationID PRIMARY KEY (UserID,TargetID),"
 				+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
-				+ "FOREIGN KEY (TargetID) REFERENCES FinancialEntities(UserID)"
-				+ ");";
+				+ "FOREIGN KEY (TargetID) REFERENCES FinancialEntities(UserID)" + ");";
 
 
 		String creditHistoryTable = "CREATE TABLE CreditHistory"
@@ -423,47 +404,30 @@ public final class SerenityLoans extends JavaPlugin {
 				+ "ItemID int NOT NULL AUTO_INCREMENT,"
 				+ "UserID varchar(36) NOT NULL,"
 				+ "EventType ENUM('Bankruptcy','Payment','MinPayment','MissedPayment','Payoff','LoanStart', 'LoanClose', 'CreditLimitReached', 'LoanModified', 'CreditUtilization', 'Overpayment') NOT NULL,"
-				+ "ScoreValue double NOT NULL,"
-				+ "Parameter double NOT NULL DEFAULT " + dissipationFactor
-				+ "," + "Notes TEXT,"
+				+ "ScoreValue double NOT NULL," + "Parameter double NOT NULL DEFAULT "
+				+ dissipationFactor + "," + "Notes TEXT,"
 				+ "EventTime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,"
 				+ "PRIMARY KEY (ItemID),"
-				+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID)"
-				+ ");";
+				+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID)" + ");";
 
-		String membershipTable = "CREATE TABLE Memberships" + "("
-				+ "UserID varchar(36) NOT NULL,"
+		String membershipTable = "CREATE TABLE Memberships" + "(" + "UserID varchar(36) NOT NULL,"
 				+ "MemberOf varchar(36) NOT NULL," + "JoinDate DATE NOT NULL,"
 				+ "Roles varchar(255)," + "Shares int DEFAULT 1,"
 				+ "CONSTRAINT uc_memberID PRIMARY KEY (UserID,MemberOf),"
 				+ "FOREIGN KEY (UserID) REFERENCES FinancialEntities(UserID),"
-				+ "FOREIGN KEY (MemberOf) REFERENCES FinancialEntities(UserID)"
-				+ ");";
+				+ "FOREIGN KEY (MemberOf) REFERENCES FinancialEntities(UserID)" + ");";
 
-		String loanTable = "CREATE TABLE Loans"
-				+ "("
-				+ "LoanID int NOT NULL AUTO_INCREMENT,"
-				+ "LenderID varchar(36) NOT NULL,"
-				+ "BorrowerID varchar(36) NOT NULL,"
-				+ "Terms int NOT NULL,"
-				+ "AutoPay ENUM('true','false') NOT NULL DEFAULT 'false',"
-				+ "Balance DECIMAL(9,"
-				+ decimals
-				+ ") NOT NULL,"
-				+ "InterestBalance DECIMAL(9,"
-				+ decimals
-				+ ") DEFAULT 0.0,"
-				+ "FeeBalance DECIMAL(9,"
-				+ decimals
-				+ ") DEFAULT 0.0,"
-				+ "StartDate TIMESTAMP NOT NULL DEFAULT NOW(),"
+		String loanTable = "CREATE TABLE Loans" + "(" + "LoanID int NOT NULL AUTO_INCREMENT,"
+				+ "LenderID varchar(36) NOT NULL," + "BorrowerID varchar(36) NOT NULL,"
+				+ "Terms int NOT NULL," + "AutoPay ENUM('true','false') NOT NULL DEFAULT 'false',"
+				+ "Balance DECIMAL(9," + decimals + ") NOT NULL," + "InterestBalance DECIMAL(9,"
+				+ decimals + ") DEFAULT 0.0," + "FeeBalance DECIMAL(9," + decimals
+				+ ") DEFAULT 0.0," + "StartDate TIMESTAMP NOT NULL DEFAULT NOW(),"
 				+ "LastUpdate TIMESTAMP NULL,"
-				+ "Open ENUM('true', 'false') NOT NULL DEFAULT 'true',"
-				+ "PRIMARY KEY (LoanID),"
+				+ "Open ENUM('true', 'false') NOT NULL DEFAULT 'true'," + "PRIMARY KEY (LoanID),"
 				+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID),"
 				+ "FOREIGN KEY (BorrowerID) REFERENCES FinancialEntities (UserID),"
-				+ "FOREIGN KEY (Terms) REFERENCES PreparedOffers (OfferID)"
-				+ ");";
+				+ "FOREIGN KEY (Terms) REFERENCES PreparedOffers (OfferID)" + ");";
 
 		String loanEventsTable = "CREATE TABLE LoanEvents"
 				+ "("
@@ -473,12 +437,12 @@ public final class SerenityLoans extends JavaPlugin {
 				+ "EventType ENUM('AccrueInterest','CompoundInterest','ServiceFee','LateFee','PaymentDue','PaymentMade','StatementOut','Open','Close','ExtraPrincipalPaid','ExtraInterestPaid','ExtraFeesPaid') NOT NULL,"
 				+ "Amount DECIMAL(9," + decimals + "),"
 				+ "Executed ENUM('true', 'false') NOT NULL DEFAULT 'false',"
-				+ "PRIMARY KEY (LoanEventID),"
-				+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)" + ");";
+				+ "PRIMARY KEY (LoanEventID)," + "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
+				+ ");";
 
 		String paymentStatementsTable = "CREATE TABLE PaymentStatements" + "("
-				+ "StatementID int NOT NULL AUTO_INCREMENT,"
-				+ "LoanID int NOT NULL," + "BillAmount DECIMAL(9,"
+				+ "StatementID int NOT NULL AUTO_INCREMENT," + "LoanID int NOT NULL,"
+				+ "BillAmount DECIMAL(9,"
 				+ decimals
 				+ ") NOT NULL,"
 				+ "Minimum DECIMAL(9,"
@@ -499,12 +463,12 @@ public final class SerenityLoans extends JavaPlugin {
 				+ decimals
 				+ ") NOT NULL DEFAULT 0,"
 				+ "PRIMARY KEY (StatementID),"
-				+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)" + ");";
+				+ "FOREIGN KEY (LoanID) REFERENCES Loans (LoanID)"
+				+ ");";
 
 		String preparedOffersTable = "CREATE TABLE PreparedOffers" + "("
-				+ "OfferID int NOT NULL AUTO_INCREMENT,"
-				+ "LenderID varchar(36) NOT NULL," + "OfferName varchar(255),"
-				+ "Value DECIMAL(9,"
+				+ "OfferID int NOT NULL AUTO_INCREMENT," + "LenderID varchar(36) NOT NULL,"
+				+ "OfferName varchar(255)," + "Value DECIMAL(9,"
 				+ decimals
 				+ ") NOT NULL,"
 				+ "InterestRate DECIMAL(6,3) NOT NULL,"
@@ -525,55 +489,41 @@ public final class SerenityLoans extends JavaPlugin {
 				+ "),"
 				+ "LoanType ENUM('Amortizing','Bullet','FixedFee','InterestOnly','Credit','Gift','Deposit','Bond','Salary') NOT NULL,"
 				+ "PRIMARY KEY (OfferID),"
-				+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID)"
-				+ ");";
+				+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID)" + ");";
 
-		String offersTable = "CREATE TABLE Offers"
-				+ "("
-				+ "LenderID varchar(36) NOT NULL,"
-				+ "BorrowerID varchar(36) NOT NULL,"
-				+ "ExpirationDate TIMESTAMP DEFAULT 0,"
+		String offersTable = "CREATE TABLE Offers" + "(" + "LenderID varchar(36) NOT NULL,"
+				+ "BorrowerID varchar(36) NOT NULL," + "ExpirationDate TIMESTAMP DEFAULT 0,"
 				+ "PreparedTerms int NOT NULL,"
 				+ "Sent ENUM('true','false') NOT NULL DEFAULT 'false',"
 				+ "CONSTRAINT uc_offerID PRIMARY KEY (LenderID,BorrowerID),"
 				+ "FOREIGN KEY (LenderID) REFERENCES FinancialEntities (UserID),"
 				+ "FOREIGN KEY (BorrowerID) REFERENCES FinancialEntities (UserID),"
-				+ "FOREIGN KEY (PreparedTerms) REFERENCES PreparedOffers (OfferID)"
-				+ ");";
+				+ "FOREIGN KEY (PreparedTerms) REFERENCES PreparedOffers (OfferID)" + ");";
 
-		String signShopsTable = "CREATE TABLE SignShops"
-				+ "("
-				+ "X int NOT NULL,"
-				+ "Y int NOT NULL,"
-				+ "Z int NOT NULL,"
-				+ "StoredOffer int NOT NULL,"
+		String signShopsTable = "CREATE TABLE SignShops" + "(" + "X int NOT NULL,"
+				+ "Y int NOT NULL," + "Z int NOT NULL," + "StoredOffer int NOT NULL,"
 				+ "CONSTRAINT uc_shopID PRIMARY KEY (X,Y,Z),"
-				+ "FOREIGN KEY (StoredOffer) REFERENCES PreparedOffers (OfferID)"
-				+ ");";
+				+ "FOREIGN KEY (StoredOffer) REFERENCES PreparedOffers (OfferID)" + ");";
 
 		String loanView = "CREATE VIEW loans_all AS "
 				+ "SELECT Loans.LoanID, Loans.LenderID, Loans.BorrowerID, Loans.StartDate, Loans.Balance, Loans.InterestBalance, Loans.FeeBalance, Loans.AutoPay, Loans.LastUpdate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee "
-				+ "FROM Loans JOIN (PreparedOffers) "
-				+ "ON Loans.Terms = PreparedOffers.OfferID;";
+				+ "FROM Loans JOIN (PreparedOffers) " + "ON Loans.Terms = PreparedOffers.OfferID;";
 
 		String offerView = "CREATE VIEW offer_view AS "
 				+ "SELECT Offers.LenderID, Offers.BorrowerID,  Offers.ExpirationDate, PreparedOffers.Value, PreparedOffers.InterestRate, PreparedOffers.Term, PreparedOffers.CompoundingPeriod, PreparedOffers.GracePeriod, PreparedOffers.PaymentTime, PreparedOffers.PaymentFrequency, PreparedOffers.LateFee, PreparedOffers.MinPayment, PreparedOffers.ServiceFeeFrequency, PreparedOffers.ServiceFee, PreparedOffers.LoanType "
 				+ "FROM Offers JOIN (PreparedOffers) "
 				+ "ON Offers.PreparedTerms = PreparedOffers.OfferID;";
 
-		String debtorView = "CREATE VIEW debtors AS "
-				+ "SELECT DISTINCT UserID "
+		String debtorView = "CREATE VIEW debtors AS " + "SELECT DISTINCT UserID "
 				+ "From Loans JOIN FinancialEntities "
 				+ "ON Loans.BorrowerID=FinancialEntities.UserID;";
 
 		String infoTable = "CREATE TABLE Info" + "(" + "DBmajor int NOT NULL,"
-				+ "DBminor int NOT NULL," + "CRscore_max double,"
-				+ "CRscore_min double,"
-				+ "CONSTRAINT uc_relationID PRIMARY KEY (DBmajor,DBminor)"
-				+ ");";
+				+ "DBminor int NOT NULL," + "CRscore_max double," + "CRscore_min double,"
+				+ "CONSTRAINT uc_relationID PRIMARY KEY (DBmajor,DBminor)" + ");";
 
-		String writeVersion = "INSERT INTO Info (DBmajor, DBminor) VALUES("
-				+ dbMajorVersion + "," + dbMinorVersion + ");";
+		String writeVersion = "INSERT INTO Info (DBmajor, DBminor) VALUES(" + dbMajorVersion + ","
+				+ dbMinorVersion + ");";
 
 		Statement statement = null;
 
@@ -581,63 +531,51 @@ public final class SerenityLoans extends JavaPlugin {
 		try {
 			statement = conn.createStatement();
 
-			if ( debugLevel >= 2 )
-				logInfo( "Statement created successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Statement created successfully." );
 
 			statement.executeUpdate( financialEntityTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built FinancialEntities table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built FinancialEntities table successfully." );
 
 			statement.executeUpdate( financialInstitutionsTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built FinancialInstitutions table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built FinancialInstitutions table successfully." );
 
 			statement.executeUpdate( trustTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Trust table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Trust table successfully." );
 
 			statement.executeUpdate( creditHistoryTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built CreditHistory table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built CreditHistory table successfully." );
 
 			statement.executeUpdate( membershipTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Memberships table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Memberships table successfully." );
 
 			statement.executeUpdate( preparedOffersTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built PreparedOffers table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built PreparedOffers table successfully." );
 
 			statement.executeUpdate( loanTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Loans table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Loans table successfully." );
 
 			statement.executeUpdate( loanEventsTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built LoanEvents table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built LoanEvents table successfully." );
 
 			statement.executeUpdate( paymentStatementsTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built PaymentStatements table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built PaymentStatements table successfully." );
 
 			statement.executeUpdate( offersTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Offers table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Offers table successfully." );
 
 			statement.executeUpdate( signShopsTable );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built SignShops table successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built SignShops table successfully." );
 
 			statement.execute( loanView );
 
@@ -645,13 +583,11 @@ public final class SerenityLoans extends JavaPlugin {
 
 			statement.executeUpdate( offerView );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Offers view successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Offers view successfully." );
 
 			statement.executeUpdate( debtorView );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Built Debtors view successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Built Debtors view successfully." );
 
 			statement.executeUpdate( infoTable );
 
@@ -659,8 +595,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 			statement.executeUpdate( writeVersion );
 
-			if ( debugLevel >= 2 )
-				logInfo( "Wrote version info successfully." );
+			if ( debugLevel >= 2 ) logInfo( "Wrote version info successfully." );
 
 
 		} catch ( SQLException e ) {
@@ -684,23 +619,19 @@ public final class SerenityLoans extends JavaPlugin {
 
 		}
 
-		if ( success && debugLevel >= 1 )
-			logInfo( "Database tables built successfully." );
+		if ( success && debugLevel >= 1 ) logInfo( "Database tables built successfully." );
 
 
 		double centralBankCash = 0;
 		if ( getConfig().contains( "economy.central-bank-balance" ) )
-			centralBankCash = getConfig().getDouble(
-					"economy.central-bank-balance" );
+			centralBankCash = getConfig().getDouble( "economy.central-bank-balance" );
 
 		int centralBankScore = 850;
 		if ( getConfig().contains( "trust.credit-score.score-range.max" ) )
-			centralBankScore = getConfig().getInt(
-					"trust.credit-score.score-range.max" );
+			centralBankScore = getConfig().getInt( "trust.credit-score.score-range.max" );
 
-		boolean cbResult = playerManager.createFinancialInstitution(
-				"CentralBank", null, PlayerType.CREDIT_UNION, centralBankCash,
-				centralBankScore );
+		boolean cbResult = playerManager.createFinancialInstitution( "CentralBank", null,
+				PlayerType.CREDIT_UNION, centralBankCash, centralBankScore );
 
 		if ( debugLevel >= 1 ) {
 
@@ -714,8 +645,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * A convenience method to statically get a reference to the most recently
-	 * enabled instance of this plugin.
+	 * A convenience method to statically get a reference to the most recently enabled instance of
+	 * this plugin.
 	 * 
 	 * @return plugin Most recently enabled instance of SerenityLoans
 	 */
@@ -726,16 +657,14 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * Connects to a MySQL database from information given in the configuration
-	 * file. If the connection has already been established, returns the
-	 * pre-existing object. Checks for liveness of the connection, and attempts
-	 * to reconnect.
+	 * Connects to a MySQL database from information given in the configuration file. If the
+	 * connection has already been established, returns the pre-existing object. Checks for liveness
+	 * of the connection, and attempts to reconnect.
 	 * 
-	 * @return conn Reference to the Connection object associated with the
-	 *         connection.
+	 * @return conn Reference to the Connection object associated with the connection.
 	 * @throws SQLException
-	 *             If configuration info cannot be found, or if there is an
-	 *             error requesting the connection from the server.
+	 *             If configuration info cannot be found, or if there is an error requesting the
+	 *             connection from the server.
 	 */
 	public Connection getConnection() throws SQLException {
 
@@ -745,8 +674,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 		String squrl = "jdbc:mysql://";
 
-		if ( getConfig().contains( "mysql.host" )
-				&& getConfig().contains( "mysql.port" )
+		if ( getConfig().contains( "mysql.host" ) && getConfig().contains( "mysql.port" )
 				&& getConfig().contains( "mysql.databasename" ) ) {
 
 			squrl += getConfig().getString( "mysql.host" );
@@ -765,13 +693,11 @@ public final class SerenityLoans extends JavaPlugin {
 		}
 
 		// Add the option delimiter if either username or password were given.
-		if ( getConfig().contains( "mysql.username" )
-				|| getConfig().contains( "mysql.password" ) ) {
+		if ( getConfig().contains( "mysql.username" ) || getConfig().contains( "mysql.password" ) ) {
 
 			squrl += "?";
 
-			if ( debugLevel >= 1 )
-				logInfo( "Using username and password info." );
+			if ( debugLevel >= 1 ) logInfo( "Using username and password info." );
 		}
 
 		// Attach username information to the URL string
@@ -793,8 +719,7 @@ public final class SerenityLoans extends JavaPlugin {
 
 		}
 
-		if ( debugLevel >= 2 )
-			logInfo( "Database configuration loaded. Setting up..." );
+		if ( debugLevel >= 2 ) logInfo( "Database configuration loaded. Setting up..." );
 
 		// This can potentially throw a SQLException. We just let it go here.
 		conn = DriverManager.getConnection( squrl );
@@ -817,8 +742,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * Wrapper method for standardizing decorations on logging. Intended for
-	 * informational messages. Will format message with [SerenityLoans] tag.
+	 * Wrapper method for standardizing decorations on logging. Intended for informational messages.
+	 * Will format message with [SerenityLoans] tag.
 	 * 
 	 * @param message
 	 *            Message to log
@@ -830,8 +755,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * Wrapper method for standardizing decorations on logging. Intended for
-	 * warning messages. Will format message with [SerenityLoans] tag.
+	 * Wrapper method for standardizing decorations on logging. Intended for warning messages. Will
+	 * format message with [SerenityLoans] tag.
 	 * 
 	 * @param message
 	 *            Message to log
@@ -843,8 +768,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * Wrapper method for standardizing decorations on logging. Intended for
-	 * error messages. Will format message with [SerenityLoans] tag.
+	 * Wrapper method for standardizing decorations on logging. Intended for error messages. Will
+	 * format message with [SerenityLoans] tag.
 	 * 
 	 * @param message
 	 *            Message to log
@@ -856,8 +781,8 @@ public final class SerenityLoans extends JavaPlugin {
 
 
 	/**
-	 * This message will schedule a single line message to be sent to the
-	 * specified sender at a later time on the main thread.
+	 * This message will schedule a single line message to be sent to the specified sender at a
+	 * later time on the main thread.
 	 * 
 	 * @param sender
 	 *            CommandSender object to send the message to.
@@ -869,22 +794,21 @@ public final class SerenityLoans extends JavaPlugin {
 		if ( debugLevel >= 3 )
 			logInfo( String.format( "Entering %s method. %s",
 					"scheduleMessage(CommandSender, String)",
-					SerenityLoans.debugLevel >= 4 ? "Thread: "
-							+ Thread.currentThread().getId() : "" ) );
+					SerenityLoans.debugLevel >= 4 ? "Thread: " + Thread.currentThread().getId()
+							: "" ) );
 
 		getServer().getScheduler().scheduleSyncDelayedTask( plugin,
 				plugin.new MessageSender( sender, new String[] { message } ) );
 
 		if ( debugLevel >= 4 )
 			logInfo( String.format( "Leaving %s method. Thread: %d.",
-					"scheduleMessage(CommandSender, String)", Thread
-							.currentThread().getId() ) );
+					"scheduleMessage(CommandSender, String)", Thread.currentThread().getId() ) );
 	}
 
 
 	/**
-	 * This message will schedule an array of message strings to be sent to the
-	 * specified sender at a later time on the main thread.
+	 * This message will schedule an array of message strings to be sent to the specified sender at
+	 * a later time on the main thread.
 	 * 
 	 * @param sender
 	 *            CommandSender object to send the message to.
@@ -896,25 +820,23 @@ public final class SerenityLoans extends JavaPlugin {
 		if ( debugLevel >= 3 )
 			logInfo( String.format( "Entering %s method. %s",
 					"scheduleMessage(CommandSender, String[])",
-					SerenityLoans.debugLevel >= 4 ? "Thread: "
-							+ Thread.currentThread().getId() : "" ) );
+					SerenityLoans.debugLevel >= 4 ? "Thread: " + Thread.currentThread().getId()
+							: "" ) );
 
 		getServer().getScheduler().scheduleSyncDelayedTask( plugin,
 				plugin.new MessageSender( sender, message ) );
 
 		if ( debugLevel >= 4 )
 			logInfo( String.format( "Leaving %s method. Thread: %d.",
-					"scheduleMessage(CommandSender, String[])", Thread
-							.currentThread().getId() ) );
+					"scheduleMessage(CommandSender, String[])", Thread.currentThread().getId() ) );
 
 	}
 
 
 	/*
-	 * This class provides an object which messages a CommandSender at an
-	 * uspecified time in the future. It is a separate class so that the
-	 * scheduler can run it at any time. It encapsulates the recipient of the
-	 * message as well as the message itself. It uses the String[] version of
+	 * This class provides an object which messages a CommandSender at an uspecified time in the
+	 * future. It is a separate class so that the scheduler can run it at any time. It encapsulates
+	 * the recipient of the message as well as the message itself. It uses the String[] version of
 	 * sendMessage to get as much info as possible out at once.
 	 */
 	private class MessageSender extends BukkitRunnable {
@@ -943,17 +865,16 @@ public final class SerenityLoans extends JavaPlugin {
 		public void run() {
 
 			if ( SerenityLoans.debugLevel >= 3 )
-				SerenityLoans.logInfo( String.format(
-						"Entering MessageSender run() method. %s",
-						SerenityLoans.debugLevel >= 4 ? "Thread: "
-								+ Thread.currentThread().getId() : "." ) );
+				SerenityLoans.logInfo( String.format( "Entering MessageSender run() method. %s",
+						SerenityLoans.debugLevel >= 4 ? "Thread: " + Thread.currentThread().getId()
+								: "." ) );
 
 			sendTo.sendMessage( message );
 
 			if ( SerenityLoans.debugLevel >= 4 )
 				SerenityLoans.logInfo( String.format(
-						"Leaving MessageSender run() method. Thread: %d.",
-						Thread.currentThread().getId() ) );
+						"Leaving MessageSender run() method. Thread: %d.", Thread.currentThread()
+								.getId() ) );
 
 		}
 
