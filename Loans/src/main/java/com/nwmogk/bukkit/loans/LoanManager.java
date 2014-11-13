@@ -180,57 +180,15 @@ public class LoanManager {
 		}
 		
 		/**
-		 * This method causes LoanEvents to be sorted by date, then by LoanEventType
+		 * This method causes LoanEvents to be sorted by date, oldest first, then by LoanEventType
 		 */
 		public int compareTo(LoanEvent other) {
-			return (int)(time.getTime() - other.time.getTime()) - (other.action.ordinal() - action.ordinal());
+			if ( time.getTime() == other.time.getTime() )
+				return other.action.ordinal() - action.ordinal();
+			
+			return (int)(time.getTime() - other.time.getTime());
 		}
-		
-//		public String toString(){
-//			String dateStr = DateFormat.getDateInstance().format(time);
-//			String actionStr = "";
-//			
-//			switch(action){
-//			
-//				case COMPOUND:
-//					actionStr = "Compound Interest";
-//					break;
-//				case PAYMENTDUE:
-//					actionStr = "Payment Due Date";
-//					break;
-//				case INTERESTACCRUAL:
-//					actionStr = "Interest Accrued";
-//					break;
-//				case SERVICEFEE:
-//					actionStr = "Service Fee Assessed";
-//					break;
-//				case STATEMENTOUT:
-//					actionStr = "Statement Sent Out";
-//					break;
-//				case LATEFEE:
-//					actionStr = "Late Fee Assessed";
-//					break;
-//				case PAYMENTMADE:
-//					actionStr = "Payment of " + amount + " made to ";
-//					switch(account){
-//						case ALL:
-//							actionStr += "all balances";
-//							break;
-//						case PRINCIPAL:
-//							actionStr += "principal balance";
-//							break;
-//						case INTEREST:
-//							actionStr += "interest balance";
-//							break;
-//						case FEES:
-//							actionStr += "fee balance";
-//							break;
-//					}
-//					break;
-//			}
-//			
-//			return dateStr + ": " + actionStr + "\n";
-//		}
+
 	}
 	
 	private SerenityLoans plugin;
