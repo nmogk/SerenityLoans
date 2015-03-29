@@ -27,23 +27,32 @@ public class PlayerManager {
 	 * @return true if the entity is in the FinancialEntities table by the end
 	 *         of the method, false otherwise.
 	 */
-	public boolean addPlayer( UUID playerId, String name ) {
+	public boolean addPlayer( UUID playerId ) {
 
 		// Check to see if the entity is already in the table
-		if ( inFinancialEntitiesTable( playerId ) ) { return true;
+		if ( inFinancialEntitiesTable( playerId ) )
+			return true;
 
-		}
+		if ( !eco.plugin.isPlayerOnline( playerId ) )
+			return false;
+
+		String name = eco.plugin.getPlayerName( playerId );
 
 		Transaction tx = eco.pm.currentTransaction();
 
-		tx.begin();
+		try {
+			tx.begin();
 
-		FinancialEntity newPlayer = new FinancialEntity( playerId, name,
-				EntityType.PLAYER );
+			FinancialEntity newPlayer = new FinancialEntity( playerId, name,
+					EntityType.PLAYER );
 
-		eco.pm.makePersistent( newPlayer );
+			eco.pm.makePersistent( newPlayer );
 
-		tx.commit();
+			tx.commit();
+		} finally {
+			if ( tx.isActive() )
+				tx.rollback(); // Error occurred so rollback the PM transaction
+		}
 
 		return !tx.isActive();
 
