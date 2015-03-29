@@ -1,5 +1,6 @@
 package com.nwmogk.loans.jdo;
 
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.UUID;
 
@@ -23,14 +24,18 @@ public class CashTransaction {
 
 	@Persistent( nullValue = NullValue.EXCEPTION )
 	protected Timestamp			transactionTime;
+	
+	@Persistent( nullValue = NullValue.EXCEPTION )
+	protected BigDecimal value;
 
 	public CashTransaction( FinancialEntity from, FinancialEntity to,
-			Timestamp transactionTime )
+			Timestamp transactionTime, BigDecimal value )
 	{
 
 		this.from = from;
 		this.to = to;
 		this.transactionTime = transactionTime;
+		this.value = value;
 	}
 
 	public UUID getTransactionId() {
@@ -51,6 +56,18 @@ public class CashTransaction {
 	public Timestamp getTransactionTime() {
 
 		return this.transactionTime;
+	}
+
+	
+	public BigDecimal getValue() {
+	
+		return this.value;
+	}
+
+	
+	public void setValue( BigDecimal value ) {
+	
+		this.value = value;
 	}
 
 }

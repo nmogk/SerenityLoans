@@ -1,5 +1,8 @@
 package com.nwmogk.loans.model;
 
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -7,6 +10,7 @@ import javax.jdo.Query;
 import javax.jdo.Transaction;
 
 import com.nwmogk.loans.api.EntityType;
+import com.nwmogk.loans.jdo.CashTransaction;
 import com.nwmogk.loans.jdo.FinancialEntity;
 
 public class PlayerManager {
@@ -39,14 +43,22 @@ public class PlayerManager {
 		String name = eco.plugin.getPlayerName( playerId );
 
 		Transaction tx = eco.pm.currentTransaction();
+		
+		BigDecimal startingCash = new BigDecimal(eco.cfg.getSettings().getProperty( "economy.initial-money" ));
+		FinancialEntity centralBank = getFinancialEntity("CentralBank", EntityType.BANK);
 
 		try {
 			tx.begin();
 
 			FinancialEntity newPlayer = new FinancialEntity( playerId, name,
 					EntityType.PLAYER );
+			
+			newPlayer.addCash( startingCash );
+			
+			CashTransaction initialAmount = new CashTransaction(centralBank, newPlayer, new Timestamp(new Date().getTime()), startingCash);
 
 			eco.pm.makePersistent( newPlayer );
+			eco.pm.makePersistent( initialAmount );
 
 			tx.commit();
 		} finally {
@@ -77,6 +89,18 @@ public class PlayerManager {
 
 		return !results.isEmpty();
 
+	}
+	
+	public FinancialEntity getFinancialEntity(String name, EntityType type) {
+		Query q = eco.pm.newQuery( FinancialEntity.class );
+		q.setFilter( "this.name.equals(search) && this.type.equals(t)" );
+		q.declareParameters( "String search" );
+		q.declareParameters( "EntityType t" );
+
+		@SuppressWarnings( "unchecked" )
+		List<FinancialEntity> results = (List<FinancialEntity>) q.execute( name, type );
+		
+		return results.get( 0 );
 	}
 
 }

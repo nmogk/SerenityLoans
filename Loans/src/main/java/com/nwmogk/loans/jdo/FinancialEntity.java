@@ -14,8 +14,8 @@ import javax.jdo.annotations.Persistent;
 import javax.jdo.annotations.PrimaryKey;
 import javax.jdo.annotations.Unique;
 
-import com.nwmogk.bukkit.loans.Conf;
-import com.nwmogk.bukkit.loans.Conf.CreditScoreSettings;
+import com.nwmogk.loans.model.Conf;
+import com.nwmogk.loans.model.Conf.CreditScoreSettings;
 import com.nwmogk.loans.api.EntityType;
 
 @PersistenceCapable
@@ -125,6 +125,18 @@ public class FinancialEntity {
 	public void setTrustMap( Map<FinancialEntity, Trust> trustMap ) {
 
 		this.trustMap = trustMap;
+	}
+	
+	public BigDecimal addCash( BigDecimal amount ) {
+		if(amount.signum() == 1)
+			cash = cash.add( amount );
+		return cash;
+	}
+	
+	public BigDecimal removeCash( BigDecimal amount ) {
+		if(amount.signum() == 1 && cash.compareTo( amount ) >= 0)
+			cash = cash.subtract( amount );
+		return cash;
 	}
 
 }

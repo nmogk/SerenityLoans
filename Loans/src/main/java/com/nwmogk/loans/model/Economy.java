@@ -1,6 +1,5 @@
 package com.nwmogk.loans.model;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,14 +16,17 @@ public class Economy {
 	PersistenceManager pm;
 	PlayerManager playerManager;
 	PluginAdapter plugin;
+	Conf cfg;
 	
-	public Economy(String propertiesFile, PluginAdapter plugin) throws FileNotFoundException, IOException {
-		Properties properties = new Properties();
-		properties.load( new FileInputStream(propertiesFile) );
+	public Economy(String datastoreSettingsFile, String behaviorSettingsFile, PluginAdapter plugin) throws FileNotFoundException, IOException {
+		Properties dataProperties = new Properties();
+		dataProperties.load( new FileInputStream(datastoreSettingsFile) );
 		
-		pm = JDOHelper.getPersistenceManagerFactory( new File(propertiesFile) ).getPersistenceManager();
+		pm = JDOHelper.getPersistenceManagerFactory( dataProperties ).getPersistenceManager();
 		
 		playerManager = new PlayerManager(this);
+		
+		cfg = new Conf(behaviorSettingsFile);
 		
 		this.plugin = plugin;
 	}
