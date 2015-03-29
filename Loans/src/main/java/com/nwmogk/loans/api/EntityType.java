@@ -43,24 +43,26 @@
 package com.nwmogk.loans.api;
 
 public enum EntityType {
-	
-	PLAYER("Player"), BANK("Bank"), CREDIT_UNION("CreditUnion"), TOWN("Town"), EMPLOYER("Employer"), OTHER("Other");
-	
-	private String name;
-	
-	private EntityType (String name) {
+
+	PLAYER( "Player" ), BANK( "Bank" ), CREDIT_UNION( "CreditUnion" ), TOWN(
+			"Town" ), EMPLOYER( "Employer" ), OTHER( "Other" );
+
+	private String	name;
+
+	private EntityType( String name ) {
+
 		this.name = name;
 	}
-	
-	public static EntityType getFromString(String type){
-		
-		for(EntityType t : EntityType.values())
-			if(type.equalsIgnoreCase( t.toString() ))
+
+	public static EntityType getFromString( String type ) {
+
+		for ( EntityType t : EntityType.values() )
+			if ( type.equalsIgnoreCase( t.toString() ) )
 				return t;
-		
+
 		return OTHER;
 	}
-	
+
 	public String toString() {
 
 		return this.name;

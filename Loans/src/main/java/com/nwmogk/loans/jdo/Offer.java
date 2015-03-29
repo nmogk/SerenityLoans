@@ -10,22 +10,22 @@ import javax.jdo.annotations.PrimaryKey;
 
 @PersistenceCapable
 public class Offer {
-	
+
 	@Persistent( customValueStrategy = "uuid" )
 	@PrimaryKey
-	protected UUID offerId;
-	
+	protected UUID				offerId;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected FinancialEntity borrower;
-	
+	protected FinancialEntity	borrower;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected Date expirationDate;
-	
+	protected Date				expirationDate;
+
 	@Persistent
-	protected boolean offerSent = false;
-	
+	protected boolean			offerSent	= false;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected Terms terms;
+	protected Terms				terms;
 
 	public Offer( FinancialEntity borrower, Date expirationDate, Terms terms ) {
 
@@ -34,61 +34,49 @@ public class Offer {
 		this.terms = terms;
 	}
 
-	
 	public FinancialEntity getBorrower() {
-	
+
 		return this.borrower;
 	}
 
-	
 	public void setBorrower( FinancialEntity borrower ) {
-	
+
 		this.borrower = borrower;
 	}
 
-	
 	public Date getExpirationDate() {
-	
+
 		return this.expirationDate;
 	}
 
-	
 	public void setExpirationDate( Date expirationDate ) {
-	
+
 		this.expirationDate = expirationDate;
 	}
 
-	
 	public boolean isOfferSent() {
-	
+
 		return this.offerSent;
 	}
 
-	
 	public void setOfferSent( boolean offerSent ) {
-	
+
 		this.offerSent = offerSent;
 	}
 
-	
 	public Terms getTerms() {
-	
+
 		return this.terms;
 	}
 
-	
 	public void setTerms( Terms terms ) {
-	
+
 		this.terms = terms;
 	}
 
-
-	
 	public UUID getOfferId() {
-	
+
 		return this.offerId;
 	}
-	
-	
 
 }

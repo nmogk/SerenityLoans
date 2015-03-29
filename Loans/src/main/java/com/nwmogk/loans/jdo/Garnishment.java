@@ -9,29 +9,29 @@ import javax.jdo.annotations.PrimaryKey;
 
 @PersistenceCapable
 public class Garnishment {
-	
+
 	@Persistent
 	@PrimaryKey
-	protected FinancialEntity entityId;
-	
+	protected FinancialEntity	entityId;
+
 	@Persistent
 	@PrimaryKey
-	protected FinancialEntity payTo;
-	
+	protected FinancialEntity	payTo;
+
 	@Persistent
-	protected BigDecimal garnished = new BigDecimal(0);
-	
+	protected BigDecimal		garnished	= new BigDecimal( 0 );
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected Loan applyTo;
-	
+	protected Loan				applyTo;
+
 	@Persistent
-	protected BigDecimal maximumAmount;
-	
+	protected BigDecimal		maximumAmount;
+
 	@Persistent
-	protected BigDecimal absoluteGarnish;
-	
+	protected BigDecimal		absoluteGarnish;
+
 	@Persistent
-	protected double percentGarnish;
+	protected double			percentGarnish;
 
 	public Garnishment( FinancialEntity entityId, FinancialEntity payTo,
 			Loan applyTo, BigDecimal maximumAmount, BigDecimal absoluteGarnish,
@@ -46,78 +46,64 @@ public class Garnishment {
 		this.percentGarnish = percentGarnish;
 	}
 
-	
 	public FinancialEntity getEntityId() {
-	
+
 		return this.entityId;
 	}
 
-	
 	public FinancialEntity getPayTo() {
-	
+
 		return this.payTo;
 	}
 
-	
 	public BigDecimal getGarnished() {
-	
+
 		return this.garnished;
 	}
 
-	
 	public Loan getApplyTo() {
-	
+
 		return this.applyTo;
 	}
 
-	
 	public BigDecimal getMaximumAmount() {
-	
+
 		return this.maximumAmount;
 	}
 
-	
 	public BigDecimal getAbsoluteGarnish() {
-	
+
 		return this.absoluteGarnish;
 	}
 
-	
 	public double getPercentGarnish() {
-	
+
 		return this.percentGarnish;
 	}
 
-	
 	public void setGarnished( BigDecimal garnished ) {
-	
+
 		this.garnished = garnished;
 	}
 
-	
 	public void setApplyTo( Loan applyTo ) {
-	
+
 		this.applyTo = applyTo;
 	}
 
-	
 	public void setMaximumAmount( BigDecimal maximumAmount ) {
-	
+
 		this.maximumAmount = maximumAmount;
 	}
 
-	
 	public void setAbsoluteGarnish( BigDecimal absoluteGarnish ) {
-	
+
 		this.absoluteGarnish = absoluteGarnish;
 	}
 
-	
 	public void setPercentGarnish( double percentGarnish ) {
-	
+
 		this.percentGarnish = percentGarnish;
 	}
-	
-	
 
 }

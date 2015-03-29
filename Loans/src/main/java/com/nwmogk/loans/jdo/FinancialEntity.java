@@ -55,6 +55,13 @@ public class FinancialEntity {
 		this.type = type;
 	}
 
+	public FinancialEntity( UUID playerId, String name, EntityType type ) {
+
+		this.entityId = playerId;
+		this.name = name;
+		this.type = type;
+	}
+
 	public String getName() {
 
 		return this.name;
@@ -110,15 +117,13 @@ public class FinancialEntity {
 		this.creditHistory = creditHistory;
 	}
 
-	
 	public Map<FinancialEntity, Trust> getTrustMap() {
-	
+
 		return this.trustMap;
 	}
 
-	
 	public void setTrustMap( Map<FinancialEntity, Trust> trustMap ) {
-	
+
 		this.trustMap = trustMap;
 	}
 

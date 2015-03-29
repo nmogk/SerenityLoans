@@ -19,13 +19,13 @@ public enum LoanEventType {
 
 		return text;
 	}
-	
-	public static LoanEventType getFromString(String type) {
-		
-		for( LoanEventType t : LoanEventType.values() )
-			if(type.equalsIgnoreCase( t.toString() ))
+
+	public static LoanEventType getFromString( String type ) {
+
+		for ( LoanEventType t : LoanEventType.values() )
+			if ( type.equalsIgnoreCase( t.toString() ) )
 				return t;
-		
+
 		return null;
 	}
 }

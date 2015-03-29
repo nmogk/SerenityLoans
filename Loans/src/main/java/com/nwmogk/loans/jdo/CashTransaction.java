@@ -10,19 +10,19 @@ import javax.jdo.annotations.PrimaryKey;
 
 @PersistenceCapable
 public class CashTransaction {
-	
+
 	@Persistent( customValueStrategy = "uuid" )
 	@PrimaryKey
-	protected UUID transactionId;
-	
+	protected UUID				transactionId;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected FinancialEntity from;
-	
+	protected FinancialEntity	from;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected FinancialEntity to;
-	
+	protected FinancialEntity	to;
+
 	@Persistent( nullValue = NullValue.EXCEPTION )
-	protected Timestamp transactionTime;
+	protected Timestamp			transactionTime;
 
 	public CashTransaction( FinancialEntity from, FinancialEntity to,
 			Timestamp transactionTime )
@@ -33,30 +33,24 @@ public class CashTransaction {
 		this.transactionTime = transactionTime;
 	}
 
-	
 	public UUID getTransactionId() {
-	
+
 		return this.transactionId;
 	}
 
-	
 	public FinancialEntity getFrom() {
-	
+
 		return this.from;
 	}
 
-	
 	public FinancialEntity getTo() {
-	
+
 		return this.to;
 	}
 
-	
 	public Timestamp getTransactionTime() {
-	
+
 		return this.transactionTime;
 	}
-	
-	
 
 }
